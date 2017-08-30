@@ -144,7 +144,7 @@ void CPMDataTransformer<Dtype>::Transform(const Datum& datum,
     const Dtype scale = param_.scale();
     const bool do_mirror = param_.mirror() && Rand(2);
     const bool has_mean_file = param_.has_mean_file();
-    const bool hasUint8 = data.size() > 0;
+    const bool hasUInt8 = data.size() > 0;
     const bool has_mean_values = mean_values_.size() > 0;
 
     CHECK_GT(datumChannels, 0);
@@ -204,7 +204,7 @@ void CPMDataTransformer<Dtype>::Transform(const Datum& datum,
                     top_index = (c * height + h) * width + (width - 1 - w);
                 else
                     top_index = (c * height + h) * width + w;
-                if (hasUint8)
+                if (hasUInt8)
                     datum_element = static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
                 else
                     datum_element = datum.float_data(data_index);
@@ -964,7 +964,6 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
     const int datumWidth = datum.width();
 
     //const int crop_size = param_.crop_size();
-    const bool hasUint8 = data.size() > 0;
     const int cropX = param_.crop_size_x();
     const int cropY = param_.crop_size_y();
 
@@ -981,44 +980,53 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
     if (MODE == 6)
         maskAll = cv::Mat(datumHeight, datumWidth, CV_8UC1);
 
-       int offset = image.rows * image.cols;
-    int dindex;
-    Dtype d_element;
-    const bool has_uint8 = data.size() > 0;
-    for (int i = 0; i < image.rows; ++i) {
-     for (int j = 0; j < image.cols; ++j) {
-      cv::Vec3b& rgb = image.at<cv::Vec3b>(i, j);
-      for(int c = 0; c < 3; c++){
-        dindex = c*offset + i*image.cols + j;
-        if (has_uint8)
-          d_element = static_cast<Dtype>(static_cast<uint8_t>(data[dindex]));
-        else
-          d_element = datum.float_data(dindex);
-        rgb[c] = d_element;
-      }
+    const auto imageArea = (int)(image.rows * image.cols);
+    const bool hasUInt8 = data.size() > 0;
+    for (auto y = 0; y < image.rows; ++y)
+    {
+        const auto yOffset = (int)(y*image.cols);
+        for (auto x = 0; x < image.cols; ++x)
+        {
+            const auto xyOffset = yOffset + x;
+            cv::Vec3b& rgb = image.at<cv::Vec3b>(y, x);
+            for (auto c = 0; c < 3; c++)
+            {
+                const auto dIndex = (int)(c*imageArea + xyOffset);
+                Dtype dElement;
+                if (hasUInt8)
+                    dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                else
+                    dElement = datum.float_data(dIndex);
+                rgb[c] = dElement;
+            }
 
-      if(MODE >= 5){
-        dindex = 4*offset + i*image.cols + j;
-        if (has_uint8)
-          d_element = static_cast<Dtype>(static_cast<uint8_t>(data[dindex]));
-        else
-          d_element = datum.float_data(dindex);
-        if (round(d_element/255)!=1 && round(d_element/255)!=0){
-          std::cout << d_element << " " << round(d_element/255) << std::endl;
+            if (MODE >= 5)
+            {
+                const auto dIndex = (int)(4*imageArea + xyOffset);
+                Dtype dElement;
+                if (hasUInt8)
+                    dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                else
+                    dElement = datum.float_data(dIndex);
+                if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
+                    throw std::runtime_error{"Value out of {0,1} at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+                    // std::cout << dElement << " " << std::round(dElement/255) << std::endl;
+                maskMiss.at<uchar>(y, x) = dElement; //round(dElement/255);
+            }
+
+            if (MODE == 6)
+            {
+                const auto dIndex = (int)(5*imageArea + xyOffset);
+                Dtype dElement;
+                if (hasUInt8)
+                    dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                else
+                    dElement = datum.float_data(dIndex);
+                maskAll.at<uchar>(y, x) = dElement;
+            }
         }
-        maskMiss.at<uchar>(i, j) = d_element; //round(d_element/255);
-      }
-
-      if(MODE == 6){
-        dindex = 5*offset + i*image.cols + j;
-        if (has_uint8)
-          d_element = static_cast<Dtype>(static_cast<uint8_t>(data[dindex]));
-        else
-          d_element = datum.float_data(dindex);
-        maskAll.at<uchar>(i, j) = d_element;
-      }
     }
-  }
+
     VLOG(2) << "  rgb[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
