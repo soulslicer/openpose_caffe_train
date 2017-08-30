@@ -845,11 +845,11 @@ cv::Size CPMDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv
     if (!maskMiss.empty())
         maskMissAugmented = cv::Mat(cropY, cropX, CV_8UC1); //for MPI, COCO with cv::Scalar{255};
     else
-        maskMissAugmented = cv::Mat{};
+        maskMissAugmented = cv::Mat();
     if (!maskAll.empty())
         maskAllAugmented = cv::Mat(cropY, cropX, CV_8UC1);
     else
-        maskAllAugmented = cv::Mat{};
+        maskAllAugmented = cv::Mat();
     for (auto y = 0 ; y < cropY ; y++)
     {
         //y,x on cropped
