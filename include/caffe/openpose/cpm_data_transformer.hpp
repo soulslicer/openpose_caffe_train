@@ -101,27 +101,26 @@ protected:
 
     struct MetaData
     {
-        std::string datasetString;
         cv::Size imageSize;
-        bool isValidation;
+        bool isValidation; // Just to check it is false
         int numberOtherPeople;
-        int peopleIndex;
-        int annotationListIndex;
         int writeNumber;
         int totalWriteNumber;
         int epoch;
         cv::Point2f objpos; //objpos_x(float), objpos_y (float)
         float scaleSelf;
         Joints jointsSelf; //(3*16)
-
         std::vector<cv::Point2f> objPosOthers; //length is numberOtherPeople
         std::vector<float> scaleOthers; //length is numberOtherPeople
         std::vector<Joints> jointsOthers; //length is numberOtherPeople
+        std::string datasetString;  // Only for visualization
+        int peopleIndex;            // Only for visualization
+        int annotationListIndex;    // Only for visualization
     };
 
     Model mModel;
     int mNumberPartsInLmdb;
-    int mNumberParts;
+    int mNumberBodyAndPAFParts;
     bool mIsTableSet;
     std::vector<std::vector<float>> mAugmentationDegs;
     std::vector<std::vector<int>> mAugmentationFlips;
@@ -129,11 +128,11 @@ protected:
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
 
-    bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, cv::Mat& maskAll, MetaData& metaData, const cv::Mat& image) const;
-    float augmentationRotate(cv::Mat& imageAugmented, cv::Mat& maskMiss, cv::Mat& maskAll, MetaData& metaData, const cv::Mat& imageSource) const;
-    float augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, cv::Mat& maskAll, MetaData& metaData, const cv::Mat& image) const;
-    cv::Size augmentationCropped(cv::Mat& imageAugmented, cv::Mat& maskMissAugmented, cv::Mat& maskAllAugmented, MetaData& metaData,
-                                 const cv::Mat& imageTemp, const cv::Mat& maskMiss, const cv::Mat& maskAll) const;
+    bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
+    float augmentationRotate(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& imageSource) const;
+    float augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
+    cv::Size augmentationCropped(cv::Mat& imageAugmented, cv::Mat& maskMissAugmented, MetaData& metaData,
+                                 const cv::Mat& imageTemp, const cv::Mat& maskMiss) const;
 
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const;
     bool onPlane(const cv::Point& point, const cv::Size& imageSize) const;

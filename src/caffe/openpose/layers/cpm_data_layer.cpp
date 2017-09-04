@@ -3,6 +3,7 @@
 #endif  // USE_OPENCV
 #include <stdint.h>
 
+#include <atomic>
 #include <vector>
 
 #include "caffe/common.hpp"
@@ -111,6 +112,7 @@ void CPMDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
 }
 
 // This function is called on prefetch thread
+std::atomic<int> sLoadBatchCounter{0}; // OpenPose: added
 template<typename Dtype>
 void CPMDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   CPUTimer batch_timer;
@@ -119,7 +121,6 @@ void CPMDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   double deque_time = 0; // OpenPose: added
   double decod_time = 0; // OpenPose: added
   double trans_time = 0;
-  static int cnt = 0; // OpenPose: added
   CPUTimer timer;
   CHECK(batch->data_.count());
   CHECK(this->transformed_data_.count());
@@ -192,8 +193,8 @@ void CPMDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     } else {
       this->cpm_data_transformer_->Transform_nv(datum, 
         &(this->transformed_data_),
-        &(this->transformed_label_), cnt);
-      ++cnt;
+        &(this->transformed_label_), sLoadBatchCounter);
+      sLoadBatchCounter++;
     }
     // OpenPose: added end
     // OpenPose: commented

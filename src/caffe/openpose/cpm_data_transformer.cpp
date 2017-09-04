@@ -7,6 +7,7 @@
 #endif  // USE_OPENCV
 
 // OpenPose: added
+#include <atomic>
 #include <algorithm>
 #include <chrono>
 #include <fstream>
@@ -28,7 +29,6 @@
 namespace caffe {
 
 // OpenPose: added
-const auto MODE = 5; //related to datum.channels(), TODO: make this a parameter in caffe.proto
 // Remainder
 // const std::map<unsigned int, std::string> POSE_COCO_BODY_PARTS {
 //     {0,  "Nose"},
@@ -55,11 +55,11 @@ const auto MODE = 5; //related to datum.channels(), TODO: make this a parameter 
 //     {21, "LFoot2"},
 //     {20, "Background"},
 // };
-const std::array<int, (int)Model::Size> NUMBER_PARTS{18, 15, 22};
+const std::array<int, (int)Model::Size> NUMBER_BODY_PARTS{18, 15, 22};
 const std::array<int, (int)Model::Size> NUMBER_PAFS{2*19, 2*14, 2*23};
-const std::array<int, (int)Model::Size> NUMBER_HEAT_MAPS{NUMBER_PARTS[0]+NUMBER_PAFS[0],
-                                                         NUMBER_PARTS[1]+NUMBER_PAFS[1],
-                                                         NUMBER_PARTS[2]+NUMBER_PAFS[2]};
+const std::array<int, (int)Model::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
+                                                         NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
+                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
 const std::array<std::vector<int>, (int)Model::Size> SWAP_LEFTS_SWAP{
     std::vector<int>{5,6,7,11,12,13,15,17},     std::vector<int>{5,6,7,11,12,13},   std::vector<int>{5,6,7,11,12,13,15,17, 19,21}
 };
@@ -115,13 +115,13 @@ CPMDataTransformer<Dtype>::CPMDataTransformer(const CPMTransformationParameter& 
     // OpenPose: added
     LOG(INFO) << "CPMDataTransformer constructor done.";
     mNumberPartsInLmdb = param_.np_in_lmdb();
-    mNumberParts = param_.num_parts();
+    mNumberBodyAndPAFParts = param_.num_parts();
     mIsTableSet = false;
     // Model
     mModel = Model::Size;
     for (auto i = 0 ; i < (int)Model::Size ; i++)
     {
-        if (mNumberParts == NUMBER_HEAT_MAPS[i])
+        if (mNumberBodyAndPAFParts == NUMBER_BODY_AND_PAF_CHANNELS[i])
         {
             mModel = (Model)i;
             break;
@@ -410,8 +410,8 @@ void CPMDataTransformer<Dtype>::Transform_nv(const Datum& datum, Blob<Dtype>* tr
     //     CHECK_EQ(datumWidth, im_width);
     // }
 
-    Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
-    Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data();
+    auto* transformedDataPtr = transformedData->mutable_cpu_data();
+    auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
     Transform_nv(transformedDataPtr, transformedLabelPtr, datum, counter); //call function 1
@@ -432,26 +432,32 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
     const auto gridY = rezY / stride;
     const auto channelOffset = gridY * gridX;
 
+    // PAF channels = 0
     for (auto gY = 0; gY < gridY; gY++)
+    {
+        const auto yOffset = gY*gridX;
         for (auto gX = 0; gX < gridX; gX++)
-            for (auto part = mNumberParts+1; part < 2*(mNumberParts+1); part++)
-                if (!(MODE == 6 && part == (2*mNumberParts + 1)))
-                    transformedLabel[part*channelOffset + gY*gridX + gX] = 0;
+        {
+            const auto xyOffset = yOffset + gX;
+            for (auto part = mNumberBodyAndPAFParts+1; part < 2*(mNumberBodyAndPAFParts+1); part++)
+                transformedLabel[part*channelOffset + xyOffset] = 0;
+        }
+    }
 
     // Parameters
-    const auto numberParts = NUMBER_PARTS[(int)mModel];
-    const auto offsetInit = NUMBER_PAFS[(int)mModel]+1;
-    const auto offsetEnd = NUMBER_HEAT_MAPS[(int)mModel]+1;
+    const auto numberBodyParts = NUMBER_BODY_PARTS[(int)mModel];
+    const auto numberPAFChannels = NUMBER_PAFS[(int)mModel]+1;
+    const auto numberBodyAndPAFChannels = NUMBER_BODY_AND_PAF_CHANNELS[(int)mModel]+1;
     const auto& labelMapA = LABEL_MAP_A[(int)mModel];
     const auto& labelMapB = LABEL_MAP_B[(int)mModel];
 
-    // Common operations
-    for (auto part = 0; part < numberParts; part++)
+    // Fill PAFs
+    for (auto part = 0; part < numberBodyParts; part++)
     {
         if (metaData.jointsSelf.isVisible[part] <= 1)
         {
             const auto& centerPoint = metaData.jointsSelf.points[part];
-            putGaussianMaps(transformedLabel + (part+mNumberParts+offsetInit)*channelOffset, centerPoint, param_.stride(), 
+            putGaussianMaps(transformedLabel + (part+mNumberBodyAndPAFParts+numberPAFChannels)*channelOffset, centerPoint, param_.stride(),
                             gridX, gridY, param_.sigma()); //self
         }
         //for every other person
@@ -460,14 +466,13 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
             if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
-                putGaussianMaps(transformedLabel + (part+mNumberParts+offsetInit)*channelOffset, centerPoint, param_.stride(), 
+                putGaussianMaps(transformedLabel + (part+mNumberBodyAndPAFParts+numberPAFChannels)*channelOffset, centerPoint, param_.stride(),
                                 gridX, gridY, param_.sigma());
             }
         }
     }
 
     const auto threshold = 1;
-
     for (auto i = 0 ; i < labelMapA.size() ; i++)
     {
         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
@@ -475,8 +480,8 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
         if (joints.isVisible[labelMapA[i]]<=1 && joints.isVisible[labelMapB[i]]<=1)
         {
             // putVecMaps
-            putVecMaps(transformedLabel + (mNumberParts+ 1+ 2*i)*channelOffset,
-                       transformedLabel + (mNumberParts+ 2+ 2*i)*channelOffset,
+            putVecMaps(transformedLabel + (mNumberBodyAndPAFParts+ 1+ 2*i)*channelOffset,
+                       transformedLabel + (mNumberBodyAndPAFParts+ 2+ 2*i)*channelOffset,
                        count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                        param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
         }
@@ -488,8 +493,8 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
             if (jointsOthers.isVisible[labelMapA[i]]<=1 && jointsOthers.isVisible[labelMapB[i]]<=1)
             {
                 //putVecMaps
-                putVecMaps(transformedLabel + (mNumberParts+ 1+ 2*i)*channelOffset,
-                           transformedLabel + (mNumberParts+ 2+ 2*i)*channelOffset,
+                putVecMaps(transformedLabel + (mNumberBodyAndPAFParts+ 1+ 2*i)*channelOffset,
+                           transformedLabel + (mNumberBodyAndPAFParts+ 2+ 2*i)*channelOffset,
                            count, jointsOthers.points[labelMapA[i]], jointsOthers.points[labelMapB[i]],
                            param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
             }
@@ -503,42 +508,35 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
         {
             double maximum = 0;
             //second background channel
-            for (auto part = mNumberParts+offsetInit ; part < mNumberParts+offsetEnd ; part++)
+            for (auto part = mNumberBodyAndPAFParts+numberPAFChannels ; part < mNumberBodyAndPAFParts+numberBodyAndPAFChannels ; part++)
             {
                 maximum = (maximum > transformedLabel[part*channelOffset + gY*gridX + gX]) ? maximum
                             : transformedLabel[part*channelOffset + gY*gridX + gX];
             }
-            transformedLabel[(2*mNumberParts+1)*channelOffset + gY*gridX + gX] = std::max(1.0-maximum, 0.0);
+            transformedLabel[(2*mNumberBodyAndPAFParts+1)*channelOffset + gY*gridX + gX] = std::max(1.0-maximum, 0.0);
         }
     }
 
     // Visualize
     if (param_.visualize())
     {
-        cv::Mat labelMap;
-        for (auto part = 0; part < 2*(mNumberParts+1); part++)
+        for (auto part = 0; part < 2*(mNumberBodyAndPAFParts+1); part++)
         {      
-            labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-            // int MPI_index = MPI_to_ours[part];
-            // cv::Point2f center = metaData.jointsSelf.points[MPI_index];
+            cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
             for (auto gY = 0; gY < gridY; gY++)
             {
-                //printf("\n");
+                const auto yOffset = gY*gridX;
                 for (auto gX = 0; gX < gridX; gX++)
-                {
-                    labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + gY*gridX + gX]*255);
-                    //printf("%f ", transformed_label_entry[gY*gridX + gX]*255);
-                }
+                    labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
             }
             cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
             cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
             cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
             
-            //center = center * (1.0/(float)param_.stride());
-            //cv::circle(labelMap, center, 3, cv::Scalar{255,0,255}, -1);
+            // const cv::Point2f center = metaData.jointsSelf.points[MPI_index] * (1.0/(float)param_.stride());
+            // cv::circle(labelMap, center, 3, cv::Scalar{255,0,255}, -1);
             char imagename [100];
             sprintf(imagename, "augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
-            //LOG(INFO) << "filename is " << imagename;
             cv::imwrite(imagename, labelMap);
         }
     }
@@ -556,15 +554,15 @@ void setLabel(cv::Mat& image, const std::string label, const cv::Point& org)
     cv::putText(image, label, org, fontface, scale, cv::Scalar{255,255,255}, thickness, 20);
 }
 
+std::atomic<int> sVisualizationCounter{0};
 template<typename Dtype>
 void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const
 {
     cv::Mat imageToVisualize = image.clone();
-    static int counter = 0;
 
     cv::rectangle(imageToVisualize, metaData.objpos-cv::Point2f{3.f,3.f}, metaData.objpos+cv::Point2f{3.f,3.f},
                   cv::Scalar{255,255,0}, CV_FILLED);
-    for (auto part = 0 ; part < mNumberParts ; part++)
+    for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
     {
         const auto currentPoint = metaData.jointsSelf.points[part];
         //LOG(INFO) << "drawing part " << part << ": ";
@@ -572,7 +570,7 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
         //LOG(INFO) << currentPoint;
         //if (metaData.jointsSelf.isVisible[part])
         // hand case
-        if (mNumberParts == 21)
+        if (mNumberBodyAndPAFParts == 21)
         {
             if (part < 4)
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
@@ -587,7 +585,7 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
             else 
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,100,100}, -1);
         }
-        else if (mNumberParts == 9)
+        else if (mNumberBodyAndPAFParts == 9)
         {
             if (part==0 || part==1 || part==2 || part==6)
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
@@ -597,7 +595,7 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
         }
         //body case
-        else if (mNumberParts == 14 || mNumberParts == 28)
+        else if (mNumberBodyAndPAFParts == 14 || mNumberBodyAndPAFParts == 28)
         {
             if (part < 14)
             {
@@ -641,7 +639,7 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
         cv::rectangle(imageToVisualize,
                       metaData.objPosOthers[person]-cv::Point2f{3.f,3.f},
                       metaData.objPosOthers[person]+cv::Point2f{3.f,3.f}, cv::Scalar{0,255,255}, CV_FILLED);
-        for (auto part = 0 ; part < mNumberParts ; part++)
+        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
             if (metaData.jointsOthers[person].isVisible[part] <= 1)
                 cv::circle(imageToVisualize, metaData.jointsOthers[person].points[part], 3, cv::Scalar{0,0,255}, -1);
     }
@@ -669,14 +667,14 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
                       cv::Point{(int)(param_.crop_size_x()), (int)(param_.crop_size_y()+imageToVisualize.rows)},
                       cv::Scalar{255,255,255}, 1);
 
-        sprintf(imagename, "augment_%04d_epoch_%03d_writenum_%03d.jpg", counter, metaData.epoch, metaData.writeNumber);
+        sprintf(imagename, "augment_%04d_epoch_%03d_writenum_%03d.jpg", sVisualizationCounter.load(), metaData.epoch, metaData.writeNumber);
     }
     else
     {
         const std::string stringInfo = "no augmentation for testing";
         setLabel(imageToVisualize, stringInfo, cv::Point{0, 20});
 
-        sprintf(imagename, "augment_%04d.jpg", counter);
+        sprintf(imagename, "augment_%04d.jpg", sVisualizationCounter.load());
     }
     //LOG(INFO) << "filename is " << imagename;
     // cv::imwrite(imagename, imageToVisualize);
@@ -687,11 +685,11 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
     }
     else
         throw std::runtime_error{"Empty image at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    counter++;
+    sVisualizationCounter++;
 }
 
 template<typename Dtype>
-bool CPMDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, cv::Mat& maskAll, MetaData& metaData,
+bool CPMDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData,
                                                  const cv::Mat& imageSource) const
 {
     bool doflip;
@@ -714,10 +712,8 @@ bool CPMDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Ma
         const int w = imageSource.cols;
         if (!maskMiss.empty())
             flip(maskMiss, maskMiss, 1);
-        if (!maskAll.empty())
-            flip(maskAll, maskAll, 1);
         metaData.objpos.x = w - 1 - metaData.objpos.x;
-        for (auto part = 0 ; part < mNumberParts ; part++)
+        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
             metaData.jointsSelf.points[part].x = w - 1 - metaData.jointsSelf.points[part].x;
         if (param_.transform_body_joint())
             swapLeftRight(metaData.jointsSelf);
@@ -725,7 +721,7 @@ bool CPMDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Ma
         for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
         {
             metaData.objPosOthers[person].x = w - 1 - metaData.objPosOthers[person].x;
-            for (auto part = 0 ; part < mNumberParts ; part++)
+            for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
                 metaData.jointsOthers[person].points[part].x = w - 1 - metaData.jointsOthers[person].points[part].x;
             if (param_.transform_body_joint())
                 swapLeftRight(metaData.jointsOthers[person]);
@@ -737,7 +733,7 @@ bool CPMDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Ma
 }
 
 template<typename Dtype>
-float CPMDataTransformer<Dtype>::augmentationRotate(cv::Mat& imageTarget, cv::Mat& maskMiss, cv::Mat& maskAll, MetaData& metaData,
+float CPMDataTransformer<Dtype>::augmentationRotate(cv::Mat& imageTarget, cv::Mat& maskMiss, MetaData& metaData,
                                                     const cv::Mat& imageSource) const
 {
     float degree;
@@ -763,20 +759,16 @@ float CPMDataTransformer<Dtype>::augmentationRotate(cv::Mat& imageTarget, cv::Ma
     //LOG(INFO) << "R=[" << R.at<double>(0,0) << " " << R.at<double>(0,1) << " " << R.at<double>(0,2) << ";" 
     //          << R.at<double>(1,0) << " " << R.at<double>(1,1) << " " << R.at<double>(1,2) << "]";
     warpAffine(imageSource, imageTarget, R, bbox.size(), cv::INTER_CUBIC, cv::BORDER_CONSTANT, cv::Scalar{128,128,128});
-    if (!maskMiss.empty())
-        //Scalar(0) for MPI, cv::Scalar{255} for COCO;
-        warpAffine(maskMiss, maskMiss, R, bbox.size(), cv::INTER_CUBIC, cv::BORDER_CONSTANT, cv::Scalar{255});
-    if (!maskAll.empty())
-        warpAffine(maskAll, maskAll, R, bbox.size(), cv::INTER_CUBIC, cv::BORDER_CONSTANT, cv::Scalar{0});
+    warpAffine(maskMiss, maskMiss, R, bbox.size(), cv::INTER_CUBIC, cv::BORDER_CONSTANT, cv::Scalar{255});
 
     //adjust metaData data
     rotatePoint(metaData.objpos, R);
-    for (auto part = 0 ; part < mNumberParts ; part++)
+    for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
         rotatePoint(metaData.jointsSelf.points[part], R);
     for (auto person=0; person<metaData.numberOtherPeople; person++)
     {
         rotatePoint(metaData.objPosOthers[person], R);
-        for (auto part = 0; part < mNumberParts ; part++)
+        for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
             rotatePoint(metaData.jointsOthers[person].points[part], R);
     }
     return degree;
@@ -784,7 +776,7 @@ float CPMDataTransformer<Dtype>::augmentationRotate(cv::Mat& imageTarget, cv::Ma
 
 // include maskMiss
 template<typename Dtype>
-float CPMDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, cv::Mat& maskAll, MetaData& metaData,
+float CPMDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData,
                                                    const cv::Mat& imageSource) const
 {
     const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
@@ -802,28 +794,24 @@ float CPMDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& 
     const float scaleAbs = param_.target_dist()/metaData.scaleSelf;
     const float scale = scaleAbs * scaleMultiplier;
     cv::resize(imageSource, imageTemp, cv::Size{}, scale, scale, cv::INTER_CUBIC);
-    if (!maskMiss.empty())
-        cv::resize(maskMiss, maskMiss, cv::Size{}, scale, scale, cv::INTER_CUBIC);
-    if (!maskAll.empty())
-        cv::resize(maskAll, maskAll, cv::Size{}, scale, scale, cv::INTER_CUBIC);
+    cv::resize(maskMiss, maskMiss, cv::Size{}, scale, scale, cv::INTER_CUBIC);
 
     //modify metaData data
     metaData.objpos *= scale;
-    for (auto part = 0; part < mNumberParts ; part++)
+    for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
         metaData.jointsSelf.points[part] *= scale;
     for (auto person=0; person<metaData.numberOtherPeople; person++)
     {
         metaData.objPosOthers[person] *= scale;
-        for (auto part = 0; part < mNumberParts ; part++)
+        for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
             metaData.jointsOthers[person].points[part] *= scale;
     }
     return scaleMultiplier;
 }
 
 template<typename Dtype>
-cv::Size CPMDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv::Mat& maskMissAugmented, cv::Mat& maskAllAugmented,
-                                                        MetaData& metaData, const cv::Mat& imageSource, const cv::Mat& maskMiss,
-                                                        const cv::Mat& maskAll) const
+cv::Size CPMDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv::Mat& maskMissAugmented,
+                                                        MetaData& metaData, const cv::Mat& imageSource, const cv::Mat& maskMiss) const
 {
     const float diceX = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
     const float diceY = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
@@ -842,14 +830,9 @@ cv::Size CPMDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv
     };
     
     imageTarget = 128*cv::Mat::ones(cropY, cropX, CV_8UC3);
-    if (!maskMiss.empty())
-        maskMissAugmented = cv::Mat(cropY, cropX, CV_8UC1); //for MPI, COCO with cv::Scalar{255};
-    else
-        maskMissAugmented = cv::Mat();
-    if (!maskAll.empty())
-        maskAllAugmented = cv::Mat(cropY, cropX, CV_8UC1);
-    else
-        maskAllAugmented = cv::Mat();
+    if (maskMiss.empty())
+        throw std::runtime_error{"maskMiss.empty()" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    maskMissAugmented = cv::Mat(cropY, cropX, CV_8UC1); //for MPI, COCO with cv::Scalar{255};
     for (auto y = 0 ; y < cropY ; y++)
     {
         //y,x on cropped
@@ -862,8 +845,6 @@ cv::Size CPMDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv
                 imageTarget.at<cv::Vec3b>(y,x) = imageSource.at<cv::Vec3b>(coord_y_on_img, coord_x_on_img);
                 if (!maskMissAugmented.empty())
                     maskMissAugmented.at<uchar>(y,x) = maskMiss.at<uchar>(coord_y_on_img, coord_x_on_img);
-                if (!maskAllAugmented.empty())
-                    maskAllAugmented.at<uchar>(y,x) = maskAll.at<uchar>(coord_y_on_img, coord_x_on_img);
             }
         }
     }
@@ -873,12 +854,12 @@ cv::Size CPMDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv
     const int offsetUp = -(center.y - (cropY/2));
     const cv::Point2f offsetPoint{(float)offsetLeft, (float)offsetUp};
     metaData.objpos += offsetPoint;
-    for (auto part = 0 ; part < mNumberParts ; part++)
+    for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
         metaData.jointsSelf.points[part] += offsetPoint;
     for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
     {
         metaData.objPosOthers[person] += offsetPoint;
-        for (auto part = 0 ; part < mNumberParts ; part++)
+        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
             metaData.jointsOthers[person].points[part] += offsetPoint;
     }
 
@@ -963,10 +944,6 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
     const int datumHeight = datum.height();
     const int datumWidth = datum.width();
 
-    //const int crop_size = param_.crop_size();
-    const int cropX = param_.crop_size_x();
-    const int cropY = param_.crop_size_y();
-
     CHECK_GT(datumChannels, 0);
     //CHECK_GE(datumHeight, crop_size);
     //CHECK_GE(datumWidth, crop_size);
@@ -974,11 +951,7 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
     timer1.Start();
     //before any transformation, get the image from datum
     cv::Mat image(datumHeight, datumWidth, CV_8UC3);
-    cv::Mat maskAll, maskMiss;
-    if (MODE >= 5)
-        maskMiss = cv::Mat(datumHeight, datumWidth, CV_8UC1);
-    if (MODE == 6)
-        maskAll = cv::Mat(datumHeight, datumWidth, CV_8UC1);
+    cv::Mat maskMiss(datumHeight, datumWidth, CV_8UC1);
 
     const auto imageArea = (int)(image.rows * image.cols);
     const bool hasUInt8 = data.size() > 0;
@@ -1000,30 +973,16 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
                 rgb[c] = dElement;
             }
 
-            if (MODE >= 5)
-            {
-                const auto dIndex = (int)(4*imageArea + xyOffset);
-                Dtype dElement;
-                if (hasUInt8)
-                    dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                else
-                    dElement = datum.float_data(dIndex);
-                if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
-                    throw std::runtime_error{"Value out of {0,1} at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
-                    // std::cout << dElement << " " << std::round(dElement/255) << std::endl;
-                maskMiss.at<uchar>(y, x) = dElement; //round(dElement/255);
-            }
-
-            if (MODE == 6)
-            {
-                const auto dIndex = (int)(5*imageArea + xyOffset);
-                Dtype dElement;
-                if (hasUInt8)
-                    dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                else
-                    dElement = datum.float_data(dIndex);
-                maskAll.at<uchar>(y, x) = dElement;
-            }
+            const auto dIndex = (int)(4*imageArea + xyOffset);
+            Dtype dElement;
+            if (hasUInt8)
+                dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+            else
+                dElement = datum.float_data(dIndex);
+            if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
+                throw std::runtime_error{"Value out of {0,1} at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+                // std::cout << dElement << " " << std::round(dElement/255) << std::endl;
+            maskMiss.at<uchar>(y, x) = dElement; //round(dElement/255);
         }
     }
 
@@ -1057,9 +1016,8 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
         LOG(INFO) << metaData.jointsSelf.points[0];
     }
     //Start transforming
-    cv::Mat imageAugmented = cv::Mat::zeros(cropY, cropX, CV_8UC3);
+    cv::Mat imageAugmented;
     cv::Mat maskMissAugmented;
-    cv::Mat maskAllAugmented;
     cv::Mat imageTemp, imageTemp2; //size determined by scale
     VLOG(2) << "   input size (" << image.cols << ", " << image.rows << ")";
     const int stride = param_.stride();
@@ -1067,19 +1025,19 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
     if (phase_ == TRAIN)
     {
         // Scale
-        augmentSelection.scale = augmentationScale(imageTemp, maskMiss, maskAll, metaData, image);
+        augmentSelection.scale = augmentationScale(imageTemp, maskMiss, metaData, image);
         // if (param_.visualize())
         //     visualize(imageTemp, metaData, augmentSelection);
         // Rotation
-        augmentSelection.degree = augmentationRotate(imageTemp2, maskMiss, maskAll, metaData, imageTemp);
+        augmentSelection.degree = augmentationRotate(imageTemp2, maskMiss, metaData, imageTemp);
         // if (param_.visualize())
         //     visualize(imageTemp2, metaData, augmentSelection);
         // Cropping
-        augmentSelection.crop = augmentationCropped(imageAugmented, maskMissAugmented, maskAllAugmented, metaData, imageTemp2, maskMiss, maskAll);
+        augmentSelection.crop = augmentationCropped(imageAugmented, maskMissAugmented, metaData, imageTemp2, maskMiss);
         // if (param_.visualize())
         //     visualize(imageAugmented, metaData, augmentSelection);
         // Flipping
-        augmentSelection.flip = augmentationFlip(imageAugmented, maskMissAugmented, maskAllAugmented, metaData, imageAugmented);
+        augmentSelection.flip = augmentationFlip(imageAugmented, maskMissAugmented, metaData, imageAugmented);
 
         // cv::imshow("imageAugmented", imageAugmented);
         // cv::Mat labelMap = maskMissAugmented;
@@ -1090,8 +1048,6 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
 
         if (!maskMissAugmented.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1.0/stride, 1.0/stride, cv::INTER_CUBIC);
-        if (!maskAllAugmented.empty())
-            cv::resize(maskAllAugmented, maskAllAugmented, cv::Size{}, 1.0/stride, 1.0/stride, cv::INTER_CUBIC);
     }
     // Test
     else
@@ -1130,35 +1086,26 @@ void CPMDataTransformer<Dtype>::Transform_nv(Dtype* transformedData, Dtype* tran
         }
     }
     
-    // label size is image size/ stride
-    if (MODE > 4)
+    // label size is image size / stride
+    for (auto gY = 0; gY < gridY; gY++)
     {
-        for (auto gY = 0; gY < gridY; gY++)
+        const auto yOffset = gY*gridX;
+        for (auto gX = 0; gX < gridX; gX++)
         {
-            for (auto gX = 0; gX < gridX; gX++)
+            const auto xyOffset = yOffset + gX;
+            for (auto part = 0; part < mNumberBodyAndPAFParts; part++)
             {
-                for (auto part = 0; part < mNumberParts; part++)
+                if (metaData.jointsSelf.isVisible[part] != 3)
                 {
-                    const float weight = float(maskMissAugmented.at<uchar>(gY, gX)) /255; //maskMissAugmented.at<uchar>(gY, gX);
-                    if (metaData.jointsSelf.isVisible[part] != 3)
-                        transformedLabel[part*channelOffset + gY*gridX + gX] = weight;
-                }  
-                // background channel
-                if (MODE == 5)
-                    transformedLabel[mNumberParts*channelOffset + gY*gridX + gX] = float(maskMissAugmented.at<uchar>(gY, gX)) /255;
-                else
-                {
-                    transformedLabel[mNumberParts*channelOffset + gY*gridX + gX] = 1;
-                    transformedLabel[(2*mNumberParts+1)*channelOffset + gY*gridX + gX] = float(maskAllAugmented.at<uchar>(gY, gX)) /255;
+                    const float weight = float(maskMissAugmented.at<uchar>(gY, gX)) / 255.f;
+                    transformedLabel[part*channelOffset + xyOffset] = weight;
                 }
-            }
+            }  
+            // background channel
+            transformedLabel[mNumberBodyAndPAFParts*channelOffset + xyOffset] = float(maskMissAugmented.at<uchar>(gY, gX)) / 255.f;
         }
-    }  
-
-    //putGaussianMaps(transformedData + 3*imageAugmentedArea, metaData.objpos, 1, imageAugmented.cols, imageAugmented.rows, param_.sigma_center());
-    //LOG(INFO) << "image transformation done!";
+    }
     generateLabelMap(transformedLabel, imageAugmented, metaData);
-
     VLOG(2) << "  putGauss+genLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 }
 
@@ -1183,6 +1130,7 @@ std::string decodeString(const string& data, const size_t idx)
 }
 
 //very specific to genLMDB.py
+std::atomic<int> sCurrentEpoch{-1};
 template<typename Dtype>
 void CPMDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& data, size_t offset3, size_t offset1)
 {
@@ -1193,20 +1141,18 @@ void CPMDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& d
                                   (int)decodeFloats<Dtype>(data, offset3+offset1, 1)};
     // ----------- Validation, nop, counters -----------------
     metaData.isValidation = (data[offset3+2*offset1]==0 ? false : true);
+    if (metaData.isValidation)
+        throw std::runtime_error{"metaData.isValidation == true. Training with val. data????? At " + getLine(__LINE__, __FUNCTION__, __FILE__)};
     metaData.numberOtherPeople = (int)data[offset3+2*offset1+1];
     metaData.peopleIndex = (int)data[offset3+2*offset1+2];
-    const auto annotationListIndex = decodeFloats<Dtype>(data, offset3+2*offset1+3, 1);
-    metaData.annotationListIndex = (int)annotationListIndex;
-    const auto writeNumber = decodeFloats<Dtype>(data, offset3+2*offset1+7, 1);
-    metaData.writeNumber = (int)writeNumber;
-    const auto totalWriteNumber = decodeFloats<Dtype>(data, offset3+2*offset1+11, 1);
-    metaData.totalWriteNumber = (int)totalWriteNumber;
+    metaData.annotationListIndex = (int)(decodeFloats<Dtype>(data, offset3+2*offset1+3, 1));
+    metaData.writeNumber = (int)(decodeFloats<Dtype>(data, offset3+2*offset1+7, 1));
+    metaData.totalWriteNumber = (int)(decodeFloats<Dtype>(data, offset3+2*offset1+11, 1));
 
     // count epochs according to counters
-    static int currentEpoch = -1;
     if (metaData.writeNumber == 0)
-        currentEpoch++;
-    metaData.epoch = currentEpoch;
+        sCurrentEpoch++;
+    metaData.epoch = sCurrentEpoch;
     if (metaData.writeNumber % 1000 == 0)
     {
         LOG(INFO) << "datasetString: " << metaData.datasetString <<"; imageSize: " << metaData.imageSize
@@ -1284,7 +1230,7 @@ void CPMDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& d
 template<typename Dtype>
 void CPMDataTransformer<Dtype>::transformMetaJoints(MetaData& metaData) const
 {
-    //transform joints in metaData from mNumberPartsInLmdb (specified in prototxt) to mNumberParts (specified in prototxt)
+    //transform joints in metaData from mNumberPartsInLmdb (specified in prototxt) to mNumberBodyAndPAFParts (specified in prototxt)
     transformJoints(metaData.jointsSelf);
     for (auto& joints : metaData.jointsOthers)
         transformJoints(joints);
@@ -1293,12 +1239,12 @@ void CPMDataTransformer<Dtype>::transformMetaJoints(MetaData& metaData) const
 template<typename Dtype>
 void CPMDataTransformer<Dtype>::transformJoints(Joints& joints) const
 {
-    //transform joints in metaData from mNumberPartsInLmdb (specified in prototxt) to mNumberParts (specified in prototxt)
+    //transform joints in metaData from mNumberPartsInLmdb (specified in prototxt) to mNumberBodyAndPAFParts (specified in prototxt)
     auto jointsOld = joints;
 
     // Common operations
-    joints.points.resize(mNumberParts);
-    joints.isVisible.resize(mNumberParts);
+    joints.points.resize(mNumberBodyAndPAFParts);
+    joints.isVisible.resize(mNumberBodyAndPAFParts);
 
     // Parameters
     const auto& vectorA = TRANSFORM_MODEL_TO_OURS_A[(int)mModel];
