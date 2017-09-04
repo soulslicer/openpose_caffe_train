@@ -532,9 +532,7 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
             cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
             cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
             cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
-            
-            // const cv::Point2f center = metaData.jointsSelf.points[MPI_index] * (1.0/(float)param_.stride());
-            // cv::circle(labelMap, center, 3, cv::Scalar{255,0,255}, -1);
+            // Write on disk
             char imagename [100];
             sprintf(imagename, "augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
             cv::imwrite(imagename, labelMap);
