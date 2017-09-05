@@ -121,11 +121,13 @@ protected:
     Model mModel;
     int mNumberPartsInLmdb;
     int mNumberBodyAndPAFParts;
+    int mNumberBodyBkgPAFParts;
     bool mIsTableSet;
     std::vector<std::vector<float>> mAugmentationDegs;
     std::vector<std::vector<int>> mAugmentationFlips;
 
-    void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const MetaData& metaData) const;
+    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const int counter);
+    void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss, const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
 
     bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
@@ -138,7 +140,6 @@ protected:
     bool onPlane(const cv::Point& point, const cv::Size& imageSize) const;
     void swapLeftRight(Joints& joints) const;
     void setAugmentationTable(const int numData);
-    void Transform_nv(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const int counter);
     void readMetaData(MetaData& metaData, const string& data, size_t offset3, size_t offset1);
     void transformMetaJoints(MetaData& metaData) const;
     void transformJoints(Joints& joints) const;
