@@ -467,7 +467,24 @@ void CPMDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dty
     timer1.Start();
 
     MetaData metaData;
-    readMetaData(metaData, data, 3 * imageArea, datumWidth);
+    if (hasUInt8)
+        readMetaData(metaData, data, 3 * imageArea, datumWidth);
+    else
+    {
+        throw std::runtime_error{"Error here at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        std::string metadata_string(imageArea, '\0');
+        for (auto y = 0; y < image.rows; ++y)
+        {
+            const auto yOffset = (int)(y*image.cols);
+            for (auto x = 0; x < image.cols; ++x)
+            {
+                const auto xyOffset = yOffset + x;
+                const auto dIndex = (int)(3*imageArea + xyOffset);
+                metadata_string[xyOffset] = datum.float_data(dIndex);
+            }
+        }
+        readMetaData(metaData, metadata_string, 0, datumWidth);
+    }
     if (param_.transform_body_joint()) // we expect to transform body joints, and not to transform hand joints
         transformMetaJoints(metaData);
 
@@ -504,11 +521,7 @@ void CPMDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dty
         imageAugmented = image;
     // Visualize final
     if (param_.visualize())
-    {
         visualize(imageAugmented, metaData, augmentSelection);
-        LOG(INFO) << metaData.jointsSelf.points.size();
-        LOG(INFO) << metaData.jointsSelf.points[0];
-    }
     VLOG(2) << "  Aug: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
@@ -655,7 +668,6 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
             cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
             cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
             cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
-            // cv::addWeighted(labelMap, 0.0, image, 1.0, 0.0, labelMap);
             // Write on disk
             char imagename [100];
             sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
@@ -690,7 +702,6 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
         //LOG(INFO) << "drawing part " << part << ": ";
         //LOG(INFO) << metaData.jointsSelf.points.size();
         //LOG(INFO) << currentPoint;
-        //if (metaData.jointsSelf.isVisible[part])
         // hand case
         if (mNumberBodyAndPAFParts == 21)
         {
@@ -716,7 +727,7 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
             else
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
         }
-        //body case
+        //body case (CPM)
         else if (mNumberBodyAndPAFParts == 14 || mNumberBodyAndPAFParts == 28)
         {
             if (part < 14)
@@ -789,24 +800,17 @@ void CPMDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& 
                       cv::Point{(int)(param_.crop_size_x()), (int)(param_.crop_size_y()+imageToVisualize.rows)},
                       cv::Scalar{255,255,255}, 1);
 
-        sprintf(imagename, "augment_%04d_epoch_%03d_writenum_%03d.jpg", sVisualizationCounter.load(), metaData.epoch, metaData.writeNumber);
+        sprintf(imagename, "visualize/augment_%04d_epoch_%03d_writenum_%03d.jpg", sVisualizationCounter.load(), metaData.epoch, metaData.writeNumber);
     }
     else
     {
         const std::string stringInfo = "no augmentation for testing";
         setLabel(imageToVisualize, stringInfo, cv::Point{0, 20});
 
-        sprintf(imagename, "augment_%04d.jpg", sVisualizationCounter.load());
+        sprintf(imagename, "visualize/augment_%04d.jpg", sVisualizationCounter.load());
     }
     //LOG(INFO) << "filename is " << imagename;
-    // cv::imwrite(imagename, imageToVisualize);
-    if (!imageToVisualize.empty())
-    {
-        cv::imshow(imagename, imageToVisualize);
-        cv::waitKey(0);
-    }
-    else
-        throw std::runtime_error{"Empty image at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    cv::imwrite(imagename, imageToVisualize);
     sVisualizationCounter++;
 }
 
