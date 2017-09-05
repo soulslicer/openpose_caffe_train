@@ -128,11 +128,10 @@ protected:
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
 
-    bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
-    float augmentationRotate(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& imageSource) const;
-    float augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
-    cv::Size augmentationCropped(cv::Mat& imageAugmented, cv::Mat& maskMissAugmented, MetaData& metaData,
-                                 const cv::Mat& imageTemp, const cv::Mat& maskMiss) const;
+    bool augmentationFlip(cv::Mat& imageAugmented, MetaData& metaData, const cv::Mat& image) const;
+    float augmentationRotate(cv::Mat& imageAugmented, MetaData& metaData, const cv::Mat& imageSource) const;
+    float augmentationScale(cv::Mat& imageTemp, MetaData& metaData, const cv::Mat& image) const;
+    cv::Size augmentationCropped(cv::Mat& imageTarget, MetaData& metaData, const cv::Mat& imageTemp) const;
 
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const;
     bool onPlane(const cv::Point& point, const cv::Size& imageSize) const;

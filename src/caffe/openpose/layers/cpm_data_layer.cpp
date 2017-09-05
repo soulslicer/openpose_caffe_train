@@ -102,11 +102,14 @@ void CPMDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       this->layer_param_.cpm_transform_param().crop_size_x();
 
     int num_parts = this->layer_param_.cpm_transform_param().num_parts();
-    top[1]->Reshape(batch_size, 2*(num_parts+1), height/stride, width/stride);
+    top[1]->Reshape(batch_size, num_parts+1, height/stride, width/stride);
+    // top[1]->Reshape(batch_size, 2*(num_parts+1), height/stride, width/stride); // Zhe's version
     for (int i = 0; i < this->prefetch_.size(); ++i) {
-      this->prefetch_[i]->label_.Reshape(batch_size, 2*(num_parts+1), height/stride, width/stride);
+      // this->prefetch_[i]->label_.Reshape(batch_size, 2*(num_parts+1), height/stride, width/stride); // Zhe's version
+      this->prefetch_[i]->label_.Reshape(batch_size, num_parts+1, height/stride, width/stride);
     }
-    this->transformed_label_.Reshape(1, 2*(num_parts+1), height/stride, width/stride);
+    this->transformed_label_.Reshape(1, num_parts+1, height/stride, width/stride);
+    // this->transformed_label_.Reshape(1, 2*(num_parts+1), height/stride, width/stride); // Zhe's version
     // OpenPose: added end
   }
 }
