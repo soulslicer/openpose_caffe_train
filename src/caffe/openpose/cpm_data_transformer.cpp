@@ -654,7 +654,6 @@ void CPMDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const 
 
     // Visualize
     if (param_.visualize())
-    // if (true)
     {
         for (auto part = 0; part < 2*mNumberBodyBkgPAFParts; part++)
         {      
