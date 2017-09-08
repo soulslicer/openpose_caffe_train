@@ -1,5 +1,8 @@
 # Official Caffe to OpenPose Custom Caffe
 
+Current Caffe version: Sep 7th, 2017
+https://github.com/BVLC/caffe
+
 
 
 ### Caffe Modification
@@ -8,14 +11,12 @@ In order to change the official Caffe to the OpenPose version:
 1. Modified file(s) (search for `OpenPose` to find the editions inside each file):
     - Makefile
     - src/caffe/proto/caffe.proto
-    - src/caffe/util/blocking_queue.cpp
+    - include/caffe/util/cudnn.hpp (fixed a warning for cuDNN 7 that current Caffe has not solved yet)
 2. New folder(s):
     - autocompile/
     - include/caffe/openpose/
     - src/caffe/openpose/
-3. New file(s):
-	- caffeToOpenPoseCaffe.md
-4. Deleted:
+3. Deleted:
 	- Makefile.config.example
 
 
