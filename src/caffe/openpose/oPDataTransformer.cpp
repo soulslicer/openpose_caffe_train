@@ -94,7 +94,7 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
     if (param_.has_mean_file()) {
         CHECK_EQ(param_.mean_value_size(), 0) <<
             "Cannot specify mean_file and mean_value at the same time";
-        const string& mean_file = param.mean_file();
+        const std::string& mean_file = param.mean_file();
         if (Caffe::root_solver()) {
             LOG(INFO) << "Loading mean file from: " << mean_file;
         }
@@ -171,8 +171,7 @@ template <typename Dtype>
 int OPDataTransformer<Dtype>::Rand(int n) {
     CHECK(rng_);
     CHECK_GT(n, 0);
-    caffe::rng_t* rng =
-            static_cast<caffe::rng_t*>(rng_->generator());
+    caffe::rng_t* rng = static_cast<caffe::rng_t*>(rng_->generator());
     return ((*rng)() % n);
 }
 
@@ -180,11 +179,8 @@ int OPDataTransformer<Dtype>::Rand(int n) {
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const bool withMaskMiss)
 {
-    //TODO: some parameter should be set in prototxt
-    const int claheTileSize = param_.clahe_tile_size();
-    const int claheClipLimit = param_.clahe_clip_limit();
-
-    const string& data = datum.data();
+    // Some parameter should be set in prototxt
+    const std::string& data = datum.data();
     const int datumChannels = datum.channels();
     const int datumHeight = datum.height();
     const int datumWidth = datum.width();
@@ -197,7 +193,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     const bool hasUInt8 = data.size() > 0;
 
-    // Read image from datum
+    // Read image (LMDB channel 1)
     cv::Mat image(datumHeight, datumWidth, CV_8UC3);
     const auto imageArea = (int)(image.rows * image.cols);
     for (auto y = 0; y < image.rows; ++y)
@@ -217,7 +213,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             }
         }
     }
-    // Read mask miss
+    // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
     if (withMaskMiss)
     {
@@ -248,7 +244,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     //color, contract
     if (param_.do_clahe())
-        clahe(image, claheTileSize, claheClipLimit);
+        clahe(image, param_.clahe_tile_size(), param_.clahe_clip_limit());
     if (param_.gray() == 1)
     {
         cv::cvtColor(image, image, CV_BGR2GRAY);
@@ -257,13 +253,14 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  color: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
+    // Read meta data (LMDB channel 3)
     MetaData metaData;
     if (hasUInt8)
-        readMetaData(metaData, data, 3 * imageArea, datumWidth);
+        readMetaData(metaData, &data[3 * imageArea], datumWidth);
     else
     {
         throw std::runtime_error{"Error" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-        std::string metadata_string(imageArea, '\0');
+        std::string metadataString(imageArea, '\0');
         for (auto y = 0; y < image.rows; ++y)
         {
             const auto yOffset = (int)(y*image.cols);
@@ -271,10 +268,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             {
                 const auto xyOffset = yOffset + x;
                 const auto dIndex = (int)(3*imageArea + xyOffset);
-                metadata_string[xyOffset] = datum.float_data(dIndex);
+                metadataString[xyOffset] = datum.float_data(dIndex);
             }
         }
-        readMetaData(metaData, metadata_string, 0, datumWidth);
+        readMetaData(metaData, metadataString.c_str(), datumWidth);
     }
     if (param_.transform_body_joint()) // we expect to transform body joints, and not to transform hand joints
         transformMetaJoints(metaData);
@@ -331,7 +328,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         }
     }
     generateLabelMap(transformedLabel, imageAugmented, maskMiss, metaData);
-    VLOG(2) << "  putGauss+genLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
+    VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 }
 
 template<typename Dtype>
@@ -605,47 +602,37 @@ void OPDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& m
 }
 
 template<typename Dtype>
-bool OPDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData,
-                                                 const cv::Mat& imageSource) const
+float OPDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData,
+                                                   const cv::Mat& imageSource) const
 {
-    bool doflip;
-    if (param_.aug_way() == "rand")
-    {
-        const auto dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        doflip = (dice <= param_.flip_prob());
-    }
-    else if (param_.aug_way() == "table")
-        doflip = (mAugmentationFlips[metaData.writeNumber][metaData.epoch % param_.num_total_augs()] == 1);
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    float scaleMultiplier;
+    // scale: linear shear into [scale_min, scale_max]
+    // float scale = (param_.scale_max() - param_.scale_min()) * dice + param_.scale_min();
+    if (dice > param_.scale_prob())
+        scaleMultiplier = 1.f;
     else
     {
-        doflip = 0;
-        LOG(INFO) << "Unhandled exception!!!!!!";
+        const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+        // scaleMultiplier: linear shear into [scale_min, scale_max]
+        scaleMultiplier = (param_.scale_max() - param_.scale_min()) * dice2 + param_.scale_min();
     }
+    const float scaleAbs = param_.target_dist()/metaData.scaleSelf;
+    const float scale = scaleAbs * scaleMultiplier;
+    cv::resize(imageSource, imageTemp, cv::Size{}, scale, scale, cv::INTER_CUBIC);
+    cv::resize(maskMiss, maskMiss, cv::Size{}, scale, scale, cv::INTER_CUBIC);
 
-    if (doflip)
+    //modify metaData data
+    metaData.objpos *= scale;
+    for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
+        metaData.jointsSelf.points[part] *= scale;
+    for (auto person=0; person<metaData.numberOtherPeople; person++)
     {
-        flip(imageSource, imageAugmented, 1);
-        const int w = imageSource.cols;
-        if (!maskMiss.empty())
-            flip(maskMiss, maskMiss, 1);
-        metaData.objpos.x = w - 1 - metaData.objpos.x;
-        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
-            metaData.jointsSelf.points[part].x = w - 1 - metaData.jointsSelf.points[part].x;
-        if (param_.transform_body_joint())
-            swapLeftRight(metaData.jointsSelf);
-
-        for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
-        {
-            metaData.objPosOthers[person].x = w - 1 - metaData.objPosOthers[person].x;
-            for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
-                metaData.jointsOthers[person].points[part].x = w - 1 - metaData.jointsOthers[person].points[part].x;
-            if (param_.transform_body_joint())
-                swapLeftRight(metaData.jointsOthers[person]);
-        }
+        metaData.objPosOthers[person] *= scale;
+        for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
+            metaData.jointsOthers[person].points[part] *= scale;
     }
-    else if (imageAugmented.data != imageSource.data)
-        imageAugmented = imageSource.clone();
-    return doflip;
+    return scaleMultiplier;
 }
 
 template<typename Dtype>
@@ -690,40 +677,6 @@ float OPDataTransformer<Dtype>::augmentationRotate(cv::Mat& imageTarget, cv::Mat
             rotatePoint(metaData.jointsOthers[person].points[part], R);
     }
     return degree;
-}
-
-template<typename Dtype>
-float OPDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData,
-                                                   const cv::Mat& imageSource) const
-{
-    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-    float scaleMultiplier;
-    // scale: linear shear into [scale_min, scale_max]
-    // float scale = (param_.scale_max() - param_.scale_min()) * dice + param_.scale_min();
-    if (dice > param_.scale_prob())
-        scaleMultiplier = 1.f;
-    else
-    {
-        const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-        // scaleMultiplier: linear shear into [scale_min, scale_max]
-        scaleMultiplier = (param_.scale_max() - param_.scale_min()) * dice2 + param_.scale_min();
-    }
-    const float scaleAbs = param_.target_dist()/metaData.scaleSelf;
-    const float scale = scaleAbs * scaleMultiplier;
-    cv::resize(imageSource, imageTemp, cv::Size{}, scale, scale, cv::INTER_CUBIC);
-    cv::resize(maskMiss, maskMiss, cv::Size{}, scale, scale, cv::INTER_CUBIC);
-
-    //modify metaData data
-    metaData.objpos *= scale;
-    for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
-        metaData.jointsSelf.points[part] *= scale;
-    for (auto person=0; person<metaData.numberOtherPeople; person++)
-    {
-        metaData.objPosOthers[person] *= scale;
-        for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
-            metaData.jointsOthers[person].points[part] *= scale;
-    }
-    return scaleMultiplier;
 }
 
 template<typename Dtype>
@@ -785,15 +738,59 @@ cv::Size OPDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv:
 }
 
 template<typename Dtype>
+bool OPDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData,
+                                                 const cv::Mat& imageSource) const
+{
+    bool doflip;
+    if (param_.aug_way() == "rand")
+    {
+        const auto dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        doflip = (dice <= param_.flip_prob());
+    }
+    else if (param_.aug_way() == "table")
+        doflip = (mAugmentationFlips[metaData.writeNumber][metaData.epoch % param_.num_total_augs()] == 1);
+    else
+    {
+        doflip = 0;
+        LOG(INFO) << "Unhandled exception!!!!!!";
+    }
+
+    if (doflip)
+    {
+        flip(imageSource, imageAugmented, 1);
+        const int w = imageSource.cols;
+        if (!maskMiss.empty())
+            flip(maskMiss, maskMiss, 1);
+        metaData.objpos.x = w - 1 - metaData.objpos.x;
+        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+            metaData.jointsSelf.points[part].x = w - 1 - metaData.jointsSelf.points[part].x;
+        if (param_.transform_body_joint())
+            swapLeftRight(metaData.jointsSelf);
+
+        for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
+        {
+            metaData.objPosOthers[person].x = w - 1 - metaData.objPosOthers[person].x;
+            for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+                metaData.jointsOthers[person].points[part].x = w - 1 - metaData.jointsOthers[person].points[part].x;
+            if (param_.transform_body_joint())
+                swapLeftRight(metaData.jointsOthers[person]);
+        }
+    }
+    else if (imageAugmented.data != imageSource.data)
+        imageAugmented = imageSource.clone();
+    return doflip;
+}
+
+template<typename Dtype>
 void OPDataTransformer<Dtype>::rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const
 {
     cv::Mat cvMatPoint(3,1, CV_64FC1);
     cvMatPoint.at<double>(0,0) = point2f.x;
     cvMatPoint.at<double>(1,0) = point2f.y;
     cvMatPoint.at<double>(2,0) = 1;
-    const cv::Mat new_point = R * cvMatPoint;
-    point2f.x = new_point.at<double>(0,0);
-    point2f.y = new_point.at<double>(1,0);
+    const cv::Mat newPoint = R * cvMatPoint;
+    point2f.x = newPoint.at<double>(0,0);
+    point2f.y = newPoint.at<double>(1,0);
 }
 
 template<typename Dtype>
@@ -850,45 +847,62 @@ void OPDataTransformer<Dtype>::setAugmentationTable(const int numData)
     // }
 }
 
+// template<typename Dtype>
+// Dtype decodeNumber(const std::string& charPtr, const size_t index, const size_t length = 1)
+// {
+//     Dtype pf;
+//     memcpy(&pf, const_cast<char*>(&charPtr[index]), length * sizeof(Dtype));
+//     return pf;
+// }
+
+// std::string decodeString(const std::string& charPtr, const size_t index)
+// {
+//     std::string result = "";
+//     auto counter = 0;
+//     while (charPtr[index+counter] != 0)
+//     {
+//         result.push_back(char(charPtr[index+counter]));
+//         counter++;
+//     }
+//     return result;
+// }
+
 template<typename Dtype>
-Dtype decodeFloats(const string& data, const size_t idx, const size_t len)
+Dtype decodeNumber(const char* charPtr)
 {
     Dtype pf;
-    memcpy(&pf, const_cast<char*>(&data[idx]), len * sizeof(Dtype));
+    memcpy(&pf, charPtr, sizeof(Dtype));
     return pf;
 }
 
-std::string decodeString(const string& data, const size_t idx)
+std::string decodeString(const char* charPtr)
 {
-    string result = "";
-    auto counter = 0;
-    while (data[idx+counter] != 0)
-    {
-        result.push_back(char(data[idx+counter]));
-        counter++;
-    }
+    std::string result = "";
+    for (auto index = 0 ; charPtr[index] != 0 ; index++)
+        result.push_back(char(charPtr[index]));
     return result;
 }
 
 //very specific to genLMDB.py
 std::atomic<int> sCurrentEpoch{-1};
 template<typename Dtype>
-void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& data, size_t offset3, size_t offset1)
+void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data, const size_t offsetPerLine)
 {
     // ------------------- Dataset name ----------------------
-    metaData.datasetString = decodeString(data, offset3);
+    metaData.datasetString = decodeString(data);
     // ------------------- Image Dimension -------------------
-    metaData.imageSize = cv::Size{(int)decodeFloats<Dtype>(data, offset3+offset1+4, 1),
-                                  (int)decodeFloats<Dtype>(data, offset3+offset1, 1)};
+    metaData.imageSize = cv::Size{(int)decodeNumber<Dtype>(&data[offsetPerLine+4]),
+                                  (int)decodeNumber<Dtype>(&data[offsetPerLine])};
+
     // ----------- Validation, nop, counters -----------------
-    metaData.isValidation = (data[offset3+2*offset1]==0 ? false : true);
+    metaData.isValidation = (data[2*offsetPerLine] != 0);
     if (metaData.isValidation)
         throw std::runtime_error{"metaData.isValidation == true. Training with val. data?????" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    metaData.numberOtherPeople = (int)data[offset3+2*offset1+1];
-    metaData.peopleIndex = (int)data[offset3+2*offset1+2];
-    metaData.annotationListIndex = (int)(decodeFloats<Dtype>(data, offset3+2*offset1+3, 1));
-    metaData.writeNumber = (int)(decodeFloats<Dtype>(data, offset3+2*offset1+7, 1));
-    metaData.totalWriteNumber = (int)(decodeFloats<Dtype>(data, offset3+2*offset1+11, 1));
+    metaData.numberOtherPeople = (int)data[2*offsetPerLine+1];
+    metaData.peopleIndex = (int)data[2*offsetPerLine+2];
+    metaData.annotationListIndex = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+3]));
+    metaData.writeNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+7]));
+    metaData.totalWriteNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+11]));
 
     // count epochs according to counters
     if (metaData.writeNumber == 0)
@@ -909,20 +923,20 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& da
     }
 
     // ------------------- objpos -----------------------
-    metaData.objpos.x = decodeFloats<Dtype>(data, offset3+3*offset1, 1);
-    metaData.objpos.y = decodeFloats<Dtype>(data, offset3+3*offset1+4, 1);
+    metaData.objpos.x = decodeNumber<Dtype>(&data[3*offsetPerLine]);
+    metaData.objpos.y = decodeNumber<Dtype>(&data[3*offsetPerLine+4]);
     metaData.objpos -= cv::Point2f{1.f,1.f};
     // ------------ scaleSelf, jointsSelf --------------
-    metaData.scaleSelf = decodeFloats<Dtype>(data, offset3+4*offset1, 1);
+    metaData.scaleSelf = decodeNumber<Dtype>(&data[4*offsetPerLine]);
     auto& jointSelf = metaData.jointsSelf;
     jointSelf.points.resize(mNumberPartsInLmdb);
     jointSelf.isVisible.resize(mNumberPartsInLmdb);
     for (auto part = 0 ; part < mNumberPartsInLmdb; part++)
     {
-        jointSelf.points[part].x = decodeFloats<Dtype>(data, offset3+5*offset1+4*part, 1);
-        jointSelf.points[part].y = decodeFloats<Dtype>(data, offset3+6*offset1+4*part, 1);
+        jointSelf.points[part].x = decodeNumber<Dtype>(&data[5*offsetPerLine+4*part]);
+        jointSelf.points[part].y = decodeNumber<Dtype>(&data[6*offsetPerLine+4*part]);
         jointSelf.points[part] -= cv::Point2f{1.f,1.f}; //from matlab 1-index to c++ 0-index
-        const auto isVisible = decodeFloats<Dtype>(data, offset3+7*offset1+4*part, 1);
+        const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
         if (isVisible == 3)
             jointSelf.isVisible[part] = 3;
         else
@@ -937,17 +951,17 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& da
         //LOG(INFO) << jointSelf.points[part].x << " " << jointSelf.points[part].y << " " << jointSelf.isVisible[part];
     }
 
-    //others (7 lines loaded)
+    // Others (7 lines loaded)
     metaData.objPosOthers.resize(metaData.numberOtherPeople);
     metaData.scaleOthers.resize(metaData.numberOtherPeople);
     metaData.jointsOthers.resize(metaData.numberOtherPeople);
     for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
     {
-        metaData.objPosOthers[person].x = decodeFloats<Dtype>(data, offset3+(8+person)*offset1, 1) - 1.f;
-        metaData.objPosOthers[person].y = decodeFloats<Dtype>(data, offset3+(8+person)*offset1+4, 1) - 1.f;
-        metaData.scaleOthers[person]  = decodeFloats<Dtype>(data, offset3+(8+metaData.numberOtherPeople)*offset1+4*person, 1);
+        metaData.objPosOthers[person].x = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine]) - 1.f;
+        metaData.objPosOthers[person].y = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine+4]) - 1.f;
+        metaData.scaleOthers[person]  = decodeNumber<Dtype>(&data[(8+metaData.numberOtherPeople)*offsetPerLine+4*person]);
     }
-    //8 + numberOtherPeople lines loaded
+    // 8 + numberOtherPeople lines loaded
     for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
     {
         auto& currentPerson = metaData.jointsOthers[person];
@@ -955,12 +969,14 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const string& da
         currentPerson.isVisible.resize(mNumberPartsInLmdb);
         for (auto part = 0 ; part < mNumberPartsInLmdb; part++)
         {
-            currentPerson.points[part].x = decodeFloats<Dtype>(data, offset3+(9+metaData.numberOtherPeople+3*person)*offset1+4*part, 1) - 1.f;
-            currentPerson.points[part].y = decodeFloats<Dtype>(data, offset3+(9+metaData.numberOtherPeople+3*person+1)*offset1+4*part, 1) - 1.f;
-            const auto isVisible = decodeFloats<Dtype>(data, offset3+(9+metaData.numberOtherPeople+3*person+2)*offset1+4*part, 1);
+            currentPerson.points[part].x = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person)*offsetPerLine+4*part]) - 1.f;
+            currentPerson.points[part].y = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+1)*offsetPerLine+4*part]) - 1.f;
+            const auto isVisible = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+2)*offsetPerLine+4*part]);
             currentPerson.isVisible[part] = (isVisible == 0 ? 0 : 1);
-            if (currentPerson.points[part].x < 0 || currentPerson.points[part].y < 0 ||
-                 currentPerson.points[part].x >= metaData.imageSize.width || currentPerson.points[part].y >= metaData.imageSize.height)
+            if (currentPerson.points[part].x < 0
+                 || currentPerson.points[part].y < 0
+                 || currentPerson.points[part].x >= metaData.imageSize.width
+                 || currentPerson.points[part].y >= metaData.imageSize.height)
             {
                 currentPerson.isVisible[part] = 2; // 2 means cropped, 1 means occluded by still on image
             }

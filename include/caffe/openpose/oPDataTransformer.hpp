@@ -132,17 +132,17 @@ protected:
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss, const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
 
-    bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
-    float augmentationRotate(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& imageSource) const;
     float augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
+    float augmentationRotate(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& imageSource) const;
     cv::Size augmentationCropped(cv::Mat& imageAugmented, cv::Mat& maskMissAugmented, MetaData& metaData,
                                  const cv::Mat& imageTemp, const cv::Mat& maskMiss) const;
+    bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
 
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const;
     bool onPlane(const cv::Point& point, const cv::Size& imageSize) const;
     void swapLeftRight(Joints& joints) const;
     void setAugmentationTable(const int numData);
-    void readMetaData(MetaData& metaData, const string& data, size_t offset3, size_t offset1);
+    void readMetaData(MetaData& metaData, const char* data, const size_t offsetPerLine);
     void transformMetaJoints(MetaData& metaData) const;
     void transformJoints(Joints& joints) const;
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit) const;
