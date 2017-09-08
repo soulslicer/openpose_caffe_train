@@ -406,7 +406,7 @@ message LayerParameter {
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
   // OpenPose: new layer
-  optional CPMTransformationParameter cpm_transform_param = 147;
+  optional OPTransformationParameter op_transform_param = 147;
   // OpenPose: end new layer
 }
 
@@ -435,8 +435,8 @@ message TransformationParameter {
 
 // OpenPose: new parameter
 // Message that stores parameters used to apply transformation
-// to the CPMData layer's data
-message CPMTransformationParameter {
+// to the OPData layer's data
+message OPTransformationParameter {
   // For data pre-processing, we can do simple scaling and subtracting the
   // data mean, if provided. Note that the mean subtraction is always carried
   // out before scaling.

@@ -4,9 +4,6 @@
 #include "caffe/layers/base_data_layer.hpp"
 #include "caffe/parallel.hpp"
 #include "caffe/util/blocking_queue.hpp"
-// OpenPose: added
-#include "caffe/openpose/data_reader.hpp"
-// OpenPose: end added
 
 namespace caffe {
 
@@ -90,9 +87,5 @@ size_t BlockingQueue<T>::size() const {
 
 template class BlockingQueue<Batch<float>*>;
 template class BlockingQueue<Batch<double>*>;
-// OpenPose: added
-template class BlockingQueue<Datum*>;
-template class BlockingQueue<shared_ptr<DataReader::QueuePair>>;
-// OpenPose: end added
 
 }  // namespace caffe

@@ -1,5 +1,5 @@
-#ifndef CAFFE_OPENPOSE_CPM_DATA_TRANSFORMER_HPP
-#define CAFFE_OPENPOSE_CPM_DATA_TRANSFORMER_HPP
+#ifndef CAFFE_OPENPOSE_OP_DATA_TRANSFORMER_HPP
+#define CAFFE_OPENPOSE_OP_DATA_TRANSFORMER_HPP
 
 // OpenPose: added
 // This function has been originally copied from include/caffe/data_transformer.hpp (both hpp and cpp)
@@ -32,10 +32,10 @@ enum class Model
  * scaling, mirroring, substracting the image mean...
  */
 template <typename Dtype>
-class CPMDataTransformer {
+class OPDataTransformer {
 public:
-    explicit CPMDataTransformer(const CPMTransformationParameter& param, Phase phase);
-    virtual ~CPMDataTransformer() {}
+    explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase);
+    virtual ~OPDataTransformer() {}
 
     /**
      * @brief Initialize the Random number generations if needed by the
@@ -54,7 +54,7 @@ public:
      *    This is destination blob. It can be part of top blob's data if
      *    set_cpu_data() is used. See image_data_layer.cpp for an example.
      */
-    void Transform(const cv::Mat& cv_img, Blob<Dtype>* transformed_blob);
+    // void Transform(const cv::Mat& cv_img, Blob<Dtype>* transformed_blob); // OpenPose: commented
 #endif  // USE_OPENCV
 
 protected:
@@ -68,10 +68,16 @@ protected:
      */
     virtual int Rand(int n);
 
-    void Transform(const Datum& datum, Dtype* transformedData);
+    // void Transform(const Datum& datum, Dtype* transformedData); // OpenPose: commented
+    // OpenPose: added
+    // Image and label
+public:
+    void Transform(const Datum& datum, Blob<Dtype>* transformed_blob, Blob<Dtype>* transformed_label_blob);
+protected:
+    // OpenPose: added end
     // Tranformation parameters
     // TransformationParameter param_; // OpenPose: commented
-    CPMTransformationParameter param_; // OpenPose: added
+    OPTransformationParameter param_; // OpenPose: added
 
 
     shared_ptr<Caffe::RNG> rng_;
@@ -80,10 +86,6 @@ protected:
     vector<Dtype> mean_values_;
 
     // OpenPose: added
-public:
-    // Image and label
-    void Transform_nv(const Datum& datum, Blob<Dtype>* transformed_blob, Blob<Dtype>* transformed_label_blob, const int counter);
-
 protected:
     struct AugmentSelection
     {
@@ -126,7 +128,7 @@ protected:
     std::vector<std::vector<float>> mAugmentationDegs;
     std::vector<std::vector<int>> mAugmentationFlips;
 
-    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const int counter);
+    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const bool withMaskMiss);
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss, const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
 
@@ -152,4 +154,4 @@ protected:
 
 }  // namespace caffe
 
-#endif  // CAFFE_OPENPOSE_CPM_DATA_TRANSFORMER_HPP_
+#endif  // CAFFE_OPENPOSE_OP_DATA_TRANSFORMER_HPP_
