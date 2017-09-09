@@ -2,7 +2,7 @@
 #define CAFFE_OPENPOSE_OP_DATA_TRANSFORMER_HPP
 
 // OpenPose: added
-// This function has been originally copied from include/caffe/data_transformer.hpp (both hpp and cpp)
+// This function has been originally copied from include/caffe/data_transformer.hpp (both hpp and cpp) at Sep 7th, 2017
 // OpenPose: added end
 
 #include <vector>
@@ -18,11 +18,12 @@
 namespace caffe {
 
 // OpenPose: added
-enum class Model
+enum class PoseModel
 {
     COCO_18 = 0,
     MPI_15 = 1,
     BODY_22 = 2,
+    DOME_18 = 3,
     Size,
 };
 // OpenPose: added end
@@ -73,6 +74,8 @@ protected:
     // Image and label
 public:
     void Transform(const Datum& datum, Blob<Dtype>* transformed_blob, Blob<Dtype>* transformed_label_blob);
+    int getNumberBodyBkgAndPAF() const;
+    int getNumberChannels() const;
 protected:
     // OpenPose: added end
     // Tranformation parameters
@@ -115,20 +118,22 @@ protected:
         std::vector<cv::Point2f> objPosOthers; //length is numberOtherPeople
         std::vector<float> scaleOthers; //length is numberOtherPeople
         std::vector<Joints> jointsOthers; //length is numberOtherPeople
-        std::string datasetString;  // Only for visualization
-        int peopleIndex;            // Only for visualization
-        int annotationListIndex;    // Only for visualization
+        // Only for depth
+        bool depthEnabled = false;
+        std::string imageSource;
+        std::string depthSource;
+        // Only for visualization
+        std::string datasetString;
+        int peopleIndex;
+        int annotationListIndex;
     };
 
-    Model mModel;
-    int mNumberPartsInLmdb;
-    int mNumberBodyAndPAFParts;
-    int mNumberBodyBkgPAFParts;
+    PoseModel mPoseModel;
     bool mIsTableSet;
     std::vector<std::vector<float>> mAugmentationDegs;
     std::vector<std::vector<int>> mAugmentationFlips;
 
-    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const bool withMaskMiss);
+    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum);
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss, const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
 
@@ -139,7 +144,6 @@ protected:
     bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
 
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const;
-    bool onPlane(const cv::Point& point, const cv::Size& imageSize) const;
     void swapLeftRight(Joints& joints) const;
     void setAugmentationTable(const int numData);
     void readMetaData(MetaData& metaData, const char* data, const size_t offsetPerLine);

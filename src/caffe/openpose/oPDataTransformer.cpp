@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <thread>
 // OpenPose: added end
 #include <string>
 #include <vector>
@@ -31,7 +32,27 @@ namespace caffe {
 
 // OpenPose: added
 // Remainder
-// const std::map<unsigned int, std::string> POSE_COCO_BODY_PARTS {
+// COCO_BODY_PARTS {
+//     {0,  "Nose"},
+//     {1,  "LEye"},
+//     {2,  "REye"},
+//     {3,  "LEar"},
+//     {4,  "REar"},
+//     {5,  "LShoulder"},
+//     {6,  "RShoulder"},
+//     {7,  "LElbow"},
+//     {8,  "RElbow"},
+//     {9,  "LWrist"},
+//     {10, "RWrist"},
+//     {11, "LHip"},
+//     {12, "RHip"},
+//     {13, "LKnee"},
+//     {14, "RKnee"},
+//     {15, "LAnkle"},
+//     {16, "RAnkle"},
+//     {17, "Background"},
+// };
+// OPENPOSE_BODY_PARTS {
 //     {0,  "Nose"},
 //     {1,  "Neck"},
 //     {2,  "RShoulder"},
@@ -50,40 +71,78 @@ namespace caffe {
 //     {15, "LEye"},
 //     {16, "REar"},
 //     {17, "LEar"},
-//     {18, "RFoot1"},
-//     {19, "LFoot1"},
-//     {20, "RFoot2"},
-//     {21, "LFoot2"},
-//     {20, "Background"},
+//     {18, "Background"},
+// };
+// OPENPOSE_DEPTH_BODY_PARTS {
+//     {0,  "Nose"},
+//     {1,  "RShoulder"},
+//     {2,  "RElbow"},
+//     {3,  "RWrist"},
+//     {4,  "LShoulder"},
+//     {5,  "LElbow"},
+//     {6,  "LWrist"},
+//     {7,  "RHip"},
+//     {8,  "RKnee"},
+//     {9,  "RAnkle"},
+//     {10, "LHip"},
+//     {11, "LKnee"},
+//     {12, "LAnkle"},
+//     {13, "REye"},
+//     {14, "LEye"},
+//     {15, "REar"},
+//     {16, "LEar"},
+//     {17, "Background"},
 // };
 const auto DEFAULT_MASK_VALUE = 255;
-const std::array<int, (int)Model::Size> NUMBER_BODY_PARTS{18, 15, 22};
-const std::array<int, (int)Model::Size> NUMBER_PAFS{2*19, 2*14, 2*23};
-const std::array<int, (int)Model::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
-                                                                     NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
-                                                                     NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
-const std::array<std::vector<int>, (int)Model::Size> SWAP_LEFTS_SWAP{
-    std::vector<int>{5,6,7,11,12,13,15,17},     std::vector<int>{5,6,7,11,12,13},   std::vector<int>{5,6,7,11,12,13,15,17, 19,21}
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 15, 22, 18};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 15, 17, 17};
+const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*14, 2*23, 2*19};
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
+                                                                         NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
+                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2],
+                                                                         NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3]};
+const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS_SWAP{
+    std::vector<int>{5,6,7,11,12,13,15,17},     std::vector<int>{5,6,7,11,12,13},   std::vector<int>{5,6,7,11,12,13,15,17, 19,21},
+    std::vector<int>{1,2,3,7,8,9,13,15}
 };
-const std::array<std::vector<int>, (int)Model::Size> SWAP_RIGHTS_SWAP{
-    std::vector<int>{2,3,4, 8,9,10,14,16},      std::vector<int>{2,3,4,8,9,10},     std::vector<int>{2,3,4, 8,9,10,14,16, 18,20}
+const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS_SWAP{
+    std::vector<int>{2,3,4, 8,9,10,14,16},      std::vector<int>{2,3,4,8,9,10},     std::vector<int>{2,3,4, 8,9,10,14,16, 18,20},
+    std::vector<int>{4,5,6,10,11,12,14,16}
 };
-const std::array<std::vector<int>, (int)Model::Size> TRANSFORM_MODEL_TO_OURS_A{
+const std::array<std::vector<int>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS_A{
     std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},      std::vector<int>{9, 8,12,11,10,13,14,15, 2, 1, 0, 3, 4, 5, 7},
-    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15}
+    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},
+    std::vector<int>{0,1, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}
 };
-const std::array<std::vector<int>, (int)Model::Size> TRANSFORM_MODEL_TO_OURS_B{
+const std::array<std::vector<int>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS_B{
     std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},      std::vector<int>{9, 8,12,11,10,13,14,15, 2, 1, 0, 3, 4, 5, 6},
-    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15}
+    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},
+    std::vector<int>{0,4, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}
 };
-const std::array<std::vector<int>, (int)Model::Size> LABEL_MAP_A{
+const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15},    std::vector<int>{0, 1, 2, 3, 1, 5, 6, 1, 14, 8, 9,  14, 11, 12},
-    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15, 10, 13, 10, 13}
+    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15, 10, 13, 10, 13},
+    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15}
 };
-const std::array<std::vector<int>, (int)Model::Size> LABEL_MAP_B{
+const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},    std::vector<int>{1, 2, 3, 4, 5, 6, 7, 14, 8, 9, 10, 11, 12, 13},
-    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17, 18, 19, 20, 21}
+    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17, 18, 19, 20, 21},
+    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17}
 };
+PoseModel flagsToPoseModel(const std::string& poseModeString)
+{
+    if (poseModeString == "COCO")
+        return PoseModel::COCO_18;
+    else if (poseModeString == "MPI")
+        return PoseModel::MPI_15;
+    else if (poseModeString == "BODY_22")
+        return PoseModel::BODY_22;
+    else if (poseModeString == "DOME")
+        return PoseModel::DOME_18;
+    // else
+    throw std::runtime_error{"String does not correspond to any model (COCO, MPI, MPI_4_layers)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    return PoseModel::COCO_18;
+}
 // OpenPose: added end
 
 template<typename Dtype>
@@ -112,22 +171,11 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
     }
     // OpenPose: added
     LOG(INFO) << "OPDataTransformer constructor done.";
-    mNumberPartsInLmdb = param_.np_in_lmdb();
-    mNumberBodyAndPAFParts = param_.num_parts();
-    mNumberBodyBkgPAFParts = mNumberBodyAndPAFParts + 1;
     mIsTableSet = false;
-    // Model
-    mModel = Model::Size;
-    for (auto i = 0 ; i < (int)Model::Size ; i++)
-    {
-        if (mNumberBodyAndPAFParts == NUMBER_BODY_AND_PAF_CHANNELS[i])
-        {
-            mModel = (Model)i;
-            break;
-        }
-    }
-    if (mModel == Model::Size)
-        throw std::runtime_error{"Invalid mModel" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    // PoseModel
+    mPoseModel = flagsToPoseModel(param_.model());
+    if (mPoseModel == PoseModel::Size)
+        throw std::runtime_error{"Invalid mPoseModel" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     // OpenPose: added end
 }
 
@@ -162,8 +210,20 @@ void OPDataTransformer<Dtype>::Transform(const Datum& datum, Blob<Dtype>* transf
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, im_channels == 5);
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum);
     VLOG(2) << "Transform_nv: " << timer.MicroSeconds() / 1000.0  << " ms";
+}
+
+template <typename Dtype>
+int OPDataTransformer<Dtype>::getNumberChannels() const
+{
+    return 2 * getNumberBodyBkgAndPAF();
+}
+
+template <typename Dtype>
+int OPDataTransformer<Dtype>::getNumberBodyBkgAndPAF() const
+{
+    return NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel] + 1;
 }
 // OpenPose: end
 
@@ -177,13 +237,14 @@ int OPDataTransformer<Dtype>::Rand(int n) {
 
 // OpenPose: added
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const bool withMaskMiss)
+void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum)
 {
     // Some parameter should be set in prototxt
     const std::string& data = datum.data();
     const int datumChannels = datum.channels();
     const int datumHeight = datum.height();
     const int datumWidth = datum.width();
+    const auto datumArea = (int)(datumHeight * datumWidth);
 
     CHECK_GT(datumChannels, 0);
     // CHECK_GE(datumHeight, crop_size);
@@ -191,31 +252,66 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     CPUTimer timer1;
     timer1.Start();
 
-    const bool hasUInt8 = data.size() > 0;
+    // const bool hasUInt8 = data.size() > 0;
+    CHECK(data.size() > 0);
+
+    // Read meta data (LMDB channel 3)
+    MetaData metaData;
+    // if (hasUInt8)
+        readMetaData(metaData, &data[3 * datumArea], datumWidth);
+    // else
+    // {
+    //     throw std::runtime_error{"Error" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    //     std::string metadataString(datumArea, '\0');
+    //     for (auto y = 0; y < datumHeight; ++y)
+    //     {
+    //         const auto yOffset = (int)(y*datumWidth);
+    //         for (auto x = 0; x < datumWidth; ++x)
+    //         {
+    //             const auto xyOffset = yOffset + x;
+    //             const auto dIndex = (int)(3*datumArea + xyOffset);
+    //             metadataString[xyOffset] = datum.float_data(dIndex);
+    //         }
+    //     }
+    //     readMetaData(metaData, metadataString.c_str(), datumWidth);
+    // }
+    if (param_.transform_body_joint()) // we expect to transform body joints, and not to transform hand joints
+        transformMetaJoints(metaData);
+    const auto depthEnabled = metaData.depthEnabled;
 
     // Read image (LMDB channel 1)
-    cv::Mat image(datumHeight, datumWidth, CV_8UC3);
-    const auto imageArea = (int)(image.rows * image.cols);
-    for (auto y = 0; y < image.rows; ++y)
+    cv::Mat image;
+    if (depthEnabled)
+        image = cv::imread(metaData.imageSource, CV_LOAD_IMAGE_COLOR);
+    else
     {
-        const auto yOffset = (int)(y*image.cols);
-        for (auto x = 0; x < image.cols; ++x)
+        image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
+        const auto imageArea = (int)(image.rows * image.cols);
+        CHECK_EQ(imageArea, datumArea);
+        for (auto y = 0; y < image.rows; ++y)
         {
-            const auto xyOffset = yOffset + x;
-            cv::Vec3b& rgb = image.at<cv::Vec3b>(y, x);
-            for (auto c = 0; c < 3; c++)
+            const auto yOffset = (int)(y*image.cols);
+            for (auto x = 0; x < image.cols; ++x)
             {
-                const auto dIndex = (int)(c*imageArea + xyOffset);
-                if (hasUInt8)
-                    rgb[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                else
-                    rgb[c] = datum.float_data(dIndex);
+                const auto xyOffset = yOffset + x;
+                cv::Vec3b& rgb = image.at<cv::Vec3b>(y, x);
+                for (auto c = 0; c < 3; c++)
+                {
+                    const auto dIndex = (int)(c*imageArea + xyOffset);
+                    // if (hasUInt8)
+                        rgb[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                    // else
+                        // rgb[c] = datum.float_data(dIndex);
+                }
             }
         }
     }
+
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
-    if (withMaskMiss)
+    if (depthEnabled)
+        maskMiss = cv::Mat(datumHeight, datumWidth, CV_8UC1, cv::Scalar{255});
+    else
     {
         maskMiss = cv::Mat(datumHeight, datumWidth, CV_8UC1, cv::Scalar{0});
         for (auto y = 0; y < image.rows; ++y)
@@ -224,27 +320,33 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             for (auto x = 0; x < image.cols; ++x)
             {
                 const auto xyOffset = yOffset + x;
-                const auto dIndex = (int)(4*imageArea + xyOffset);
+                const auto dIndex = (int)(4*datumArea + xyOffset);
                 Dtype dElement;
-                if (hasUInt8)
+                // if (hasUInt8)
                     dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                else
-                    dElement = datum.float_data(dIndex);
+                // else
+                    // dElement = datum.float_data(dIndex);
                 if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
                     throw std::runtime_error{"Value out of {0,1}" + getLine(__LINE__, __FUNCTION__, __FILE__)};
                 maskMiss.at<uchar>(y, x) = dElement; //round(dElement/255);
             }
         }
     }
-    else
-        maskMiss = cv::Mat(datumHeight, datumWidth, CV_8UC1, cv::Scalar{255});
 
+    // Time measurement
     VLOG(2) << "  rgb[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
-    //color, contract
+    // Depth image
+    cv::Mat depth;
+    if (depthEnabled)
+        depth = cv::imread(metaData.depthSource, CV_LOAD_IMAGE_ANYDEPTH);
+
+    // Clahe
     if (param_.do_clahe())
         clahe(image, param_.clahe_tile_size(), param_.clahe_clip_limit());
+
+    // Gray --> BGR
     if (param_.gray() == 1)
     {
         cv::cvtColor(image, image, CV_BGR2GRAY);
@@ -253,37 +355,16 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  color: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
-    // Read meta data (LMDB channel 3)
-    MetaData metaData;
-    if (hasUInt8)
-        readMetaData(metaData, &data[3 * imageArea], datumWidth);
-    else
-    {
-        throw std::runtime_error{"Error" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-        std::string metadataString(imageArea, '\0');
-        for (auto y = 0; y < image.rows; ++y)
-        {
-            const auto yOffset = (int)(y*image.cols);
-            for (auto x = 0; x < image.cols; ++x)
-            {
-                const auto xyOffset = yOffset + x;
-                const auto dIndex = (int)(3*imageArea + xyOffset);
-                metadataString[xyOffset] = datum.float_data(dIndex);
-            }
-        }
-        readMetaData(metaData, metadataString.c_str(), datumWidth);
-    }
-    if (param_.transform_body_joint()) // we expect to transform body joints, and not to transform hand joints
-        transformMetaJoints(metaData);
-
     VLOG(2) << "  ReadMeta+MetaJoints: " << timer1.MicroSeconds()*1e-3 << " ms";
+
+    // Data augmentation
     timer1.Start();
     AugmentSelection augmentSelection;
     // Visualize original
     if (param_.visualize())
         visualize(image, metaData, augmentSelection);
-    //Start transforming
     cv::Mat imageAugmented;
+    cv::Mat depthAugmented;
     VLOG(2) << "   input size (" << image.cols << ", " << image.rows << ")";
     const int stride = param_.stride();
     // We only do random transform augmentSelection augmentation when training.
@@ -292,6 +373,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         // Temporary variables
         cv::Mat imageTemp; // Size determined by scale
         cv::Mat maskMissTemp;
+        cv::Mat depthTemp;
         // Scale
         augmentSelection.scale = augmentationScale(imageAugmented, maskMiss, metaData, image);
         // Rotation
@@ -306,14 +388,17 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     }
     // Test
     else
+    {
         imageAugmented = image;
+        depthAugmented = depth;
+    }
     // Visualize final
     if (param_.visualize())
         visualize(imageAugmented, metaData, augmentSelection);
     VLOG(2) << "  Aug: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
-    //copy transformed image (imageAugmented) into transformedData, do the mean-subtraction here
+    // Copy imageAugmented into transformedData + mean-subtraction
     const int imageAugmentedArea = imageAugmented.rows * imageAugmented.cols;
     for (auto y = 0; y < imageAugmented.rows ; y++)
     {
@@ -327,8 +412,39 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             transformedData[totalOffet + 2*imageAugmentedArea] = (rgb[2] - 128)/256.0;
         }
     }
+
+    // Generate and copy label
     generateLabelMap(transformedLabel, imageAugmented, maskMiss, metaData);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
+
+    // Visualize
+    if (param_.visualize())
+    {
+        const auto rezX = (int)imageAugmented.cols;
+        const auto rezY = (int)imageAugmented.rows;
+        const auto stride = (int)param_.stride();
+        const auto gridX = rezX / stride;
+        const auto gridY = rezY / stride;
+        const auto channelOffset = gridY * gridX;
+        const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF();
+        for (auto part = 0; part < 2*numberBodyBkgPAFParts; part++)
+        {
+            cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+            for (auto gY = 0; gY < gridY; gY++)
+            {
+                const auto yOffset = gY*gridX;
+                for (auto gX = 0; gX < gridX; gX++)
+                    labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+            }
+            cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+            cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
+            cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
+            // Write on disk
+            char imagename [100];
+            sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
+            cv::imwrite(imagename, labelMap);
+        }
+    }
 }
 
 template<typename Dtype>
@@ -341,9 +457,11 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto gridX = rezX / stride;
     const auto gridY = rezY / stride;
     const auto channelOffset = gridY * gridX;
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF();
 
     // Labels to 0
-    std::fill(transformedLabel, transformedLabel + 2*mNumberBodyBkgPAFParts * gridY * gridX, 0.f);
+    std::fill(transformedLabel, transformedLabel + 2*numberBodyBkgPAFParts * gridY * gridX, 0.f);
 
     // label size is image size / stride
     for (auto gY = 0; gY < gridY; gY++)
@@ -352,7 +470,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         for (auto gX = 0; gX < gridX; gX++)
         {
             const auto xyOffset = yOffset + gX;
-            for (auto part = 0; part < mNumberBodyAndPAFParts; part++)
+            for (auto part = 0; part < numberBodyAndPAFParts; part++)
             {
                 if (metaData.jointsSelf.isVisible[part] != 3)
                 {
@@ -361,16 +479,15 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
             }
             // background channel
-            transformedLabel[mNumberBodyAndPAFParts*channelOffset + xyOffset] = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
+            transformedLabel[numberBodyAndPAFParts*channelOffset + xyOffset] = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
         }
     }
 
     // Parameters
-    const auto numberBodyParts = NUMBER_BODY_PARTS[(int)mModel];
-    const auto numberPAFChannels = NUMBER_PAFS[(int)mModel]+1;
-    const auto numberBodyAndPAFChannels = NUMBER_BODY_AND_PAF_CHANNELS[(int)mModel]+1;
-    const auto& labelMapA = LABEL_MAP_A[(int)mModel];
-    const auto& labelMapB = LABEL_MAP_B[(int)mModel];
+    const auto numberBodyParts = NUMBER_BODY_PARTS[(int)mPoseModel];
+    const auto numberPAFChannels = NUMBER_PAFS[(int)mPoseModel]+1;
+    const auto& labelMapA = LABEL_MAP_A[(int)mPoseModel];
+    const auto& labelMapB = LABEL_MAP_B[(int)mPoseModel];
 
     // PAFs
     const auto threshold = 1;
@@ -381,8 +498,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         if (joints.isVisible[labelMapA[i]]<=1 && joints.isVisible[labelMapB[i]]<=1)
         {
             // putVecMaps
-            putVecMaps(transformedLabel + (mNumberBodyBkgPAFParts + 2*i)*channelOffset,
-                       transformedLabel + (mNumberBodyBkgPAFParts + 2*i + 1)*channelOffset,
+            putVecMaps(transformedLabel + (numberBodyBkgPAFParts + 2*i)*channelOffset,
+                       transformedLabel + (numberBodyBkgPAFParts + 2*i + 1)*channelOffset,
                        count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                        param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
         }
@@ -394,8 +511,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (jointsOthers.isVisible[labelMapA[i]]<=1 && jointsOthers.isVisible[labelMapB[i]]<=1)
             {
                 //putVecMaps
-                putVecMaps(transformedLabel + (mNumberBodyBkgPAFParts + 2*i)*channelOffset,
-                           transformedLabel + (mNumberBodyBkgPAFParts + 2*i + 1)*channelOffset,
+                putVecMaps(transformedLabel + (numberBodyBkgPAFParts + 2*i)*channelOffset,
+                           transformedLabel + (numberBodyBkgPAFParts + 2*i + 1)*channelOffset,
                            count, jointsOthers.points[labelMapA[i]], jointsOthers.points[labelMapB[i]],
                            param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
             }
@@ -408,7 +525,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         if (metaData.jointsSelf.isVisible[part] <= 1)
         {
             const auto& centerPoint = metaData.jointsSelf.points[part];
-            putGaussianMaps(transformedLabel + (part+mNumberBodyAndPAFParts+numberPAFChannels)*channelOffset, centerPoint, param_.stride(),
+            putGaussianMaps(transformedLabel + (part+numberBodyAndPAFParts+numberPAFChannels)*channelOffset, centerPoint, param_.stride(),
                             gridX, gridY, param_.sigma()); //self
         }
         //for every other person
@@ -417,7 +534,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
-                putGaussianMaps(transformedLabel + (part+mNumberBodyAndPAFParts+numberPAFChannels)*channelOffset, centerPoint, param_.stride(),
+                putGaussianMaps(transformedLabel + (part+numberBodyAndPAFParts+numberPAFChannels)*channelOffset, centerPoint, param_.stride(),
                                 gridX, gridY, param_.sigma());
             }
         }
@@ -431,34 +548,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             const auto xyOffset = yOffset + gX;
             Dtype maximum = 0.;
-            for (auto part = mNumberBodyAndPAFParts+numberPAFChannels ; part < mNumberBodyAndPAFParts+numberBodyAndPAFChannels ; part++)
+            for (auto part = numberBodyAndPAFParts+numberPAFChannels ; part < numberBodyAndPAFParts+numberBodyBkgPAFParts ; part++)
             {
                 const auto index = part * channelOffset + xyOffset;
                 maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
             }
-            transformedLabel[(2*mNumberBodyAndPAFParts+1)*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
-        }
-    }
-
-    // Visualize
-    if (param_.visualize())
-    {
-        for (auto part = 0; part < 2*mNumberBodyBkgPAFParts; part++)
-        {
-            cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-            for (auto gY = 0; gY < gridY; gY++)
-            {
-                const auto yOffset = gY*gridX;
-                for (auto gX = 0; gX < gridX; gX++)
-                    labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
-            }
-            cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-            cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
-            cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
-            // Write on disk
-            char imagename [100];
-            sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
-            cv::imwrite(imagename, labelMap);
+            transformedLabel[(2*numberBodyAndPAFParts+1)*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
         }
     }
 }
@@ -483,14 +578,15 @@ void OPDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& m
 
     cv::rectangle(imageToVisualize, metaData.objpos-cv::Point2f{3.f,3.f}, metaData.objpos+cv::Point2f{3.f,3.f},
                   cv::Scalar{255,255,0}, CV_FILLED);
-    for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
     {
         const auto currentPoint = metaData.jointsSelf.points[part];
         //LOG(INFO) << "drawing part " << part << ": ";
         //LOG(INFO) << metaData.jointsSelf.points.size();
         //LOG(INFO) << currentPoint;
         // hand case
-        if (mNumberBodyAndPAFParts == 21)
+        if (numberBodyAndPAFParts == 21)
         {
             if (part < 4)
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
@@ -505,7 +601,7 @@ void OPDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& m
             else
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,100,100}, -1);
         }
-        else if (mNumberBodyAndPAFParts == 9)
+        else if (numberBodyAndPAFParts == 9)
         {
             if (part==0 || part==1 || part==2 || part==6)
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
@@ -515,7 +611,7 @@ void OPDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& m
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
         }
         //body case (CPM)
-        else if (mNumberBodyAndPAFParts == 14 || mNumberBodyAndPAFParts == 28)
+        else if (numberBodyAndPAFParts == 14 || numberBodyAndPAFParts == 28)
         {
             if (part < 14)
             {
@@ -559,7 +655,7 @@ void OPDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& m
         cv::rectangle(imageToVisualize,
                       metaData.objPosOthers[person]-cv::Point2f{3.f,3.f},
                       metaData.objPosOthers[person]+cv::Point2f{3.f,3.f}, cv::Scalar{0,255,255}, CV_FILLED);
-        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+        for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
             if (metaData.jointsOthers[person].isVisible[part] <= 1)
                 cv::circle(imageToVisualize, metaData.jointsOthers[person].points[part], 3, cv::Scalar{0,0,255}, -1);
     }
@@ -602,8 +698,7 @@ void OPDataTransformer<Dtype>::visualize(const cv::Mat& image, const MetaData& m
 }
 
 template<typename Dtype>
-float OPDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData,
-                                                   const cv::Mat& imageSource) const
+float OPDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const
 {
     const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
     float scaleMultiplier;
@@ -619,17 +714,21 @@ float OPDataTransformer<Dtype>::augmentationScale(cv::Mat& imageTemp, cv::Mat& m
     }
     const float scaleAbs = param_.target_dist()/metaData.scaleSelf;
     const float scale = scaleAbs * scaleMultiplier;
-    cv::resize(imageSource, imageTemp, cv::Size{}, scale, scale, cv::INTER_CUBIC);
+    // outputCvMats.resize(inputCvMats.size());
+    // for (auto i = 0 ; i < outputCvMats.size() ; i++)
+        // cv::resize(inputCvMats[i], outputCvMats[i], cv::Size{}, scale, scale, cv::INTER_CUBIC);
+    cv::resize(image, imageTemp, cv::Size{}, scale, scale, cv::INTER_CUBIC);
     cv::resize(maskMiss, maskMiss, cv::Size{}, scale, scale, cv::INTER_CUBIC);
 
     //modify metaData data
     metaData.objpos *= scale;
-    for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    for (auto part = 0; part < numberBodyAndPAFParts ; part++)
         metaData.jointsSelf.points[part] *= scale;
     for (auto person=0; person<metaData.numberOtherPeople; person++)
     {
         metaData.objPosOthers[person] *= scale;
-        for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
+        for (auto part = 0; part < numberBodyAndPAFParts ; part++)
             metaData.jointsOthers[person].points[part] *= scale;
     }
     return scaleMultiplier;
@@ -668,15 +767,21 @@ float OPDataTransformer<Dtype>::augmentationRotate(cv::Mat& imageTarget, cv::Mat
 
     //adjust metaData data
     rotatePoint(metaData.objpos, R);
-    for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
         rotatePoint(metaData.jointsSelf.points[part], R);
     for (auto person=0; person<metaData.numberOtherPeople; person++)
     {
         rotatePoint(metaData.objPosOthers[person], R);
-        for (auto part = 0; part < mNumberBodyAndPAFParts ; part++)
+        for (auto part = 0; part < numberBodyAndPAFParts ; part++)
             rotatePoint(metaData.jointsOthers[person].points[part], R);
     }
     return degree;
+}
+
+bool onPlane(const cv::Point& point, const cv::Size& imageSize)
+{
+    return (point.x >= 0 && point.y >= 0 && point.x < imageSize.width && point.y < imageSize.height);
 }
 
 template<typename Dtype>
@@ -711,7 +816,7 @@ cv::Size OPDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv:
         {
             const int coord_x_on_img = center.x - cropX/2 + x;
             const int coord_y_on_img = center.y - cropY/2 + y;
-            if (onPlane(cv::Point{coord_x_on_img, coord_y_on_img}, cv::Size{imageSource.cols, imageSource.rows}))
+            if (onPlane(cv::Point{coord_x_on_img, coord_y_on_img}, imageSource.size()))
             {
                 imageTarget.at<cv::Vec3b>(y,x) = imageSource.at<cv::Vec3b>(coord_y_on_img, coord_x_on_img);
                 if (!maskMissTemp.empty())
@@ -725,12 +830,13 @@ cv::Size OPDataTransformer<Dtype>::augmentationCropped(cv::Mat& imageTarget, cv:
     const int offsetUp = -(center.y - (cropY/2));
     const cv::Point2f offsetPoint{(float)offsetLeft, (float)offsetUp};
     metaData.objpos += offsetPoint;
-    for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
         metaData.jointsSelf.points[part] += offsetPoint;
     for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
     {
         metaData.objPosOthers[person] += offsetPoint;
-        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+        for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
             metaData.jointsOthers[person].points[part] += offsetPoint;
     }
 
@@ -762,7 +868,8 @@ bool OPDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Mat
         if (!maskMiss.empty())
             flip(maskMiss, maskMiss, 1);
         metaData.objpos.x = w - 1 - metaData.objpos.x;
-        for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+        const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+        for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
             metaData.jointsSelf.points[part].x = w - 1 - metaData.jointsSelf.points[part].x;
         if (param_.transform_body_joint())
             swapLeftRight(metaData.jointsSelf);
@@ -770,7 +877,7 @@ bool OPDataTransformer<Dtype>::augmentationFlip(cv::Mat& imageAugmented, cv::Mat
         for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
         {
             metaData.objPosOthers[person].x = w - 1 - metaData.objPosOthers[person].x;
-            for (auto part = 0 ; part < mNumberBodyAndPAFParts ; part++)
+            for (auto part = 0 ; part < numberBodyAndPAFParts ; part++)
                 metaData.jointsOthers[person].points[part].x = w - 1 - metaData.jointsOthers[person].points[part].x;
             if (param_.transform_body_joint())
                 swapLeftRight(metaData.jointsOthers[person]);
@@ -794,16 +901,10 @@ void OPDataTransformer<Dtype>::rotatePoint(cv::Point2f& point2f, const cv::Mat& 
 }
 
 template<typename Dtype>
-bool OPDataTransformer<Dtype>::onPlane(const cv::Point& point, const cv::Size& imageSize) const
-{
-    return (point.x >= 0 && point.y >= 0 && point.x < imageSize.width && point.y < imageSize.height);
-}
-
-template<typename Dtype>
 void OPDataTransformer<Dtype>::swapLeftRight(Joints& joints) const
 {
-    const auto& vectorLeft = SWAP_LEFTS_SWAP[(int)mModel];
-    const auto& vectorRight = SWAP_RIGHTS_SWAP[(int)mModel];
+    const auto& vectorLeft = SWAP_LEFTS_SWAP[(int)mPoseModel];
+    const auto& vectorRight = SWAP_RIGHTS_SWAP[(int)mPoseModel];
     for (auto i = 0 ; i < vectorLeft.size() ; i++)
     {
         const auto li = vectorLeft[i];
@@ -896,13 +997,15 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
 
     // ----------- Validation, nop, counters -----------------
     metaData.isValidation = (data[2*offsetPerLine] != 0);
-    if (metaData.isValidation)
-        throw std::runtime_error{"metaData.isValidation == true. Training with val. data?????" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     metaData.numberOtherPeople = (int)data[2*offsetPerLine+1];
     metaData.peopleIndex = (int)data[2*offsetPerLine+2];
     metaData.annotationListIndex = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+3]));
     metaData.writeNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+7]));
     metaData.totalWriteNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+11]));
+    if (metaData.isValidation)
+        throw std::runtime_error{"metaData.isValidation == true. Training with val. data????? " + metaData.datasetString
+                                 + ", index: " + std::to_string(metaData.annotationListIndex)
+                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
     // count epochs according to counters
     if (metaData.writeNumber == 0)
@@ -929,9 +1032,10 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     // ------------ scaleSelf, jointsSelf --------------
     metaData.scaleSelf = decodeNumber<Dtype>(&data[4*offsetPerLine]);
     auto& jointSelf = metaData.jointsSelf;
-    jointSelf.points.resize(mNumberPartsInLmdb);
-    jointSelf.isVisible.resize(mNumberPartsInLmdb);
-    for (auto part = 0 ; part < mNumberPartsInLmdb; part++)
+    const auto numberPartsInLmdb = NUMBER_PARTS_LMDB[(int)mPoseModel];
+    jointSelf.points.resize(numberPartsInLmdb);
+    jointSelf.isVisible.resize(numberPartsInLmdb);
+    for (auto part = 0 ; part < numberPartsInLmdb; part++)
     {
         jointSelf.points[part].x = decodeNumber<Dtype>(&data[5*offsetPerLine+4*part]);
         jointSelf.points[part].y = decodeNumber<Dtype>(&data[6*offsetPerLine+4*part]);
@@ -965,9 +1069,9 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
     {
         auto& currentPerson = metaData.jointsOthers[person];
-        currentPerson.points.resize(mNumberPartsInLmdb);
-        currentPerson.isVisible.resize(mNumberPartsInLmdb);
-        for (auto part = 0 ; part < mNumberPartsInLmdb; part++)
+        currentPerson.points.resize(numberPartsInLmdb);
+        currentPerson.isVisible.resize(numberPartsInLmdb);
+        for (auto part = 0 ; part < numberPartsInLmdb; part++)
         {
             currentPerson.points[part].x = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person)*offsetPerLine+4*part]) - 1.f;
             currentPerson.points[part].y = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+1)*offsetPerLine+4*part]) - 1.f;
@@ -987,7 +1091,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
 template<typename Dtype>
 void OPDataTransformer<Dtype>::transformMetaJoints(MetaData& metaData) const
 {
-    //transform joints in metaData from mNumberPartsInLmdb (specified in prototxt) to mNumberBodyAndPAFParts (specified in prototxt)
+    //transform joints in metaData from NUMBER_PARTS_LMDB[(int)mPoseModel] (specified in prototxt) to NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel] (specified in prototxt)
     transformJoints(metaData.jointsSelf);
     for (auto& joints : metaData.jointsOthers)
         transformJoints(joints);
@@ -996,23 +1100,24 @@ void OPDataTransformer<Dtype>::transformMetaJoints(MetaData& metaData) const
 template<typename Dtype>
 void OPDataTransformer<Dtype>::transformJoints(Joints& joints) const
 {
-    //transform joints in metaData from mNumberPartsInLmdb (specified in prototxt) to mNumberBodyAndPAFParts (specified in prototxt)
+    //transform joints in metaData from NUMBER_PARTS_LMDB[(int)mPoseModel] (specified in prototxt) to NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel] (specified in prototxt)
     auto jointsOld = joints;
 
     // Common operations
-    joints.points.resize(mNumberBodyAndPAFParts);
-    joints.isVisible.resize(mNumberBodyAndPAFParts);
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    joints.points.resize(numberBodyAndPAFParts);
+    joints.isVisible.resize(numberBodyAndPAFParts);
 
     // Parameters
-    const auto& vectorA = TRANSFORM_MODEL_TO_OURS_A[(int)mModel];
-    const auto& vectorB = TRANSFORM_MODEL_TO_OURS_B[(int)mModel];
+    const auto& vectorA = TRANSFORM_MODEL_TO_OURS_A[(int)mPoseModel];
+    const auto& vectorB = TRANSFORM_MODEL_TO_OURS_B[(int)mPoseModel];
 
     for (auto i = 0 ; i < vectorA.size() ; i++)
     {
         joints.points[i] = (jointsOld.points[vectorA[i]] + jointsOld.points[vectorB[i]]) * 0.5f;
         if (jointsOld.isVisible[vectorA[i]] == 2 || jointsOld.isVisible[vectorB[i]] == 2)
             joints.isVisible[i] = 2;
-        else if (mModel == Model::COCO_18 && (jointsOld.isVisible[vectorA[i]] == 3 || jointsOld.isVisible[vectorB[i]] == 3))
+        else if (mPoseModel == PoseModel::COCO_18 && (jointsOld.isVisible[vectorA[i]] == 3 || jointsOld.isVisible[vectorB[i]] == 3))
             joints.isVisible[i] = 3;
         else
             joints.isVisible[i] = jointsOld.isVisible[vectorA[i]] && jointsOld.isVisible[vectorB[i]];

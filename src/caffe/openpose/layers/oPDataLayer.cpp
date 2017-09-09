@@ -64,8 +64,8 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     if (this->output_labels_)
     {
         const int stride = this->layer_param_.op_transform_param().stride();
-        const int numberParts = this->layer_param_.op_transform_param().num_parts();
-        std::vector<int> labelShape{batch_size, 2*(numberParts+1), height/stride, width/stride};
+        const int numberChannels = this->mOPDataTransformer->getNumberChannels();
+        std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
             this->prefetch_[i]->label_.Reshape(labelShape);
