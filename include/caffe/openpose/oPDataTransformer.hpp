@@ -118,9 +118,9 @@ protected:
         std::vector<cv::Point2f> objPosOthers; //length is numberOtherPeople
         std::vector<float> scaleOthers; //length is numberOtherPeople
         std::vector<Joints> jointsOthers; //length is numberOtherPeople
-        // Only for depth
-        bool depthEnabled = false;
+        // Only for DomeDB
         std::string imageSource;
+        bool depthEnabled = false;
         std::string depthSource;
         // Only for visualization
         std::string datasetString;

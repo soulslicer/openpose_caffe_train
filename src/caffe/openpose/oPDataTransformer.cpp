@@ -201,7 +201,7 @@ void OPDataTransformer<Dtype>::Transform(const Datum& datum, Blob<Dtype>* transf
     const int im_num = transformedData->num();
     const int im_channels = transformedData->channels();
     const int lb_num = transformedLabel->num();
-    CHECK_GE(datumChannels, 3);
+    CHECK_GE(datumChannels, 1);
     CHECK_EQ(im_channels, 3);
     CHECK_EQ(im_num, lb_num);
     CHECK_GE(im_num, 1);
@@ -239,16 +239,13 @@ int OPDataTransformer<Dtype>::Rand(int n) {
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum)
 {
-    // Some parameter should be set in prototxt
+    // Parameters
     const std::string& data = datum.data();
-    const int datumChannels = datum.channels();
     const int datumHeight = datum.height();
     const int datumWidth = datum.width();
     const auto datumArea = (int)(datumHeight * datumWidth);
 
-    CHECK_GT(datumChannels, 0);
-    // CHECK_GE(datumHeight, crop_size);
-    // CHECK_GE(datumWidth, crop_size);
+    // Time measurement
     CPUTimer timer1;
     timer1.Start();
 
@@ -257,7 +254,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read meta data (LMDB channel 3)
     MetaData metaData;
-    // if (hasUInt8)
+    if (mPoseModel == PoseModel::DOME_18)
+        readMetaData(metaData, data.c_str(), datumWidth);
+    else //if (hasUInt8)
         readMetaData(metaData, &data[3 * datumArea], datumWidth);
     // else
     // {
@@ -281,8 +280,13 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read image (LMDB channel 1)
     cv::Mat image;
-    if (depthEnabled)
-        image = cv::imread(metaData.imageSource, CV_LOAD_IMAGE_COLOR);
+    if (mPoseModel == PoseModel::DOME_18)
+    {
+        const auto imageFullPath = param_.media_directory() + metaData.imageSource;
+        image = cv::imread(imageFullPath, CV_LOAD_IMAGE_COLOR);
+        if (image.empty())
+            throw std::runtime_error{"Empty image at " + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    }
     else
     {
         image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
@@ -309,7 +313,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
-    if (depthEnabled)
+    if (mPoseModel == PoseModel::DOME_18)
         maskMiss = cv::Mat(datumHeight, datumWidth, CV_8UC1, cv::Scalar{255});
     else
     {
@@ -429,20 +433,24 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF();
         for (auto part = 0; part < 2*numberBodyBkgPAFParts; part++)
         {
-            cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-            for (auto gY = 0; gY < gridY; gY++)
+            // Reduce #images saved (ideally images from 0 to numberBodyBkgPAFParts should be the same)
+            if (part < 5 || part >= numberBodyBkgPAFParts - 10)
             {
-                const auto yOffset = gY*gridX;
-                for (auto gX = 0; gX < gridX; gX++)
-                    labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+                cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+                for (auto gY = 0; gY < gridY; gY++)
+                {
+                    const auto yOffset = gY*gridX;
+                    for (auto gX = 0; gX < gridX; gX++)
+                        labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+                }
+                cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+                cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
+                cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
+                // Write on disk
+                char imagename [100];
+                sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
+                cv::imwrite(imagename, labelMap);
             }
-            cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-            cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
-            cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
-            // Write on disk
-            char imagename [100];
-            sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
-            cv::imwrite(imagename, labelMap);
         }
     }
 }
@@ -989,13 +997,13 @@ std::atomic<int> sCurrentEpoch{-1};
 template<typename Dtype>
 void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data, const size_t offsetPerLine)
 {
-    // ------------------- Dataset name ----------------------
+    // Dataset name
     metaData.datasetString = decodeString(data);
-    // ------------------- Image Dimension -------------------
+    // Image Dimension
     metaData.imageSize = cv::Size{(int)decodeNumber<Dtype>(&data[offsetPerLine+4]),
                                   (int)decodeNumber<Dtype>(&data[offsetPerLine])};
 
-    // ----------- Validation, nop, counters -----------------
+    // Validation, #people, counters
     metaData.isValidation = (data[2*offsetPerLine] != 0);
     metaData.numberOtherPeople = (int)data[2*offsetPerLine+1];
     metaData.peopleIndex = (int)data[2*offsetPerLine+2];
@@ -1007,7 +1015,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
                                  + ", index: " + std::to_string(metaData.annotationListIndex)
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
-    // count epochs according to counters
+    // Count epochs according to counters
     if (metaData.writeNumber == 0)
         sCurrentEpoch++;
     metaData.epoch = sCurrentEpoch;
@@ -1085,6 +1093,18 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
                 currentPerson.isVisible[part] = 2; // 2 means cropped, 1 means occluded by still on image
             }
         }
+    }
+    if (mPoseModel == PoseModel::DOME_18)
+    {
+        // Image path
+        // const int currentLine = (9+metaData.numberOtherPeople+3*metaData.numberOtherPeople);
+        const int currentLine = (8+metaData.numberOtherPeople+3*metaData.numberOtherPeople);
+        metaData.imageSource = decodeString(&data[currentLine * offsetPerLine]);
+        // Depth enabled
+        metaData.depthEnabled = decodeNumber<Dtype>(&data[(currentLine+1) * offsetPerLine]) == Dtype(255);
+        // Depth path
+        if (metaData.depthEnabled)
+            metaData.depthSource = decodeString(&data[(currentLine+2) * offsetPerLine]);
     }
 }
 

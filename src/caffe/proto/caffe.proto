@@ -483,6 +483,7 @@ message OPTransformationParameter {
   optional uint32 gray = 34 [default = 0];
   optional bool transform_body_joint = 38 [default = true];
   optional string model = 39 [default = "COCO"];
+  optional string media_directory = 40 [default = ""];
 }
 // OpenPose: end new parameter
 
