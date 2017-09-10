@@ -314,10 +314,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
     if (mPoseModel == PoseModel::DOME_18)
-        maskMiss = cv::Mat(image.cols, image.rows, CV_8UC1, cv::Scalar{255});
+        maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
     else
     {
-        maskMiss = cv::Mat(image.cols, image.rows, CV_8UC1, cv::Scalar{0});
+        maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{0});
         for (auto y = 0; y < maskMiss.rows; y++)
         {
             const auto yOffset = (int)(y*image.cols);
