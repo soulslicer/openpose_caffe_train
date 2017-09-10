@@ -93,8 +93,8 @@ protected:
     struct AugmentSelection
     {
         bool flip = false;
-        float degree = 0.f;
-        cv::Size crop = cv::Size{};
+        std::pair<cv::Mat, cv::Size> RotAndFinalSize;
+        cv::Point2i cropCenter;
         float scale = 1.f;
     };
 
@@ -134,15 +134,27 @@ protected:
     std::vector<std::vector<int>> mAugmentationFlips;
 
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum);
-    void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss, const MetaData& metaData) const;
+    void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss,
+                          const MetaData& metaData) const;
     void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
-
-    float augmentationScale(cv::Mat& imageTemp, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
-    float augmentationRotate(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& imageSource) const;
-    cv::Size augmentationCropped(cv::Mat& imageAugmented, cv::Mat& maskMissAugmented, MetaData& metaData,
-                                 const cv::Mat& imageTemp, const cv::Mat& maskMiss) const;
-    bool augmentationFlip(cv::Mat& imageAugmented, cv::Mat& maskMiss, MetaData& metaData, const cv::Mat& image) const;
-
+    // Scale
+    float estimateScale(const MetaData& metaData) const;
+    void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image) const;
+    void applyScale(MetaData& metaData, const float scale) const;
+    // Rotation
+    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize) const;
+    void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size> RotAndFinalSize,
+                       const cv::Mat& image, const unsigned char defaultBorderValue) const;
+    void applyRotation(MetaData& metaData, const cv::Mat& Rot) const;
+    // Cropping
+    cv::Point2i estimateCrop(const MetaData& metaData) const;
+    void applyCrop(cv::Mat& imageAugmented, const cv::Point2i& cropCenter, const cv::Mat& image,
+                   const unsigned char defaultBorderValue) const;
+    void applyCrop(MetaData& metaData, const cv::Point2i& cropCenter) const;
+    // Flipping
+    bool estimateFlip(const MetaData& metaData) const;
+    void applyFlip(cv::Mat& imageAugmented, const bool flip, const cv::Mat& image) const;
+    void applyFlip(MetaData& metaData, const bool flip, const int imageWidth) const;
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const;
     void swapLeftRight(Joints& joints) const;
     void setAugmentationTable(const int numData);
@@ -150,9 +162,11 @@ protected:
     void transformMetaJoints(MetaData& metaData) const;
     void transformJoints(Joints& joints) const;
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit) const;
-    void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY, const float sigma) const;
-    void putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride,
-                    const int gridX, const int gridY, const float sigma, const int thre) const;
+    void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
+                         const float sigma) const;
+    void putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
+                    const cv::Point2f& centerB, const int stride, const int gridX, const int gridY, const float sigma,
+                    const int thre) const;
     // OpenPose: added end
 };
 
