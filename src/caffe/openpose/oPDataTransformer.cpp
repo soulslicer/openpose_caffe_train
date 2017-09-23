@@ -572,10 +572,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         }
         if (depthEnabled)
         {
-            cv::Mat depthMap = depthAugmented.clone();
-            cv::resize(depthMap, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+            cv::Mat depthMap;
+            cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
             char imagename [100];
-            sprintf(imagename, "visualize/augment_%04d_label_part_%02d.png", metaData.writeNumber, 2*numberBodyBkgPAFParts+1);
+            sprintf(imagename, "visualize/augment_%04d_label_part_depth.png", metaData.writeNumber, 2*numberBodyBkgPAFParts+1);
             cv::imwrite(imagename, depthMap);
         }
     }
