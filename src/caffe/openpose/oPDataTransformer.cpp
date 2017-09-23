@@ -319,7 +319,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const std::string& data = datumNegative->data();
         const int datumNegativeHeight = datumNegative->height();
         const int datumNegativeWidth = datumNegative->width();
-        const auto datumNegativeArea = (int)(datumHeight * datumWidth);
+        const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
         // Background image
         backgroundImage = cv::Mat(datumNegativeHeight, datumNegativeWidth, CV_8UC3);
         const auto imageArea = (int)(backgroundImage.rows * backgroundImage.cols);
@@ -337,6 +337,16 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                     rgb[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
                 }
             }
+        }
+        // Resize
+        if (backgroundImage.cols < param_.crop_size_x() || backgroundImage.rows < param_.crop_size_y())
+        {
+            const auto scaleX = param_.crop_size_x() / (double)backgroundImage.cols;
+            const auto scaleY = param_.crop_size_y() / (double)backgroundImage.rows;
+            const auto scale = std::max(scaleX, scaleY) * 1.1; // 1.1 to avoid truncating final size down
+            cv::Mat backgroundImageTemp;
+            cv::resize(backgroundImage, backgroundImageTemp, cv::Size{}, scale, scale, CV_INTER_CUBIC);
+            backgroundImage = backgroundImageTemp;
         }
         // Mask fro background image
         maskBackgroundImage = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{0}); // Image size, not backgroundImage
@@ -429,8 +439,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyRotation(metaData, augmentSelection.RotAndFinalSize.first);
         // Cropping
         augmentSelection.cropCenter = estimateCrop(metaData);
+        const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
         applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, 0);
-        applyCrop(backgroundImageTemp, augmentSelection.cropCenter, backgroundImage, 0);
+        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0);
         applyCrop(maskBackgroundImage, augmentSelection.cropCenter, maskBackgroundImageTemp, 255);
         applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, DEFAULT_MASK_VALUE);
         applyCrop(depthAugmented, augmentSelection.cropCenter, depthTemp, 0);

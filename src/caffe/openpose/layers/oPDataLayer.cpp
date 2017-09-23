@@ -21,7 +21,6 @@ template <typename Dtype>
 OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
     offset_(),
-    offsetNegatives(), // OpenPose: added
     op_transform_param_(param.op_transform_param()) // OpenPose: added
 {
     db_.reset(db::GetDB(param.data_param().backend()));
@@ -31,13 +30,13 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     // Set up negatives DB
     if (!param.op_transform_param().source_background().empty())
     {
-        negativesDb = true;
-        dbNegatives.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
-        dbNegatives->Open(param.op_transform_param().source_background(), db::READ);
-        cursorNegatives.reset(dbNegatives->NewCursor());
+        backgroundDb = true;
+        dbBackground.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
+        dbBackground->Open(param.op_transform_param().source_background(), db::READ);
+        cursorBackground.reset(dbBackground->NewCursor());
     }
     else
-        negativesDb = false;
+        backgroundDb = false;
     // OpenPose: added end
 }
 
@@ -136,14 +135,14 @@ void OPDataLayer<Dtype>::Next()
         cursor_->SeekToFirst();
     }
     // OpenPose: added
-    if (negativesDb)
+    if (backgroundDb)
     {
-        cursorNegatives->Next();
+        cursorBackground->Next();
         if (!cursor_->valid())
         {
             LOG_IF(INFO, Caffe::root_solver())
                     << "Restarting negatives data prefetching from start.";
-            cursorNegatives->SeekToFirst();
+            cursorBackground->SeekToFirst();
         }
     }
     // OpenPose: added ended
@@ -168,7 +167,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // OpenPose: added ended
 
     Datum datum;
-    Datum datumNegatives;
+    Datum datumBackground;
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
         while (Skip()) {
@@ -176,8 +175,8 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         }
         datum.ParseFromString(cursor_->value());
         // OpenPose: added
-        if (negativesDb)
-            datumNegatives.ParseFromString(cursorNegatives->value());
+        if (backgroundDb)
+            datumBackground.ParseFromString(cursorBackground->value());
         // OpenPose: added ended
         read_time += timer.MicroSeconds();
 
@@ -212,11 +211,11 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         const int offsetLabel = batch->label_.offset(item_id);
         this->transformed_label_.set_cpu_data(topLabel + offsetLabel);
         // Process iamge & label
-        if (negativesDb)
+        if (backgroundDb)
             this->mOPDataTransformer->Transform(&(this->transformed_data_),
                                                 &(this->transformed_label_),
                                                 datum,
-                                                &datumNegatives);
+                                                &datumBackground);
         else
             this->mOPDataTransformer->Transform(&(this->transformed_data_),
                                                 &(this->transformed_label_),
