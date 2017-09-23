@@ -29,11 +29,11 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     cursor_.reset(db_->NewCursor());
     // OpenPose: added
     // Set up negatives DB
-    if (!param.op_transform_param().source_negatives().empty())
+    if (!param.op_transform_param().source_background().empty())
     {
         negativesDb = true;
         dbNegatives.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
-        dbNegatives->Open(param.op_transform_param().source_negatives(), db::READ);
+        dbNegatives->Open(param.op_transform_param().source_background(), db::READ);
         cursorNegatives.reset(dbNegatives->NewCursor());
     }
     else

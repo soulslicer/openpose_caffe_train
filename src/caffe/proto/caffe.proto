@@ -484,7 +484,7 @@ message OPTransformationParameter {
   optional bool transform_body_joint = 38 [default = true];
   optional string model = 39 [default = "COCO"];
   optional string media_directory = 40 [default = ""];
-  optional string source_negatives = 41 [default = ""];
+  optional string source_background = 41 [default = ""];
 }
 // OpenPose: end new parameter
 
