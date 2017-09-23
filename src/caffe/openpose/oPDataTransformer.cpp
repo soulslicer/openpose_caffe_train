@@ -99,25 +99,26 @@ const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*23, 2*19};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
                                                                          NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
-const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS_SWAP{
+const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS{
+    std::vector<std::vector<int>>{
+        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}                       // COCO_18
+    },
+    std::vector<std::vector<int>>{
+        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {16},{15},{16},{15}  // BODY_22
+    },
+    std::vector<std::vector<int>>{
+        {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {8}, {9}, {10},{11},{12},{13},{14},{15},{16}                    // DOME_18
+    }
+};
+const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
     std::vector<int>{5,6,7,11,12,13,15,17},                                                                 // COCO_18
     std::vector<int>{5,6,7,11,12,13,15,17, 19,21},                                                          // BODY_22
-    std::vector<int>{1,2,3,7,8,9,13,15}                                                                     // DOME_18
+    std::vector<int>{5,6,7,11,12,13,15,17}                                                                  // DOME_18
 };
-const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS_SWAP{
+const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                                  // COCO_18
     std::vector<int>{2,3,4, 8,9,10,14,16, 18,20},                                                           // BODY_22
-    std::vector<int>{4,5,6,10,11,12,14,16}                                                                  // DOME_18
-};
-const std::array<std::vector<int>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS_A{
-    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},                                      // COCO_18
-    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},                         // BODY_22
-    std::vector<int>{0,1, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}                                    // DOME_18
-};
-const std::array<std::vector<int>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS_B{
-    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},                                      // COCO_18
-    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},                         // BODY_22
-    std::vector<int>{0,4, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}                                    // DOME_18
+    std::vector<int>{2,3,4, 8,9,10,14,16}                                                                   // DOME_18
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15},                    // COCO_18
@@ -131,14 +132,14 @@ const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
 };
 PoseModel flagsToPoseModel(const std::string& poseModeString)
 {
-    if (poseModeString == "COCO")
+    if (poseModeString == "COCO_18")
         return PoseModel::COCO_18;
     else if (poseModeString == "BODY_22")
         return PoseModel::BODY_22;
-    else if (poseModeString == "DOME")
+    else if (poseModeString == "DOME_18")
         return PoseModel::DOME_18;
     // else
-    throw std::runtime_error{"String does not correspond to any model (COCO, BODY_22, DOME, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    throw std::runtime_error{"String does not correspond to any model (COCO_18, DOME_18, BODY_22, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     return PoseModel::COCO_18;
 }
 // OpenPose: added end
@@ -383,7 +384,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Depth image
     cv::Mat depth;
     if (depthEnabled)
-        depth = cv::imread(metaData.depthSource, CV_LOAD_IMAGE_ANYDEPTH);
+    {
+        const auto depthFullPath = param_.media_directory() + metaData.depthSource;
+        depth = cv::imread(depthFullPath, CV_LOAD_IMAGE_ANYDEPTH);
+        if (image.empty())
+            throw std::runtime_error{"Empty depth at " + depthFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    }
 
     // Clahe
     if (param_.do_clahe())
@@ -941,6 +947,19 @@ void OPDataTransformer<Dtype>::applyCrop(cv::Mat& imageAugmented, const cv::Poin
                 }
             }
         }
+        else if (imageAugmented.type() == CV_16UC1)
+        {
+            for (auto y = 0 ; y < cropY ; y++)
+            {
+                for (auto x = 0 ; x < cropX ; x++)
+                {
+                    const int xOrigin = cropCenter.x - cropX/2 + x;
+                    const int yOrigin = cropCenter.y - cropY/2 + y;
+                    if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
+                        imageAugmented.at<uint16_t>(y,x) = image.at<uint16_t>(yOrigin, xOrigin);
+                }
+            }
+        }
         else
             throw std::runtime_error{"Not implemented for image.type() == " + std::to_string(imageAugmented.type())
                                      + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -1034,8 +1053,8 @@ void OPDataTransformer<Dtype>::rotatePoint(cv::Point2f& point2f, const cv::Mat& 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::swapLeftRight(Joints& joints) const
 {
-    const auto& vectorLeft = SWAP_LEFTS_SWAP[(int)mPoseModel];
-    const auto& vectorRight = SWAP_RIGHTS_SWAP[(int)mPoseModel];
+    const auto& vectorLeft = SWAP_LEFTS[(int)mPoseModel];
+    const auto& vectorRight = SWAP_RIGHTS[(int)mPoseModel];
     for (auto i = 0 ; i < vectorLeft.size() ; i++)
     {
         const auto li = vectorLeft[i];
@@ -1205,11 +1224,12 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     if (mPoseModel == PoseModel::DOME_18)
     {
         // Image path
-        // const int currentLine = (9+metaData.numberOtherPeople+3*metaData.numberOtherPeople);
-        const int currentLine = (8+metaData.numberOtherPeople+3*metaData.numberOtherPeople);
+        int currentLine = 8;
+        if (metaData.numberOtherPeople != 0)
+            currentLine = 9+4*metaData.numberOtherPeople;
         metaData.imageSource = decodeString(&data[currentLine * offsetPerLine]);
         // Depth enabled
-        metaData.depthEnabled = decodeNumber<Dtype>(&data[(currentLine+1) * offsetPerLine]) == Dtype(255);
+        metaData.depthEnabled = decodeNumber<Dtype>(&data[(currentLine+1) * offsetPerLine]) != Dtype(0);
         // Depth path
         if (metaData.depthEnabled)
             metaData.depthSource = decodeString(&data[(currentLine+2) * offsetPerLine]);
@@ -1239,9 +1259,8 @@ void OPDataTransformer<Dtype>::transformJoints(Joints& joints) const
     joints.isVisible.resize(numberBodyAndPAFParts);
 
     // From COCO/DomeDB to OP keypoint indexes
-    const auto& modelToOursA = TRANSFORM_MODEL_TO_OURS_A[(int)mPoseModel];
-    const auto& modelToOursB = TRANSFORM_MODEL_TO_OURS_B[(int)mPoseModel];
-    for (auto i = 0 ; i < modelToOursA.size() ; i++)
+    const auto& modelToOurs = TRANSFORM_MODEL_TO_OURS[(int)mPoseModel];
+    for (auto i = 0 ; i < modelToOurs.size() ; i++)
     {
         // Original COCO:
         //     v=0: not labeled
@@ -1251,13 +1270,26 @@ void OPDataTransformer<Dtype>::transformJoints(Joints& joints) const
         //     v=0: labeled but not visible
         //     v=1: labeled and visible
         //     v=2: out of image / unlabeled
-        joints.points[i] = (jointsOld.points[modelToOursA[i]] + jointsOld.points[modelToOursB[i]]) * 0.5f;
-        // 2
-        if (jointsOld.isVisible[modelToOursA[i]] == 2 || jointsOld.isVisible[modelToOursB[i]] == 2)
-            joints.isVisible[i] = 2;
-        // 0 or 1
-        else
-            joints.isVisible[i] = jointsOld.isVisible[modelToOursA[i]] && jointsOld.isVisible[modelToOursB[i]];
+        // Get joints.points[i]
+        joints.points[i] = cv::Point2f{0.f, 0.f};
+        for (auto& modelToOursIndex : modelToOurs[i])
+            joints.points[i] += jointsOld.points[modelToOursIndex];
+        joints.points[i] *= (1.f / (float)modelToOurs[i].size());
+        // Get joints.isVisible[i]
+        joints.isVisible[i] = 1;
+        for (auto& modelToOursIndex : modelToOurs[i])
+        {
+            // If any of them is 2 --> 2 (not in the image or unlabeled)
+            if (jointsOld.isVisible[modelToOursIndex] == 2)
+            {
+                joints.isVisible[i] = 2;
+                break;
+            }
+            // If no 2 but 0 -> 0 (ocluded but located)
+            else if (jointsOld.isVisible[modelToOursIndex] == 0)
+                joints.isVisible[i] = 0;
+            // Else 1 (if all are 1s)
+        }
     }
 }
 
