@@ -115,12 +115,13 @@ namespace caffe {
 //     {16, "LEar"},
 //     {17, "Background"},
 // };
-const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19};
-const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 17, 17};
-const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*19, 2*20};
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 17, 17, 17};
+const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*19, 2*20, 2*20};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
-                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
+                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2],
+                                                                         NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3]};
 const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS{
     std::vector<std::vector<int>>{
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}           // COCO_18
@@ -130,27 +131,34 @@ const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_
     },
     std::vector<std::vector<int>>{
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}  // COCO_19
+    },
+    std::vector<std::vector<int>>{
+        {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {9,10}, {9}, {10},{11},{12},{13},{14},{15},{16}     // DOME_19
     }
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
     std::vector<int>{5,6,7,11,12,13,15,17},                                                             // COCO_18
     std::vector<int>{5,6,7,11,12,13,15,17},                                                             // DOME_18
-    std::vector<int>{5,6,7,12,13,14,16,18}                                                              // COCO_19
+    std::vector<int>{5,6,7,12,13,14,16,18},                                                             // COCO_19
+    std::vector<int>{5,6,7,12,13,14,16,18},                                                             // DOME_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // COCO_18
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // DOME_18
-    std::vector<int>{2,3,4, 9,10,11,15,17}                                                              // COCO_19
+    std::vector<int>{2,3,4, 9,10,11,15,17},                                                             // COCO_19
+    std::vector<int>{2,3,4, 9,10,11,15,17},                                                             // DOME_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // COCO_18
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // DOME_18
-    std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16}                // COCO_19
+    std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},               // COCO_19
+    std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},               // DOME_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // COCO_18
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // DOME_18
-    std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18}                // COCO_19
+    std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},               // COCO_19
+    std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},               // DOME_19
 };
 PoseModel flagsToPoseModel(const std::string& poseModeString)
 {
@@ -160,6 +168,8 @@ PoseModel flagsToPoseModel(const std::string& poseModeString)
         return PoseModel::COCO_19;
     else if (poseModeString == "DOME_18")
         return PoseModel::DOME_18;
+    else if (poseModeString == "DOME_19")
+        return PoseModel::DOME_19;
     // else
     throw std::runtime_error{"String does not correspond to any model (COCO_18, DOME_18, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     return PoseModel::COCO_18;
@@ -275,7 +285,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read meta data (LMDB channel 3)
     MetaData metaData;
-    if (mPoseModel == PoseModel::DOME_18)
+    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
         readMetaData(metaData, data.c_str(), datumWidth);
     else
     {
@@ -288,7 +298,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read image (LMDB channel 1)
     cv::Mat image;
-    if (mPoseModel == PoseModel::DOME_18)
+    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
     {
         const auto imageFullPath = param_.media_directory() + metaData.imageSource;
         image = cv::imread(imageFullPath, CV_LOAD_IMAGE_COLOR);
@@ -362,7 +372,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
-    if (mPoseModel == PoseModel::DOME_18)
+    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
         maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
     else
     {
@@ -560,11 +570,14 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                 cv::imwrite(imagename, labelMap);
             }
         }
-        cv::Mat depthMap = depthAugmented.clone();
-        cv::resize(depthMap, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-        char imagename [100];
-        sprintf(imagename, "visualize/augment_%04d_label_part_%02d.png", metaData.writeNumber, 2*numberBodyBkgPAFParts+1);
-        cv::imwrite(imagename, depthMap);
+        if (depthEnabled)
+        {
+            cv::Mat depthMap = depthAugmented.clone();
+            cv::resize(depthMap, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+            char imagename [100];
+            sprintf(imagename, "visualize/augment_%04d_label_part_%02d.png", metaData.writeNumber, 2*numberBodyBkgPAFParts+1);
+            cv::imwrite(imagename, depthMap);
+        }
     }
 }
 
@@ -1267,7 +1280,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
                     currentPerson.isVisible[part] = 2; // 2 means cropped/unlabeled, 0 means occluded  but in image
         }
     }
-    if (mPoseModel == PoseModel::DOME_18)
+    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
     {
         // Image path
         int currentLine = 8;

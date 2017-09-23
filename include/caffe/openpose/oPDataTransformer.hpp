@@ -23,6 +23,7 @@ enum class PoseModel
     COCO_18 = 0,
     DOME_18 = 1,
     COCO_19 = 2,
+    DOME_19 = 3,
     Size,
 };
 // OpenPose: added end
