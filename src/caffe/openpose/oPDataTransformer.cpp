@@ -123,34 +123,34 @@ const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_
                                                                          NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
 const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS{
     std::vector<std::vector<int>>{
-        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}                       // COCO_18
+        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}           // COCO_18
     },
     std::vector<std::vector<int>>{
-        {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {8}, {9}, {10},{11},{12},{13},{14},{15},{16}                    // DOME_18
+        {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {8}, {9}, {10},{11},{12},{13},{14},{15},{16}        // DOME_18
     },
     std::vector<std::vector<int>>{
-        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}              // COCO_19
+        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}  // COCO_19
     }
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
-    std::vector<int>{5,6,7,11,12,13,15,17},                                                                 // COCO_18
-    std::vector<int>{5,6,7,11,12,13,15,17},                                                                 // DOME_18
-    std::vector<int>{5,6,7,12,13,14,16,18}                                                                  // COCO_19
+    std::vector<int>{5,6,7,11,12,13,15,17},                                                             // COCO_18
+    std::vector<int>{5,6,7,11,12,13,15,17},                                                             // DOME_18
+    std::vector<int>{5,6,7,12,13,14,16,18}                                                              // COCO_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
-    std::vector<int>{2,3,4, 8,9,10,14,16},                                                                  // COCO_18
-    std::vector<int>{2,3,4, 8,9,10,14,16},                                                                  // DOME_18
-    std::vector<int>{2,3,4, 9,10,11,15,17}                                                                  // COCO_19
+    std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // COCO_18
+    std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // DOME_18
+    std::vector<int>{2,3,4, 9,10,11,15,17}                                                              // COCO_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
-    std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                   // COCO_18
-    std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                   // DOME_18
-    std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16}                    // COCO_19
+    std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // COCO_18
+    std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // DOME_18
+    std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16}                // COCO_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
-    std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                   // COCO_18
-    std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                   // DOME_18
-    std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18}                    // COCO_19
+    std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // COCO_18
+    std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // DOME_18
+    std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18}                // COCO_19
 };
 PoseModel flagsToPoseModel(const std::string& poseModeString)
 {
