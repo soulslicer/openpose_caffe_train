@@ -1382,7 +1382,9 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
     const int minY = std::max( int(round(std::min(centerAAux.y, centerBAux.y) - threshold)), 0);
     const int maxY = std::min( int(round(std::max(centerAAux.y, centerBAux.y) + threshold)), gridY);
 
-    const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
+    // const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
+    cv::Point2f bc = centerBAux - centerAAux;
+    bc *= (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
 
     // const float x_p = (centerAAux.x + centerBAux.x) / 2;
     // const float y_p = (centerAAux.y + centerBAux.y) / 2;
