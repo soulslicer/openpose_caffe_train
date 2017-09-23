@@ -255,24 +255,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     MetaData metaData;
     if (mPoseModel == PoseModel::DOME_18)
         readMetaData(metaData, data.c_str(), datumWidth);
-    else //if (hasUInt8)
+    else
+    {
         readMetaData(metaData, &data[3 * datumArea], datumWidth);
-    // else
-    // {
-    //     throw std::runtime_error{"Error" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    //     std::string metadataString(datumArea, '\0');
-    //     for (auto y = 0; y < datumHeight; ++y)
-    //     {
-    //         const auto yOffset = (int)(y*datumWidth);
-    //         for (auto x = 0; x < datumWidth; ++x)
-    //         {
-    //             const auto xyOffset = yOffset + x;
-    //             const auto dIndex = (int)(3*datumArea + xyOffset);
-    //             metadataString[xyOffset] = datum.float_data(dIndex);
-    //         }
-    //     }
-    //     readMetaData(metaData, metadataString.c_str(), datumWidth);
-    // }
+        metaData.depthEnabled = false;
+    }
     if (param_.transform_body_joint()) // we expect to transform body joints, and not to transform hand joints
         transformMetaJoints(metaData);
     const auto depthEnabled = metaData.depthEnabled;
@@ -401,7 +388,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         cv::cvtColor(image, image, CV_BGR2GRAY);
         cv::cvtColor(image, image, CV_GRAY2BGR);
     }
-    VLOG(2) << "  color: " << timer1.MicroSeconds()*1e-3 << " ms";
+    VLOG(2) << "  cvtColor and CLAHE: " << timer1.MicroSeconds()*1e-3 << " ms";
     timer1.Start();
 
     VLOG(2) << "  ReadMeta+MetaJoints: " << timer1.MicroSeconds()*1e-3 << " ms";
@@ -472,6 +459,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
             imageAugmented = imageAugmentedTemp;
         }
+        if (depthEnabled && !depthTemp.empty())
+            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
     }
     // Test
     else
@@ -479,6 +468,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         imageAugmented = image;
         maskMissAugmented = maskMiss;
         depthAugmented = depth;
+        // Resize mask
+        if (!maskMissAugmented.empty())
+            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+        if (depthEnabled)
+            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
     }
     // Visualize final
     if (param_.visualize())
@@ -503,6 +497,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Generate and copy label
     generateLabelMap(transformedLabel, imageAugmented, maskMissAugmented, metaData);
+    if (depthEnabled)
+        generateLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // Visualize
@@ -541,6 +537,34 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                 sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
                 cv::imwrite(imagename, labelMap);
             }
+        }
+        cv::Mat depthMap = depthAugmented.clone();
+        cv::resize(depthMap, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+        char imagename [100];
+        sprintf(imagename, "visualize/augment_%04d_label_part_%02d.png", metaData.writeNumber, 2*numberBodyBkgPAFParts+1);
+        cv::imwrite(imagename, depthMap);
+    }
+}
+
+template<typename Dtype>
+void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const
+{
+    const auto gridX = (int)depth.cols;
+    const auto gridY = (int)depth.rows;
+    const auto channelOffset = gridY * gridX;
+    const auto numberBodyAndPAFParts = NUMBER_BODY_AND_PAF_CHANNELS[(int)mPoseModel];
+    // generate depth
+    for (auto gY = 0; gY < gridY; gY++)
+    {
+        const auto yOffset = gY*gridX;
+        for (auto gX = 0; gX < gridX; gX++)
+        {
+            const auto xyOffset = yOffset + gX;
+
+            auto depth_val = depth.at<uint16_t>(gY, gX);
+
+            transformedLabel[(2*numberBodyAndPAFParts+2)*channelOffset + xyOffset] = (depth_val>0)?1.0:0.0;
+            transformedLabel[(2*numberBodyAndPAFParts+3)*channelOffset + xyOffset] = float(depth_val)/1000.0;
         }
     }
 }
@@ -1358,10 +1382,7 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
     const int minY = std::max( int(round(std::min(centerAAux.y, centerBAux.y) - threshold)), 0);
     const int maxY = std::min( int(round(std::max(centerAAux.y, centerBAux.y) + threshold)), gridY);
 
-    cv::Point2f bc = centerBAux - centerAAux;
-    const float norm_bc = sqrt(bc.x*bc.x + bc.y*bc.y);
-    bc.x = bc.x /norm_bc;
-    bc.y = bc.y /norm_bc;
+    const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
 
     // const float x_p = (centerAAux.x + centerBAux.x) / 2;
     // const float y_p = (centerAAux.y + centerBAux.y) / 2;
