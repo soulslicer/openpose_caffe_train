@@ -41,6 +41,10 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   uint64_t offset_;
 
   // OpenPose: added
+  bool negativesDb;
+  shared_ptr<db::DB> dbNegatives;
+  shared_ptr<db::Cursor> cursorNegatives;
+  uint64_t offsetNegatives;
   Blob<Dtype> transformed_label_;
   OPTransformationParameter op_transform_param_;
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformer;

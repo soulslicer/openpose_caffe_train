@@ -194,24 +194,24 @@ void OPDataTransformer<Dtype>::InitRand() {
 
 // OpenPose: added
 template<typename Dtype>
-void OPDataTransformer<Dtype>::Transform(const Datum& datum, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel)
+void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum, const Datum* datumNegative)
 {
     // Secuirty checks
     const int datumChannels = datum.channels();
-    const int im_num = transformedData->num();
-    const int im_channels = transformedData->channels();
-    const int lb_num = transformedLabel->num();
+    const int imageNum = transformedData->num();
+    const int imageChannels = transformedData->channels();
+    const int labelNum = transformedLabel->num();
     CHECK_GE(datumChannels, 1);
-    CHECK_EQ(im_channels, 3);
-    CHECK_EQ(im_num, lb_num);
-    CHECK_GE(im_num, 1);
+    CHECK_EQ(imageChannels, 3);
+    CHECK_EQ(imageNum, labelNum);
+    CHECK_GE(imageNum, 1);
 
     auto* transformedDataPtr = transformedData->mutable_cpu_data();
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum);
-    VLOG(2) << "Transform_nv: " << timer.MicroSeconds() / 1000.0  << " ms";
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative);
+    VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
 
 template <typename Dtype>
@@ -237,7 +237,7 @@ int OPDataTransformer<Dtype>::Rand(int n) {
 
 // OpenPose: added
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum)
+void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const Datum* datumNegative)
 {
     // Parameters
     const std::string& data = datum.data();
@@ -311,6 +311,37 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         }
     }
 
+    // Read background image
+    cv::Mat backgroundImage;
+    cv::Mat maskBackgroundImage;
+    if (datumNegative != nullptr)
+    {
+        const std::string& data = datumNegative->data();
+        const int datumNegativeHeight = datumNegative->height();
+        const int datumNegativeWidth = datumNegative->width();
+        const auto datumNegativeArea = (int)(datumHeight * datumWidth);
+        // Background image
+        backgroundImage = cv::Mat(datumNegativeHeight, datumNegativeWidth, CV_8UC3);
+        const auto imageArea = (int)(backgroundImage.rows * backgroundImage.cols);
+        CHECK_EQ(imageArea, datumNegativeArea);
+        for (auto y = 0; y < backgroundImage.rows; ++y)
+        {
+            const auto yOffset = (int)(y*backgroundImage.cols);
+            for (auto x = 0; x < backgroundImage.cols; ++x)
+            {
+                const auto xyOffset = yOffset + x;
+                cv::Vec3b& rgb = backgroundImage.at<cv::Vec3b>(y, x);
+                for (auto c = 0; c < 3; c++)
+                {
+                    const auto dIndex = (int)(c*imageArea + xyOffset);
+                    rgb[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                }
+            }
+        }
+        // Mask fro background image
+        maskBackgroundImage = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{0}); // Image size, not backgroundImage
+    }
+
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
     if (mPoseModel == PoseModel::DOME_18)
@@ -368,6 +399,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     if (param_.visualize())
         visualize(image, metaData, augmentSelection);
     cv::Mat imageAugmented;
+    cv::Mat backgroundImageAugmented;
     cv::Mat maskMissAugmented;
     cv::Mat depthAugmented;
     VLOG(2) << "   input size (" << image.cols << ", " << image.rows << ")";
@@ -377,35 +409,54 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     {
         // Temporary variables
         cv::Mat imageTemp; // Size determined by scale
+        cv::Mat backgroundImageTemp;
+        cv::Mat maskBackgroundImageTemp;
         cv::Mat maskMissTemp;
         cv::Mat depthTemp;
         // Scale
         augmentSelection.scale = estimateScale(metaData);
         applyScale(imageTemp, augmentSelection.scale, image);
+        applyScale(maskBackgroundImageTemp, augmentSelection.scale, maskBackgroundImage);
         applyScale(maskMissTemp, augmentSelection.scale, maskMiss);
         applyScale(depthTemp, augmentSelection.scale, depth);
         applyScale(metaData, augmentSelection.scale);
         // Rotation
         augmentSelection.RotAndFinalSize = estimateRotation(metaData, imageTemp.size());
         applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, 0);
+        applyRotation(maskBackgroundImageTemp, augmentSelection.RotAndFinalSize, maskBackgroundImageTemp, 255);
         applyRotation(maskMissTemp, augmentSelection.RotAndFinalSize, maskMissTemp, DEFAULT_MASK_VALUE);
         applyRotation(depthTemp, augmentSelection.RotAndFinalSize, depthTemp, 0);
         applyRotation(metaData, augmentSelection.RotAndFinalSize.first);
         // Cropping
         augmentSelection.cropCenter = estimateCrop(metaData);
         applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, 0);
+        applyCrop(backgroundImageTemp, augmentSelection.cropCenter, backgroundImage, 0);
+        applyCrop(maskBackgroundImage, augmentSelection.cropCenter, maskBackgroundImageTemp, 255);
         applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, DEFAULT_MASK_VALUE);
         applyCrop(depthAugmented, augmentSelection.cropCenter, depthTemp, 0);
         applyCrop(metaData, augmentSelection.cropCenter);
         // Flipping
         augmentSelection.flip = estimateFlip(metaData);
         applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
+        applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
+        applyFlip(maskBackgroundImage, augmentSelection.flip, maskBackgroundImage);
         applyFlip(maskMissAugmented, augmentSelection.flip, maskMissAugmented);
         applyFlip(depthAugmented, augmentSelection.flip, depthAugmented);
         applyFlip(metaData, augmentSelection.flip, imageAugmented.cols);
         // Resize mask
         if (!maskMissTemp.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+        // Final background image - elementwise multiplication
+        if (!backgroundImageAugmented.empty() && !maskBackgroundImage.empty())
+        {
+            // Apply mask to background image
+            cv::Mat backgroundImageAugmentedTemp;
+            backgroundImageAugmented.copyTo(backgroundImageAugmentedTemp, maskBackgroundImage);
+            // Add background image to image augmented
+            cv::Mat imageAugmentedTemp;
+            addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
+            imageAugmented = imageAugmentedTemp;
+        }
     }
     // Test
     else
@@ -453,6 +504,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF();
         for (auto part = 0; part < 2*numberBodyBkgPAFParts; part++)
         {
+            // Original image
+            // char imagename [100];
+            // sprintf(imagename, "visualize/augment_%04d_label_part_000.jpg", metaData.writeNumber);
+            // cv::imwrite(imagename, imageAugmented);
             // Reduce #images saved (ideally images from 0 to numberBodyBkgPAFParts should be the same)
             if (part < 3 || part >= numberBodyBkgPAFParts - 3)
             {
@@ -477,7 +532,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss,
-                                                 const MetaData& metaData) const
+                                                const MetaData& metaData) const
 {
     const auto rezX = (int)image.cols;
     const auto rezY = (int)image.rows;
