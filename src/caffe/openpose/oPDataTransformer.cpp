@@ -115,19 +115,15 @@ namespace caffe {
 //     {16, "LEar"},
 //     {17, "Background"},
 // };
-const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 22, 18, 19};
-const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 17, 17, 17};
-const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*23, 2*19, 2*20};
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 17, 17};
+const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*19, 2*20};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
-                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2],
-                                                                         NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3]};
+                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
 const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS{
     std::vector<std::vector<int>>{
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}                       // COCO_18
-    },
-    std::vector<std::vector<int>>{
-        {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {16},{15},{16},{15}  // BODY_22
     },
     std::vector<std::vector<int>>{
         {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {8}, {9}, {10},{11},{12},{13},{14},{15},{16}                    // DOME_18
@@ -138,25 +134,21 @@ const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
     std::vector<int>{5,6,7,11,12,13,15,17},                                                                 // COCO_18
-    std::vector<int>{5,6,7,11,12,13,15,17, 19,21},                                                          // BODY_22
     std::vector<int>{5,6,7,11,12,13,15,17},                                                                 // DOME_18
     std::vector<int>{5,6,7,12,13,14,16,18}                                                                  // COCO_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                                  // COCO_18
-    std::vector<int>{2,3,4, 8,9,10,14,16, 18,20},                                                           // BODY_22
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                                  // DOME_18
     std::vector<int>{2,3,4, 9,10,11,15,17}                                                                  // COCO_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                   // COCO_18
-    std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15, 10, 13, 10, 13},   // BODY_22
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                   // DOME_18
     std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16}                    // COCO_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                   // COCO_18
-    std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17, 18, 19, 20, 21},   // BODY_22
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                   // DOME_18
     std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18}                    // COCO_19
 };
@@ -164,12 +156,12 @@ PoseModel flagsToPoseModel(const std::string& poseModeString)
 {
     if (poseModeString == "COCO_18")
         return PoseModel::COCO_18;
-    else if (poseModeString == "BODY_22")
-        return PoseModel::BODY_22;
+    else if (poseModeString == "COCO_19")
+        return PoseModel::COCO_19;
     else if (poseModeString == "DOME_18")
         return PoseModel::DOME_18;
     // else
-    throw std::runtime_error{"String does not correspond to any model (COCO_18, DOME_18, BODY_22, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    throw std::runtime_error{"String does not correspond to any model (COCO_18, DOME_18, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     return PoseModel::COCO_18;
 }
 // OpenPose: added end

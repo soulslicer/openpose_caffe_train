@@ -21,9 +21,8 @@ namespace caffe {
 enum class PoseModel
 {
     COCO_18 = 0,
-    BODY_22 = 1,
-    DOME_18 = 2,
-    COCO_19 = 3,
+    DOME_18 = 1,
+    COCO_19 = 2,
     Size,
 };
 // OpenPose: added end
