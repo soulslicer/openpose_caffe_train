@@ -93,54 +93,52 @@ namespace caffe {
 //     {16, "LEar"},
 //     {17, "Background"},
 // };
-const auto DEFAULT_MASK_VALUE = 255;
-const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 15, 22, 18};
-const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 15, 17, 17};
-const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*14, 2*23, 2*19};
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 22, 18};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 17, 17};
+const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*23, 2*19};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
-                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2],
-                                                                         NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3]};
+                                                                         NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2]};
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS_SWAP{
-    std::vector<int>{5,6,7,11,12,13,15,17},     std::vector<int>{5,6,7,11,12,13},   std::vector<int>{5,6,7,11,12,13,15,17, 19,21},
-    std::vector<int>{1,2,3,7,8,9,13,15}
+    std::vector<int>{5,6,7,11,12,13,15,17},                                                                 // COCO_18
+    std::vector<int>{5,6,7,11,12,13,15,17, 19,21},                                                          // BODY_22
+    std::vector<int>{1,2,3,7,8,9,13,15}                                                                     // DOME_18
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS_SWAP{
-    std::vector<int>{2,3,4, 8,9,10,14,16},      std::vector<int>{2,3,4,8,9,10},     std::vector<int>{2,3,4, 8,9,10,14,16, 18,20},
-    std::vector<int>{4,5,6,10,11,12,14,16}
+    std::vector<int>{2,3,4, 8,9,10,14,16},                                                                  // COCO_18
+    std::vector<int>{2,3,4, 8,9,10,14,16, 18,20},                                                           // BODY_22
+    std::vector<int>{4,5,6,10,11,12,14,16}                                                                  // DOME_18
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS_A{
-    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},      std::vector<int>{9, 8,12,11,10,13,14,15, 2, 1, 0, 3, 4, 5, 7},
-    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},
-    std::vector<int>{0,1, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}
+    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},                                      // COCO_18
+    std::vector<int>{0,5, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},                         // BODY_22
+    std::vector<int>{0,1, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}                                    // DOME_18
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS_B{
-    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},      std::vector<int>{9, 8,12,11,10,13,14,15, 2, 1, 0, 3, 4, 5, 6},
-    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},
-    std::vector<int>{0,4, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}
+    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3},                                      // COCO_18
+    std::vector<int>{0,6, 6,8,10, 5,7,9, 12,14,16, 11,13,15, 2,1,4,3, 16,15,16,15},                         // BODY_22
+    std::vector<int>{0,4, 1,2,3,  4,5,6,  7, 8, 9, 10,11,12,13,14,15,16}                                    // DOME_18
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
-    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15},    std::vector<int>{0, 1, 2, 3, 1, 5, 6, 1, 14, 8, 9,  14, 11, 12},
-    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15, 10, 13, 10, 13},
-    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15}
+    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15},                    // COCO_18
+    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15, 10, 13, 10, 13},    // BODY_22
+    std::vector<int>{1, 8,  9, 1,  11, 12, 1, 2, 3, 2,  1, 5, 6, 5,  1, 0,  0,  14, 15}                     // DOME_18
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
-    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},    std::vector<int>{1, 2, 3, 4, 5, 6, 7, 14, 8, 9, 10, 11, 12, 13},
-    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17, 18, 19, 20, 21},
-    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17}
+    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                    // COCO_18
+    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17, 18, 19, 20, 21},    // BODY_22
+    std::vector<int>{8, 9, 10, 11, 12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17}                     // DOME_18
 };
 PoseModel flagsToPoseModel(const std::string& poseModeString)
 {
     if (poseModeString == "COCO")
         return PoseModel::COCO_18;
-    else if (poseModeString == "MPI")
-        return PoseModel::MPI_15;
     else if (poseModeString == "BODY_22")
         return PoseModel::BODY_22;
     else if (poseModeString == "DOME")
         return PoseModel::DOME_18;
     // else
-    throw std::runtime_error{"String does not correspond to any model (COCO, MPI, MPI_4_layers)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    throw std::runtime_error{"String does not correspond to any model (COCO, BODY_22, DOME, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     return PoseModel::COCO_18;
 }
 // OpenPose: added end
@@ -434,7 +432,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         augmentSelection.RotAndFinalSize = estimateRotation(metaData, imageTemp.size());
         applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, 0);
         applyRotation(maskBackgroundImageTemp, augmentSelection.RotAndFinalSize, maskBackgroundImageTemp, 255);
-        applyRotation(maskMissTemp, augmentSelection.RotAndFinalSize, maskMissTemp, DEFAULT_MASK_VALUE);
+        applyRotation(maskMissTemp, augmentSelection.RotAndFinalSize, maskMissTemp, 255);
         applyRotation(depthTemp, augmentSelection.RotAndFinalSize, depthTemp, 0);
         applyRotation(metaData, augmentSelection.RotAndFinalSize.first);
         // Cropping
@@ -443,7 +441,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, 0);
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0);
         applyCrop(maskBackgroundImage, augmentSelection.cropCenter, maskBackgroundImageTemp, 255);
-        applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, DEFAULT_MASK_VALUE);
+        applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, 255);
         applyCrop(depthAugmented, augmentSelection.cropCenter, depthTemp, 0);
         applyCrop(metaData, augmentSelection.cropCenter);
         // Flipping
@@ -557,7 +555,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Labels to 0
     std::fill(transformedLabel, transformedLabel + 2*numberBodyBkgPAFParts * gridY * gridX, 0.f);
 
-    // label size is image size / stride
+    // Label size = image size / stride
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -566,11 +564,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             const auto xyOffset = yOffset + gX;
             for (auto part = 0; part < numberBodyAndPAFParts; part++)
             {
-                if (metaData.jointsSelf.isVisible[part] != 3)
-                {
-                    const float weight = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
-                    transformedLabel[part*channelOffset + xyOffset] = weight;
-                }
+                const float weight = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
+                transformedLabel[part*channelOffset + xyOffset] = weight;
             }
             // background channel
             transformedLabel[numberBodyAndPAFParts*channelOffset + xyOffset] = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
@@ -1153,22 +1148,21 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     jointSelf.isVisible.resize(numberPartsInLmdb);
     for (auto part = 0 ; part < numberPartsInLmdb; part++)
     {
-        jointSelf.points[part].x = decodeNumber<Dtype>(&data[5*offsetPerLine+4*part]);
-        jointSelf.points[part].y = decodeNumber<Dtype>(&data[6*offsetPerLine+4*part]);
-        jointSelf.points[part] -= cv::Point2f{1.f,1.f}; //from matlab 1-index to c++ 0-index
+        // Point
+        auto& jointPoint = jointSelf.points[part];
+        jointPoint.x = decodeNumber<Dtype>(&data[5*offsetPerLine+4*part]);
+        jointPoint.y = decodeNumber<Dtype>(&data[6*offsetPerLine+4*part]);
+        // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
+        if (mPoseModel == PoseModel::COCO_18)
+            jointPoint -= cv::Point2f{1.f,1.f};
+        // isVisible flag
         const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
-        if (isVisible == 3)
-            jointSelf.isVisible[part] = 3;
-        else
-        {
-            jointSelf.isVisible[part] = (isVisible == 0) ? 0 : 1;
-            if (jointSelf.points[part].x < 0 || jointSelf.points[part].y < 0 ||
-                 jointSelf.points[part].x >= metaData.imageSize.width || jointSelf.points[part].y >= metaData.imageSize.height)
-            {
-                jointSelf.isVisible[part] = 2; // 2 means cropped, 0 means occluded by still on image
-            }
-        }
-        //LOG(INFO) << jointSelf.points[part].x << " " << jointSelf.points[part].y << " " << jointSelf.isVisible[part];
+        CHECK_LE(isVisible, 2); // isVisible in range [0, 2]
+        jointSelf.isVisible[part] = std::round(isVisible);
+        if (jointSelf.isVisible[part] != 2)
+            if (jointPoint.x < 0 || jointPoint.y < 0 || jointPoint.x >= metaData.imageSize.width || jointPoint.y >= metaData.imageSize.height)
+                jointSelf.isVisible[part] = 2; // 2 means cropped/unlabeled, 0 means occluded but in image
+        // LOG(INFO) << jointPoint.x << " " << jointPoint.y << " " << jointSelf.isVisible[part];
     }
 
     // Others (7 lines loaded)
@@ -1177,8 +1171,11 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     metaData.jointsOthers.resize(metaData.numberOtherPeople);
     for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
     {
-        metaData.objPosOthers[person].x = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine]) - 1.f;
-        metaData.objPosOthers[person].y = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine+4]) - 1.f;
+        metaData.objPosOthers[person].x = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine]);
+        metaData.objPosOthers[person].y = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine+4]);
+        // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
+        if (mPoseModel == PoseModel::COCO_18)
+            metaData.objPosOthers[person] -= cv::Point2f{1.f,1.f};
         metaData.scaleOthers[person]  = decodeNumber<Dtype>(&data[(8+metaData.numberOtherPeople)*offsetPerLine+4*person]);
     }
     // 8 + numberOtherPeople lines loaded
@@ -1189,17 +1186,20 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
         currentPerson.isVisible.resize(numberPartsInLmdb);
         for (auto part = 0 ; part < numberPartsInLmdb; part++)
         {
-            currentPerson.points[part].x = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person)*offsetPerLine+4*part]) - 1.f;
-            currentPerson.points[part].y = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+1)*offsetPerLine+4*part]) - 1.f;
+            // Point
+            // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
+            auto& jointPoint = currentPerson.points[part];
+            jointPoint.x = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person)*offsetPerLine+4*part]);
+            jointPoint.y = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+1)*offsetPerLine+4*part]);
+            // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
+            if (mPoseModel == PoseModel::COCO_18)
+                jointPoint -= cv::Point2f{1.f,1.f};
+            // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+2)*offsetPerLine+4*part]);
-            currentPerson.isVisible[part] = (isVisible == 0 ? 0 : 1);
-            if (currentPerson.points[part].x < 0
-                 || currentPerson.points[part].y < 0
-                 || currentPerson.points[part].x >= metaData.imageSize.width
-                 || currentPerson.points[part].y >= metaData.imageSize.height)
-            {
-                currentPerson.isVisible[part] = 2; // 2 means cropped, 1 means occluded by still on image
-            }
+            currentPerson.isVisible[part] = std::round(isVisible);
+            if (currentPerson.isVisible[part] != 2)
+                if (jointPoint.x < 0 || jointPoint.y < 0 || jointPoint.x >= metaData.imageSize.width || jointPoint.y >= metaData.imageSize.height)
+                    currentPerson.isVisible[part] = 2; // 2 means cropped/unlabeled, 0 means occluded  but in image
         }
     }
     if (mPoseModel == PoseModel::DOME_18)
@@ -1238,19 +1238,26 @@ void OPDataTransformer<Dtype>::transformJoints(Joints& joints) const
     joints.points.resize(numberBodyAndPAFParts);
     joints.isVisible.resize(numberBodyAndPAFParts);
 
-    // Parameters
-    const auto& vectorA = TRANSFORM_MODEL_TO_OURS_A[(int)mPoseModel];
-    const auto& vectorB = TRANSFORM_MODEL_TO_OURS_B[(int)mPoseModel];
-
-    for (auto i = 0 ; i < vectorA.size() ; i++)
+    // From COCO/DomeDB to OP keypoint indexes
+    const auto& modelToOursA = TRANSFORM_MODEL_TO_OURS_A[(int)mPoseModel];
+    const auto& modelToOursB = TRANSFORM_MODEL_TO_OURS_B[(int)mPoseModel];
+    for (auto i = 0 ; i < modelToOursA.size() ; i++)
     {
-        joints.points[i] = (jointsOld.points[vectorA[i]] + jointsOld.points[vectorB[i]]) * 0.5f;
-        if (jointsOld.isVisible[vectorA[i]] == 2 || jointsOld.isVisible[vectorB[i]] == 2)
+        // Original COCO:
+        //     v=0: not labeled
+        //     v=1: labeled but not visible
+        //     v=2: labeled and visible
+        // OpenPose:
+        //     v=0: labeled but not visible
+        //     v=1: labeled and visible
+        //     v=2: out of image / unlabeled
+        joints.points[i] = (jointsOld.points[modelToOursA[i]] + jointsOld.points[modelToOursB[i]]) * 0.5f;
+        // 2
+        if (jointsOld.isVisible[modelToOursA[i]] == 2 || jointsOld.isVisible[modelToOursB[i]] == 2)
             joints.isVisible[i] = 2;
-        else if (mPoseModel == PoseModel::COCO_18 && (jointsOld.isVisible[vectorA[i]] == 3 || jointsOld.isVisible[vectorB[i]] == 3))
-            joints.isVisible[i] = 3;
+        // 0 or 1
         else
-            joints.isVisible[i] = jointsOld.isVisible[vectorA[i]] && jointsOld.isVisible[vectorB[i]];
+            joints.isVisible[i] = jointsOld.isVisible[modelToOursA[i]] && jointsOld.isVisible[modelToOursB[i]];
     }
 }
 
@@ -1281,12 +1288,13 @@ void OPDataTransformer<Dtype>::clahe(cv::Mat& bgrImage, const int tileSize, cons
 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int stride, const int gridX,
-                                                const int gridY, const float sigma) const
+                                               const int gridY, const float sigma) const
 {
     //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
     const float start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     for (auto gY = 0; gY < gridY; gY++)
     {
+        const auto yOffset = gY*gridX;
         for (auto gX = 0; gX < gridX; gX++)
         {
             const float x = start + gX * stride;
@@ -1294,19 +1302,21 @@ void OPDataTransformer<Dtype>::putGaussianMaps(Dtype* entry, const cv::Point2f& 
             const float d2 = (x-centerPoint.x)*(x-centerPoint.x) + (y-centerPoint.y)*(y-centerPoint.y);
             const float exponent = d2 / 2.0 / sigma / sigma;
             //ln(100) = -ln(1%)
-            if (exponent > 4.6052)
-                continue;
-            entry[gY*gridX + gX] += exp(-exponent);
-            if (entry[gY*gridX + gX] > 1)
-                entry[gY*gridX + gX] = 1;
+            if (exponent <= 4.6052)
+            {
+                const auto xyOffset = yOffset + gX;
+                entry[xyOffset] += std::exp(-exponent);
+                if (entry[xyOffset] > 1)
+                    entry[xyOffset] = 1;
+            }
         }
     }
 }
 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
-                                           const cv::Point2f& centerB, const int stride, const int gridX, const int gridY,
-                                           const float sigma, const int threshold) const
+                                          const cv::Point2f& centerB, const int stride, const int gridX, const int gridY,
+                                          const float sigma, const int threshold) const
 {
     const auto centerAAux = 0.125f * centerA;
     const auto centerBAux = 0.125f * centerB;
