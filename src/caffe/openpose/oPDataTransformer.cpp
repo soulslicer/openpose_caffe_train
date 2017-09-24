@@ -1436,17 +1436,10 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
         {
             const auto xyOffset = yOffset + gX;
             const cv::Point2f ba{gX - centerAAux.x, gY - centerAAux.y};
-            const float dist = std::abs(ba.x*bc.y - ba.y*bc.x);
-
-            // const float A = cosine * (gX - x_p) + sine * (gY - y_p);
-            // const float B = sine * (gX - x_p) - cosine * (gY - y_p);
-            // const float judge = A * A / a_sqrt + B * B / b_sqrt;
-
-            if (dist <= threshold)
-            //if (judge <= 1)
+            const float distance = std::abs(ba.x*bc.y - ba.y*bc.x);
+            if (distance <= threshold)
             {
                 auto& counter = count.at<uchar>(gY, gX);
-                //LOG(INFO) << "putVecMaps here we start for " << gX << " " << gY;
                 if (counter == 0)
                 {
                     entryX[xyOffset] = bc.x;
@@ -1459,7 +1452,6 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
                 }
                 counter++;
             }
-
         }
     }
 }
