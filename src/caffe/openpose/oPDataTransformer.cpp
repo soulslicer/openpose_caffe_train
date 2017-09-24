@@ -1431,8 +1431,10 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
 
     for (auto gY = minY; gY < maxY; gY++)
     {
+        const auto yOffset = gY*gridX;
         for (auto gX = minX; gX < maxX; gX++)
         {
+            const auto xyOffset = yOffset + gX;
             const cv::Point2f ba{gX - centerAAux.x, gY - centerAAux.y};
             const float dist = std::abs(ba.x*bc.y - ba.y*bc.x);
 
@@ -1443,19 +1445,19 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
             if (dist <= threshold)
             //if (judge <= 1)
             {
-                const int counter = count.at<uchar>(gY, gX);
+                auto& counter = count.at<uchar>(gY, gX);
                 //LOG(INFO) << "putVecMaps here we start for " << gX << " " << gY;
                 if (counter == 0)
                 {
-                    entryX[gY*gridX + gX] = bc.x;
-                    entryY[gY*gridX + gX] = bc.y;
+                    entryX[xyOffset] = bc.x;
+                    entryY[xyOffset] = bc.y;
                 }
                 else
                 {
-                    entryX[gY*gridX + gX] = (entryX[gY*gridX + gX]*counter + bc.x) / (counter + 1);
-                    entryY[gY*gridX + gX] = (entryY[gY*gridX + gX]*counter + bc.y) / (counter + 1);
-                    count.at<uchar>(gY, gX) = counter + 1;
+                    entryX[xyOffset] = (entryX[xyOffset]*counter + bc.x) / (counter + 1);
+                    entryY[xyOffset] = (entryY[xyOffset]*counter + bc.y) / (counter + 1);
                 }
+                counter++;
             }
 
         }
