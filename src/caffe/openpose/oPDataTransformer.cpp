@@ -1217,7 +1217,9 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     // Objpos
     metaData.objpos.x = decodeNumber<Dtype>(&data[3*offsetPerLine]);
     metaData.objpos.y = decodeNumber<Dtype>(&data[3*offsetPerLine+4]);
-    metaData.objpos -= cv::Point2f{1.f,1.f};
+    // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
+    if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
+        metaData.objpos -= cv::Point2f{1.f,1.f};
     // scaleSelf, jointsSelf
     metaData.scaleSelf = decodeNumber<Dtype>(&data[4*offsetPerLine]);
     auto& jointSelf = metaData.jointsSelf;
@@ -1231,7 +1233,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
         jointPoint.x = decodeNumber<Dtype>(&data[5*offsetPerLine+4*part]);
         jointPoint.y = decodeNumber<Dtype>(&data[6*offsetPerLine+4*part]);
         // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-        if (mPoseModel == PoseModel::COCO_18)
+        if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
             jointPoint -= cv::Point2f{1.f,1.f};
         // isVisible flag
         const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
@@ -1252,7 +1254,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
         metaData.objPosOthers[person].x = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine]);
         metaData.objPosOthers[person].y = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine+4]);
         // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-        if (mPoseModel == PoseModel::COCO_18)
+        if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
             metaData.objPosOthers[person] -= cv::Point2f{1.f,1.f};
         metaData.scaleOthers[person]  = decodeNumber<Dtype>(&data[(8+metaData.numberOtherPeople)*offsetPerLine+4*person]);
     }
@@ -1270,7 +1272,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
             jointPoint.x = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person)*offsetPerLine+4*part]);
             jointPoint.y = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+1)*offsetPerLine+4*part]);
             // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-            if (mPoseModel == PoseModel::COCO_18)
+            if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
                 jointPoint -= cv::Point2f{1.f,1.f};
             // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+2)*offsetPerLine+4*part]);
