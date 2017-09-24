@@ -97,26 +97,27 @@ namespace caffe {
 // };
 // OPENPOSE_DEPTH_BODY_PARTS {
 //     {0,  "Nose"},
-//     {1,  "RShoulder"},
-//     {2,  "RElbow"},
-//     {3,  "RWrist"},
-//     {4,  "LShoulder"},
-//     {5,  "LElbow"},
-//     {6,  "LWrist"},
-//     {7,  "RHip"},
-//     {8,  "RKnee"},
-//     {9,  "RAnkle"},
-//     {10, "LHip"},
-//     {11, "LKnee"},
-//     {12, "LAnkle"},
-//     {13, "REye"},
-//     {14, "LEye"},
-//     {15, "REar"},
-//     {16, "LEar"},
-//     {17, "Background"},
+//     {1,  "Neck"},
+//     {2,  "RShoulder"},
+//     {3,  "RElbow"},
+//     {4,  "RWrist"},
+//     {5,  "LShoulder"},
+//     {6,  "LElbow"},
+//     {7,  "LWrist"},
+//     {8,  "RHip"},
+//     {9,  "RKnee"},
+//     {10, "RAnkle"},
+//     {11, "LHip"},
+//     {12, "LKnee"},
+//     {13, "LAnkle"},
+//     {14, "REye"},
+//     {15, "LEye"},
+//     {16, "REar"},
+//     {17, "LEar"},
+//     {18, "Background"},
 // };
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19};
-const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 17, 17, 17};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19};
 const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*19, 2*20, 2*20};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
@@ -127,13 +128,13 @@ const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}           // COCO_18
     },
     std::vector<std::vector<int>>{
-        {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {8}, {9}, {10},{11},{12},{13},{14},{15},{16}        // DOME_18
+        {0},{1}, {2},{3},{4},  {5},{6},{7},  {9},{10},{11}, {12},{13},{14},  {15},{16},{17},{18}        // DOME_18
     },
     std::vector<std::vector<int>>{
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}  // COCO_19
     },
     std::vector<std::vector<int>>{
-        {0},{1,4}, {1},{2},{3},  {4},{5},{6},  {7}, {9,10}, {9}, {10},{11},{12},{13},{14},{15},{16}     // DOME_19
+        {0},{1}, {2},{3},{4},  {5},{6},{7},  {8},  {9},{10},{11},  {12},{13},{14},  {15},{16},{17},{18} // DOME_19
     }
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
