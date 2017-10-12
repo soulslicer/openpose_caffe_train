@@ -32,6 +32,27 @@ namespace caffe {
 
 // OpenPose: added
 // Remainder
+// OPENPOSE_DEPTH_BODY_PARTS {
+//     {0,  "Nose"},
+//     {1,  "Neck"},
+//     {2,  "RShoulder"},
+//     {3,  "RElbow"},
+//     {4,  "RWrist"},
+//     {5,  "LShoulder"},
+//     {6,  "LElbow"},
+//     {7,  "LWrist"},
+//     {8,  "RHip"},
+//     {9,  "RKnee"},
+//     {10, "RAnkle"},
+//     {11, "LHip"},
+//     {12, "LKnee"},
+//     {13, "LAnkle"},
+//     {14, "REye"},
+//     {15, "LEye"},
+//     {16, "REar"},
+//     {17, "LEar"},
+//     {18, "Background"},
+// };
 // COCO_BODY_PARTS {
 //     {0,  "Nose"},
 //     {1,  "LEye"},
@@ -50,7 +71,11 @@ namespace caffe {
 //     {14, "RKnee"},
 //     {15, "LAnkle"},
 //     {16, "RAnkle"},
-//     {17, "Background"},
+//     {17-21, "Background"},
+//     {17, "LBigToe"},
+//     {18, "LSmallToe"},
+//     {19, "RBigToe"},
+//     {20, "RSmallToe"},
 // };
 // OPENPOSE_BODY_PARTS_18 {
 //     {0,  "Nose"},
@@ -95,34 +120,46 @@ namespace caffe {
 //     {18, "LEar"},
 //     {19, "Background"},
 // };
-// OPENPOSE_DEPTH_BODY_PARTS {
-//     {0,  "Nose"},
-//     {1,  "Neck"},
-//     {2,  "RShoulder"},
-//     {3,  "RElbow"},
-//     {4,  "RWrist"},
-//     {5,  "LShoulder"},
-//     {6,  "LElbow"},
-//     {7,  "LWrist"},
+// OPENPOSE_BODY_PARTS_23 {
+//     {0,  "Neck"},
+//     {1,  "RShoulder"},
+//     {2,  "RElbow"},
+//     {3,  "RWrist"},
+//     {4,  "LShoulder"},
+//     {5,  "LElbow"},
+//     {6,  "LWrist"},
+//     {7,  "LowerAbs"},
 //     {8,  "RHip"},
 //     {9,  "RKnee"},
 //     {10, "RAnkle"},
-//     {11, "LHip"},
-//     {12, "LKnee"},
-//     {13, "LAnkle"},
-//     {14, "REye"},
-//     {15, "LEye"},
-//     {16, "REar"},
-//     {17, "LEar"},
-//     {18, "Background"},
+//     {11, "RBigToe"},
+//     {12, "RSmallToe"},
+//     {13, "LHip"},
+//     {14, "LKnee"},
+//     {15, "LAnkle"},
+//     {16, "LBigToe"},
+//     {17, "LSmallToe"},
+//     {18, "Nose"},
+//     {19, "REye"},
+//     {20, "REar"},
+//     {21, "LEye"},
+//     {22, "LEar"},
+//     {23, "Background"}
 // };
-const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19};
-const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19};
-const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*19, 2*19, 2*20, 2*20};
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19};
+const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*(NUMBER_BODY_PARTS[0]+1),
+                                                        2*(NUMBER_BODY_PARTS[1]+1),
+                                                        2*(NUMBER_BODY_PARTS[2]+1),
+                                                        2*(NUMBER_BODY_PARTS[3]+1),
+                                                        2*(NUMBER_BODY_PARTS[4]+1),
+                                                        2*(NUMBER_BODY_PARTS[5]+1)};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
                                                                          NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2],
-                                                                         NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3]};
+                                                                         NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3],
+                                                                         NUMBER_BODY_PARTS[4]+NUMBER_PAFS[4],
+                                                                         NUMBER_BODY_PARTS[5]+NUMBER_PAFS[5]};
 const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS{
     std::vector<std::vector<int>>{
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}           // COCO_18
@@ -135,45 +172,63 @@ const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_
     },
     std::vector<std::vector<int>>{
         {0},{1}, {2},{3},{4},  {5},{6},{7},  {8},  {9},{10},{11},  {12},{13},{14},  {15},{16},{17},{18} // DOME_19
-    }
+    },
+    std::vector<std::vector<int>>{
+        {5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16},{19},{20}, {11},{13},{15},{17},{18}, {0},{2},{4},{1},{3}  // COCO_23
+    },
+    std::vector<std::vector<int>>{
+        {1}, {2},{3},{4}, {5},{6},{7}, {8}, {9},{10},{11},{11},{11}, {12},{13},{14},{14},{14}, {0},{15},{17},{16},{18} // DOME_23_19
+    },
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
     std::vector<int>{5,6,7,11,12,13,15,17},                                                             // COCO_18
     std::vector<int>{5,6,7,11,12,13,15,17},                                                             // DOME_18
     std::vector<int>{5,6,7,12,13,14,16,18},                                                             // COCO_19
     std::vector<int>{5,6,7,12,13,14,16,18},                                                             // DOME_19
+    std::vector<int>{1,2,3, 8,9,10,11,12, 19,20},                                                       // COCO_23
+    std::vector<int>{1,2,3, 8,9,10,11,12, 19,20},                                                       // DOME_23_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // COCO_18
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // DOME_18
     std::vector<int>{2,3,4, 9,10,11,15,17},                                                             // COCO_19
     std::vector<int>{2,3,4, 9,10,11,15,17},                                                             // DOME_19
+    std::vector<int>{4,5,6, 13,14,15,16,17, 21,22},                                                     // COCO_23
+    std::vector<int>{4,5,6, 13,14,15,16,17, 21,22},                                                     // DOME_23_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // COCO_18
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // DOME_18
     std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},               // COCO_19
     std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},               // DOME_19
+    std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // COCO_23
+    std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // DOME_23_19
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // COCO_18
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // DOME_18
     std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},               // COCO_19
     std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},               // DOME_19
+    std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // COCO_23
+    std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // DOME_23_19
 };
-PoseModel flagsToPoseModel(const std::string& poseModeString)
+std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
 {
     if (poseModeString == "COCO_18")
-        return PoseModel::COCO_18;
+        return std::make_pair(PoseModel::COCO_18, PoseCategory::COCO);
     else if (poseModeString == "COCO_19")
-        return PoseModel::COCO_19;
+        return std::make_pair(PoseModel::COCO_19, PoseCategory::COCO);
+    else if (poseModeString == "COCO_23")
+        return std::make_pair(PoseModel::COCO_23, PoseCategory::COCO);
     else if (poseModeString == "DOME_18")
-        return PoseModel::DOME_18;
+        return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
     else if (poseModeString == "DOME_19")
-        return PoseModel::DOME_19;
+        return std::make_pair(PoseModel::DOME_19, PoseCategory::DOME);
+    else if (poseModeString == "DOME_23")
+        return std::make_pair(PoseModel::DOME_23_19, PoseCategory::DOME);
     // else
     throw std::runtime_error{"String does not correspond to any model (COCO_18, DOME_18, ...)" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    return PoseModel::COCO_18;
+    return std::make_pair(PoseModel::COCO_18, PoseCategory::COCO);
 }
 // OpenPose: added end
 
@@ -205,9 +260,7 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
     LOG(INFO) << "OPDataTransformer constructor done.";
     mIsTableSet = false;
     // PoseModel
-    mPoseModel = flagsToPoseModel(param_.model());
-    if (mPoseModel == PoseModel::Size)
-        throw std::runtime_error{"Invalid mPoseModel" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(param_.model());
     // OpenPose: added end
 }
 
@@ -268,6 +321,42 @@ int OPDataTransformer<Dtype>::Rand(int n) {
 }
 
 // OpenPose: added
+void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, const float ratio)
+{
+    for (auto part = 0 ; part < 2 ; part++)
+    {
+        const auto kneeIndex = 9+part*5;
+        const auto ankleIndex = kneeIndex+1;
+        if (isVisible.at(kneeIndex) != 2 && isVisible.at(ankleIndex) != 2)
+        {
+            const auto knee = points.at(kneeIndex);
+            const auto ankle = points.at(ankleIndex);
+            const int distance = (int)std::round(ratio*std::sqrt((knee.x - ankle.x)*(knee.x - ankle.x)
+                                                                 + (knee.y - ankle.y)*(knee.y - ankle.y)));
+            const cv::Point momentum = (ankle-knee)*0.15f;
+            cv::Rect roi{(int)std::round(ankle.x + momentum.x)-distance,
+                         (int)std::round(ankle.y + momentum.y)-distance,
+                         2*distance, 2*distance};
+            if (roi.x < 0)
+            {
+                roi.width += roi.x;
+                roi.x = 0;
+            }
+            if (roi.y < 0)
+            {
+                roi.height += roi.y;
+                roi.y = 0;
+            }
+            if (roi.width + roi.x >= maskMiss.cols)
+                roi.width = maskMiss.cols - 1 - roi.x;
+            if (roi.height + roi.y >= maskMiss.rows)
+                roi.height = maskMiss.rows - 1 - roi.y;
+            // maskMiss(roi).setTo(128); // Debugging
+            maskMiss(roi).setTo(0);
+        }
+    }
+}
+
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const Datum* datumNegative)
 {
@@ -286,7 +375,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read meta data (LMDB channel 3)
     MetaData metaData;
-    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
+    if (mPoseCategory == PoseCategory::DOME)
         readMetaData(metaData, data.c_str(), datumWidth);
     else
     {
@@ -299,7 +388,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read image (LMDB channel 1)
     cv::Mat image;
-    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
+    if (mPoseCategory == PoseCategory::DOME)
     {
         const auto imageFullPath = param_.media_directory() + metaData.imageSource;
         image = cv::imread(imageFullPath, CV_LOAD_IMAGE_COLOR);
@@ -373,7 +462,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
-    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
+    if (mPoseCategory == PoseCategory::DOME)
         maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
     else
     {
@@ -396,6 +485,50 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             }
         }
     }
+// TODO: TEMPORARY! DO IT NICELY!
+// Add square to image feet for people with no labeled feet
+if (mPoseModel == PoseModel::COCO_23 || mPoseModel == PoseModel::DOME_23_19)
+{
+    // bool saveIt = false;
+    if (mPoseModel == PoseModel::DOME_23_19)
+    {
+        const auto& selfPoints = metaData.jointsSelf.points;
+        const auto& selfVisible = metaData.jointsSelf.isVisible;
+        // If knees and ankles visible
+        if (selfVisible.at(9) != 2 && selfVisible.at(10) != 2 && selfVisible.at(14) != 2 && selfVisible.at(15) != 2)
+        {
+            maskFeet(maskMiss, selfVisible, selfPoints, (mPoseModel == PoseModel::DOME_23_19 ? 1.25f : 0.5f));
+            // saveIt = true;
+        }
+    }
+    for (const auto& jointsOther : metaData.jointsOthers)
+    {
+        const auto& otherPoints = jointsOther.points;
+        const auto& otherVisible = jointsOther.isVisible;
+        // If no points visible
+        if ((otherVisible.at(11) == 2.f && otherVisible.at(12) == 2.f && otherVisible.at(16) == 2.f && otherVisible.at(17) == 2.f)
+            || mPoseModel == PoseModel::DOME_23_19)
+        {
+            // If knees and ankles visible
+            if (otherVisible.at(9) != 2 && otherVisible.at(10) != 2 && otherVisible.at(14) != 2 && otherVisible.at(15) != 2)
+            {
+                maskFeet(maskMiss, otherVisible, otherPoints, (mPoseModel == PoseModel::DOME_23_19 ? 1.25f : 0.5f));
+                // saveIt = true;
+            }
+        }
+    }
+    // // Debugging
+    // if (saveIt)
+    // {
+    //     cv::Mat labelMap = maskMiss.clone();
+    //     cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
+    //     cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
+    //     // Write on disk
+    //     char imagename [100];
+    //     sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, 0);
+    //     cv::imwrite(imagename, labelMap);
+    // }
+}
 
     // Time measurement
     VLOG(2) << "  rgb[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
@@ -1219,7 +1352,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
     metaData.objpos.x = decodeNumber<Dtype>(&data[3*offsetPerLine]);
     metaData.objpos.y = decodeNumber<Dtype>(&data[3*offsetPerLine+4]);
     // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-    if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
+    if (mPoseCategory == PoseCategory::COCO)
         metaData.objpos -= cv::Point2f{1.f,1.f};
     // scaleSelf, jointsSelf
     metaData.scaleSelf = decodeNumber<Dtype>(&data[4*offsetPerLine]);
@@ -1234,7 +1367,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
         jointPoint.x = decodeNumber<Dtype>(&data[5*offsetPerLine+4*part]);
         jointPoint.y = decodeNumber<Dtype>(&data[6*offsetPerLine+4*part]);
         // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-        if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
+        if (mPoseCategory == PoseCategory::COCO)
             jointPoint -= cv::Point2f{1.f,1.f};
         // isVisible flag
         const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
@@ -1255,7 +1388,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
         metaData.objPosOthers[person].x = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine]);
         metaData.objPosOthers[person].y = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine+4]);
         // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-        if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
+        if (mPoseCategory == PoseCategory::COCO)
             metaData.objPosOthers[person] -= cv::Point2f{1.f,1.f};
         metaData.scaleOthers[person]  = decodeNumber<Dtype>(&data[(8+metaData.numberOtherPeople)*offsetPerLine+4*person]);
     }
@@ -1273,7 +1406,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
             jointPoint.x = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person)*offsetPerLine+4*part]);
             jointPoint.y = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+1)*offsetPerLine+4*part]);
             // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
-            if (mPoseModel == PoseModel::COCO_18 || mPoseModel == PoseModel::COCO_19)
+            if (mPoseCategory == PoseCategory::COCO)
                 jointPoint -= cv::Point2f{1.f,1.f};
             // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[(9+metaData.numberOtherPeople+3*person+2)*offsetPerLine+4*part]);
@@ -1283,7 +1416,7 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
                     currentPerson.isVisible[part] = 2; // 2 means cropped/unlabeled, 0 means occluded  but in image
         }
     }
-    if (mPoseModel == PoseModel::DOME_18 || mPoseModel == PoseModel::DOME_19)
+    if (mPoseCategory == PoseCategory::DOME)
     {
         // Image path
         int currentLine = 8;

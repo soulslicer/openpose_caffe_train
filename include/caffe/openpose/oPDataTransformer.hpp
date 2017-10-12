@@ -18,13 +18,20 @@
 namespace caffe {
 
 // OpenPose: added
-enum class PoseModel
+enum class PoseModel : unsigned short
 {
     COCO_18 = 0,
     DOME_18 = 1,
     COCO_19 = 2,
     DOME_19 = 3,
+    COCO_23 = 4,
+    DOME_23_19 = 5,
     Size,
+};
+enum class PoseCategory : bool
+{
+    COCO,
+    DOME
 };
 // OpenPose: added end
 
@@ -129,6 +136,7 @@ protected:
     };
 
     PoseModel mPoseModel;
+    PoseCategory mPoseCategory;
     bool mIsTableSet;
     std::vector<std::vector<float>> mAugmentationDegs;
     std::vector<std::vector<int>> mAugmentationFlips;
