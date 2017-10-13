@@ -26,6 +26,7 @@ enum class PoseModel : unsigned short
     DOME_19 = 3,
     COCO_23 = 4,
     DOME_23_19 = 5,
+    COCO_23_18 = 6,
     Size,
 };
 enum class PoseCategory : bool
@@ -80,7 +81,8 @@ protected:
     // OpenPose: added
     // Image and label
 public:
-    void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum, const Datum* datumNegative = nullptr);
+    void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
+                   const Datum* datumNegative = nullptr);
     int getNumberBodyBkgAndPAF() const;
     int getNumberChannels() const;
 protected:
@@ -141,11 +143,13 @@ protected:
     std::vector<std::vector<float>> mAugmentationDegs;
     std::vector<std::vector<int>> mAugmentationFlips;
 
-    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum, const Datum* datumNegative);
+    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
+                              const Datum* datumNegative);
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss,
                           const MetaData& metaData) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
-    void visualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection) const;
+    void writeImageAndKeypoints(const cv::Mat& image, const MetaData& metaData,
+                                const AugmentSelection& augmentSelection) const;
     // Scale
     float estimateScale(const MetaData& metaData) const;
     void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image) const;
