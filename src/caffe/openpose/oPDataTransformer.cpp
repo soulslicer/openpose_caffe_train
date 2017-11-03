@@ -1406,16 +1406,11 @@ void OPDataTransformer<Dtype>::readMetaData(MetaData& metaData, const char* data
                                   (int)decodeNumber<Dtype>(&data[offsetPerLine])};
 
     // Validation, #people, counters
-    metaData.isValidation = (data[2*offsetPerLine] != 0);
-    metaData.numberOtherPeople = (int)data[2*offsetPerLine+1];
-    metaData.peopleIndex = (int)data[2*offsetPerLine+2];
-    metaData.annotationListIndex = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+3]));
-    metaData.writeNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+7]));
-    metaData.totalWriteNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+11]));
-    if (metaData.isValidation)
-        throw std::runtime_error{"metaData.isValidation == true. Training with val. data??? " + metaData.datasetString
-                                 + ", index: " + std::to_string(metaData.annotationListIndex)
-                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    metaData.numberOtherPeople = (int)data[2*offsetPerLine];
+    metaData.peopleIndex = (int)data[2*offsetPerLine+1];
+    metaData.annotationListIndex = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+2]));
+    metaData.writeNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+6]));
+    metaData.totalWriteNumber = (int)(decodeNumber<Dtype>(&data[2*offsetPerLine+10]));
 
     // Count epochs according to counters
     if (metaData.writeNumber == 0)
