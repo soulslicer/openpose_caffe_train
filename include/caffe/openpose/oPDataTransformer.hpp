@@ -27,6 +27,7 @@ enum class PoseModel : unsigned short
     COCO_23 = 4,
     DOME_23_19 = 5,
     COCO_23_18 = 6,
+    DOME_23 = 7,
     Size,
 };
 enum class PoseCategory : bool

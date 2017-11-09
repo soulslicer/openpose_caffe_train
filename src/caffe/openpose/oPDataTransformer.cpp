@@ -53,6 +53,32 @@ namespace caffe {
 //     {17, "LEar"},
 //     {18, "Background"},
 // };
+// DOME_BODY_PARTS {
+//     {0,  "Nose"},
+//     {1,  "Neck"},
+//     {2,  "RShoulder"},
+//     {3,  "RElbow"},
+//     {4,  "RWrist"},
+//     {5,  "LShoulder"},
+//     {6,  "LElbow"},
+//     {7,  "LWrist"},
+//     {8,  "LowerAbs"},
+//     {9,  "RHip"},
+//     {10, "RKnee"},
+//     {11, "RAnkle"},
+//     {12, "LHip"},
+//     {13, "LKnee"},
+//     {14, "LAnkle"},
+//     {15, "REye"},
+//     {16, "LEye"},
+//     {17, "REar"},
+//     {18, "LEar"},
+//     {19, "RBigToe"},
+//     {20, "RSmallToe"},
+//     {21, "LBigToe"},
+//     {22, "LSmallToe"},
+//     {19/23, "Background"},
+// };
 // COCO_BODY_PARTS {
 //     {0,  "Nose"},
 //     {1,  "LEye"},
@@ -146,22 +172,24 @@ namespace caffe {
 //     {22, "LEar"},
 //     {23, "Background"}
 // };
-const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23};
-const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17};
+const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23};
+const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23};
 const std::array<int, (int)PoseModel::Size> NUMBER_PAFS{2*(NUMBER_BODY_PARTS[0]+1),
                                                         2*(NUMBER_BODY_PARTS[1]+1),
                                                         2*(NUMBER_BODY_PARTS[2]+1),
                                                         2*(NUMBER_BODY_PARTS[3]+1),
                                                         2*(NUMBER_BODY_PARTS[4]+1),
                                                         2*(NUMBER_BODY_PARTS[5]+1),
-                                                        2*(NUMBER_BODY_PARTS[6]+1)};
+                                                        2*(NUMBER_BODY_PARTS[6]+1),
+                                                        2*(NUMBER_BODY_PARTS[7]+1)};
 const std::array<int, (int)PoseModel::Size> NUMBER_BODY_AND_PAF_CHANNELS{NUMBER_BODY_PARTS[0]+NUMBER_PAFS[0],
                                                                          NUMBER_BODY_PARTS[1]+NUMBER_PAFS[1],
                                                                          NUMBER_BODY_PARTS[2]+NUMBER_PAFS[2],
                                                                          NUMBER_BODY_PARTS[3]+NUMBER_PAFS[3],
                                                                          NUMBER_BODY_PARTS[4]+NUMBER_PAFS[4],
                                                                          NUMBER_BODY_PARTS[5]+NUMBER_PAFS[5],
-                                                                         NUMBER_BODY_PARTS[6]+NUMBER_PAFS[6]};
+                                                                         NUMBER_BODY_PARTS[6]+NUMBER_PAFS[6],
+                                                                         NUMBER_BODY_PARTS[7]+NUMBER_PAFS[7]};
 const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_MODEL_TO_OURS{
     std::vector<std::vector<int>>{
         {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}           // COCO_18
@@ -184,6 +212,9 @@ const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> TRANSFORM_
     std::vector<std::vector<int>>{
         {5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16},{0},{0}, {11},{13},{15},{0},{0}, {0},{2},{4},{1},{3}  // COCO_23_18
     },
+    std::vector<std::vector<int>>{
+        {1}, {2},{3},{4}, {5},{6},{7}, {8}, {9},{10},{11},{19},{20}, {12},{13},{14},{21},{22}, {0},{15},{17},{16},{18} // DOME_23
+    },
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
     std::vector<int>{5,6,7,11,12,13,15,17},                                                             // COCO_18
@@ -193,6 +224,7 @@ const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_LEFTS{
     std::vector<int>{1,2,3, 8,9,10,11,12, 19,20},                                                       // COCO_23
     std::vector<int>{1,2,3, 8,9,10,11,12, 19,20},                                                       // DOME_23_19
     std::vector<int>{1,2,3, 8,9,10,11,12, 19,20},                                                       // COCO_23_18
+    std::vector<int>{1,2,3, 8,9,10,11,12, 19,20},                                                       // DOME_23
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
     std::vector<int>{2,3,4, 8,9,10,14,16},                                                              // COCO_18
@@ -202,6 +234,7 @@ const std::array<std::vector<int>, (int)PoseModel::Size> SWAP_RIGHTS{
     std::vector<int>{4,5,6, 13,14,15,16,17, 21,22},                                                     // COCO_23
     std::vector<int>{4,5,6, 13,14,15,16,17, 21,22},                                                     // DOME_23_19
     std::vector<int>{4,5,6, 13,14,15,16,17, 21,22},                                                     // COCO_23_18
+    std::vector<int>{4,5,6, 13,14,15,16,17, 21,22},                                                     // DOME_23
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},               // COCO_18
@@ -211,6 +244,7 @@ const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // COCO_23
     std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // DOME_23_19
     std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // COCO_23_18
+    std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // DOME_23
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // COCO_18
@@ -220,6 +254,7 @@ const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // COCO_23
     std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // DOME_23_19
     std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // COCO_23_18
+    std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // DOME_23
 };
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
 {
@@ -235,6 +270,8 @@ std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeSt
         return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
     else if (poseModeString == "DOME_19")
         return std::make_pair(PoseModel::DOME_19, PoseCategory::DOME);
+    else if (poseModeString == "DOME_23")
+        return std::make_pair(PoseModel::DOME_23, PoseCategory::DOME);
     else if (poseModeString == "DOME_23_19")
         return std::make_pair(PoseModel::DOME_23_19, PoseCategory::DOME);
     // else
