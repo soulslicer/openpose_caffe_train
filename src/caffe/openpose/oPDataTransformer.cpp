@@ -659,22 +659,26 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             // sprintf(imagename, "visualize/augment_%04d_label_part_000.jpg", metaData.writeNumber);
             // cv::imwrite(imagename, imageAugmented);
             // Reduce #images saved (ideally images from 0 to numberBodyBkgPAFParts should be the same)
-            if (part < 3 || part >= numberBodyBkgPAFParts - 3)
+            // if (mPoseModel == PoseModel::COCO_23_18)
             {
-                cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-                for (auto gY = 0; gY < gridY; gY++)
+                if (part < 3 || part >= numberBodyBkgPAFParts - 3)
                 {
-                    const auto yOffset = gY*gridX;
-                    for (auto gX = 0; gX < gridX; gX++)
-                        labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+                    cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+                    for (auto gY = 0; gY < gridY; gY++)
+                    {
+                        const auto yOffset = gY*gridX;
+                        for (auto gX = 0; gX < gridX; gX++)
+                            labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+                    }
+                    cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+                    cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
+                    cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
+                    // Write on disk
+                    char imagename [100];
+                    sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", param_.model().c_str(),
+                            metaData.writeNumber, part);
+                    cv::imwrite(imagename, labelMap);
                 }
-                cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-                cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
-                cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
-                // Write on disk
-                char imagename [100];
-                sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
-                cv::imwrite(imagename, labelMap);
             }
         }
         if (depthEnabled)
@@ -682,7 +686,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             cv::Mat depthMap;
             cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
             char imagename [100];
-            sprintf(imagename, "visualize/augment_%04d_label_part_depth.png", metaData.writeNumber);
+            sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
+                    metaData.writeNumber);
             cv::imwrite(imagename, depthMap);
         }
     }
@@ -711,6 +716,45 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 }
 
+void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
+{
+    // x,y < 0
+    if (roi.x < 0)
+    {
+        roi.width += roi.x;
+        roi.x = 0;
+    }
+    if (roi.y < 0)
+    {
+        roi.height += roi.y;
+        roi.y = 0;
+    }
+    // Bigger than image
+    if (roi.width + roi.x >= imageSize.width)
+        roi.width = imageSize.width - 1 - roi.x;
+    if (roi.height + roi.y >= imageSize.height)
+        roi.height = imageSize.height - 1 - roi.y;
+    // Width/height negative
+    roi.width = std::max(0, roi.width);
+    roi.height = std::max(0, roi.height);
+}
+
+// Unused for now. But maybe for COCO when including face + hands + foot datasets...
+void maskBackground(cv::Mat& backgroundChannel, float scale, const cv::Point2f& objpos)
+{
+    scale = 128;
+// std::cout << scale << std::endl;
+    cv::Rect roi{(int)std::round(objpos.x - scale/2.f),
+                 (int)std::round(objpos.y - scale/2.f),
+                 (int)std::round(scale),
+                 (int)std::round(scale)};
+    // Apply ROI
+    keepRoiInside(roi, backgroundChannel.size());
+std::cout << roi << std::endl;
+    // if (roi.area() > 0)
+    //     backgroundChannel(roi).setTo(0.5f); // For debugging use 0.5f
+}
+
 void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
               const float stride, const float ratio)
 {
@@ -728,22 +772,8 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
             cv::Rect roi{(int)std::round(ankle.x + momentum.x)-distance,
                          (int)std::round(ankle.y + momentum.y)-distance,
                          2*distance, 2*distance};
-            if (roi.x < 0)
-            {
-                roi.width += roi.x;
-                roi.x = 0;
-            }
-            if (roi.y < 0)
-            {
-                roi.height += roi.y;
-                roi.y = 0;
-            }
-            if (roi.width + roi.x >= maskMiss.cols)
-                roi.width = maskMiss.cols - 1 - roi.x;
-            if (roi.height + roi.y >= maskMiss.rows)
-                roi.height = maskMiss.rows - 1 - roi.y;
-            roi.width = std::max(0, roi.width);
-            roi.height = std::max(0, roi.height);
+            // Apply ROI
+            keepRoiInside(roi, maskMiss.size());
             if (roi.area() > 0)
                 maskMiss(roi).setTo(0.f); // For debugging use 0.5f
         }
@@ -797,8 +827,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             indexesToRemove.emplace_back(indexBase);
             indexesToRemove.emplace_back(indexBase+1);
         }
-        // Body parts + background
-        for (auto index : {11, 12, 16, 17, 23})
+        // Body parts
+        for (auto index : {11, 12, 16, 17})
         {
             const auto indexBase = numberPAFChannels + index;
             indexesToRemove.emplace_back(indexBase);
@@ -812,6 +842,23 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 std::fill(&transformedLabel[index*channelOffset],
                           &transformedLabel[index*channelOffset + channelOffset], 0);
             }
+        }
+        // Background
+        if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_18)
+        {
+            const auto backgroundIndex = numberPAFChannels + NUMBER_BODY_PARTS[(int)mPoseModel];
+            int type;
+            if (sizeof(Dtype) == sizeof(float))
+                type = CV_32F;
+            else if (sizeof(Dtype) == sizeof(double))
+                type = CV_64F;
+            else
+                throw std::runtime_error{"Only float or double"
+                                         + getLine(__LINE__, __FUNCTION__, __FILE__)};
+            cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
+            maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            for (const auto& jointsOther : metaData.jointsOthers)
+                maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
         }
         // Mask foot region over person whose feet are not anotated with a square
         if (mPoseModel == PoseModel::COCO_23)
@@ -1651,23 +1698,26 @@ void OPDataTransformer<Dtype>::putGaussianMaps(Dtype* entry, const cv::Point2f& 
                                                const int gridX, const int gridY, const float sigma) const
 {
     //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
-    const float start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
+    const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
         for (auto gX = 0; gX < gridX; gX++)
         {
-            const float x = start + gX * stride;
-            const float y = start + gY * stride;
-            const float d2 = (x-centerPoint.x)*(x-centerPoint.x) + (y-centerPoint.y)*(y-centerPoint.y);
-            const float exponent = d2 / 2.0 / sigma / sigma;
+            const Dtype x = start + gX * stride;
+            const Dtype y = start + gY * stride;
+            const Dtype d2 = (x-centerPoint.x)*(x-centerPoint.x) + (y-centerPoint.y)*(y-centerPoint.y);
+            const Dtype exponent = d2 / 2.0 / sigma / sigma;
             //ln(100) = -ln(1%)
             if (exponent <= 4.6052)
             {
                 const auto xyOffset = yOffset + gX;
-                entry[xyOffset] += std::exp(-exponent);
-                if (entry[xyOffset] > 1)
-                    entry[xyOffset] = 1;
+                // Option a) Max
+                entry[xyOffset] = std::min(Dtype(1), std::max(entry[xyOffset], std::exp(-exponent)));
+                // // Option b) Average
+                // entry[xyOffset] += std::exp(-exponent);
+                // if (entry[xyOffset] > 1)
+                //     entry[xyOffset] = 1;
             }
         }
     }
@@ -1689,37 +1739,41 @@ void OPDataTransformer<Dtype>::putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat&
     // const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
     cv::Point2f bc = centerBAux - centerAAux;
     bc *= (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
-
-    // const float x_p = (centerAAux.x + centerBAux.x) / 2;
-    // const float y_p = (centerAAux.y + centerBAux.y) / 2;
-    // const float angle = atan2f(centerBAux.y - centerAAux.y, centerBAux.x - centerAAux.x);
-    // const float sine = sinf(angle);
-    // const float cosine = cosf(angle);
-    // const float a_sqrt = (centerAAux.x - x_p) * (centerAAux.x - x_p) + (centerAAux.y - y_p) * (centerAAux.y - y_p);
-    // const float b_sqrt = 10; //fixed
-
-    for (auto gY = minY; gY < maxY; gY++)
+    // If PAF is not 0 (e.g. PAF perpendicular to image plane)
+    if (!isnan(bc.x) && !isnan(bc.y) && std::abs(bc.x) < Dtype(1.01) && std::abs(bc.y) < Dtype(1.01))
     {
-        const auto yOffset = gY*gridX;
-        for (auto gX = minX; gX < maxX; gX++)
+
+        // const float x_p = (centerAAux.x + centerBAux.x) / 2;
+        // const float y_p = (centerAAux.y + centerBAux.y) / 2;
+        // const float angle = atan2f(centerBAux.y - centerAAux.y, centerBAux.x - centerAAux.x);
+        // const float sine = sinf(angle);
+        // const float cosine = cosf(angle);
+        // const float a_sqrt = (centerAAux.x - x_p) * (centerAAux.x - x_p) + (centerAAux.y - y_p) * (centerAAux.y - y_p);
+        // const float b_sqrt = 10; //fixed
+
+        for (auto gY = minY; gY < maxY; gY++)
         {
-            const auto xyOffset = yOffset + gX;
-            const cv::Point2f ba{gX - centerAAux.x, gY - centerAAux.y};
-            const float distance = std::abs(ba.x*bc.y - ba.y*bc.x);
-            if (distance <= threshold)
+            const auto yOffset = gY*gridX;
+            for (auto gX = minX; gX < maxX; gX++)
             {
-                auto& counter = count.at<uchar>(gY, gX);
-                if (counter == 0)
+                const auto xyOffset = yOffset + gX;
+                const cv::Point2f ba{gX - centerAAux.x, gY - centerAAux.y};
+                const float distance = std::abs(ba.x*bc.y - ba.y*bc.x);
+                if (distance <= threshold)
                 {
-                    entryX[xyOffset] = bc.x;
-                    entryY[xyOffset] = bc.y;
+                    auto& counter = count.at<uchar>(gY, gX);
+                    if (counter == 0)
+                    {
+                        entryX[xyOffset] = bc.x;
+                        entryY[xyOffset] = bc.y;
+                    }
+                    else
+                    {
+                        entryX[xyOffset] = (entryX[xyOffset]*counter + bc.x) / (counter + 1);
+                        entryY[xyOffset] = (entryY[xyOffset]*counter + bc.y) / (counter + 1);
+                    }
+                    counter++;
                 }
-                else
-                {
-                    entryX[xyOffset] = (entryX[xyOffset]*counter + bc.x) / (counter + 1);
-                    entryY[xyOffset] = (entryY[xyOffset]*counter + bc.y) / (counter + 1);
-                }
-                counter++;
             }
         }
     }
