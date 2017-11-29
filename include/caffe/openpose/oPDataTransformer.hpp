@@ -28,6 +28,7 @@ enum class PoseModel : unsigned short
     DOME_23_19 = 5,
     COCO_23_18 = 6,
     DOME_23 = 7,
+    DOME_59 = 8,
     Size,
 };
 enum class PoseCategory : bool
@@ -178,9 +179,9 @@ protected:
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;
-    void putVecMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
-                    const cv::Point2f& centerB, const int stride, const int gridX, const int gridY, const float sigma,
-                    const int thre) const;
+    void putVectorMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
+                       const cv::Point2f& centerB, const int stride, const int gridX, const int gridY,
+                       const float sigma, const int thre) const;
     // OpenPose: added end
 };
 
