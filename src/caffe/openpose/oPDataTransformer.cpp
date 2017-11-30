@@ -332,8 +332,8 @@ const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
     std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // COCO_23_18
     std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},            // DOME_23
     std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16,                // DOME_59
-                     19,20,21, 23,24,25, 27,28,29, 31,32,33, 35,36,37, // Left hand
-                     39,40,41, 43,44,45, 47,48,49, 51,52,53, 55,56,57} // Right hand
+                     7,19,20,21, 7,23,24,25, 7,27,28,29, 7,31,32,33, 7,35,36,37, // Left hand
+                     4,39,40,41, 4,43,44,45, 4,47,48,49, 4,51,52,53, 4,55,56,57} // Right hand
 };
 const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},               // COCO_18
@@ -345,8 +345,8 @@ const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
     std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // COCO_23_18
     std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},           // DOME_23
     std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18,                // DOME_59
-                     20,21,22, 24,25,26, 28,29,30, 32,33,34, 36,37,38, // Left hand
-                     40,41,42, 44,45,46, 48,49,50, 52,53,54, 56,57,58} // Right hand
+                     19,20,21,22, 23,24,25,26, 27,28,29,30, 31,32,33,34, 35,36,37,38, // Left hand
+                     39,40,41,42, 43,44,45,46, 47,48,49,50, 51,52,53,54, 55,56,57,58} // Right hand
 };
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
 {
@@ -831,22 +831,6 @@ void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
     // Width/height negative
     roi.width = std::max(0, roi.width);
     roi.height = std::max(0, roi.height);
-}
-
-// Unused for now. But maybe for COCO when including face + hands + foot datasets...
-void maskBackground(cv::Mat& backgroundChannel, float scale, const cv::Point2f& objpos)
-{
-    scale = 128;
-// std::cout << scale << std::endl;
-    cv::Rect roi{(int)std::round(objpos.x - scale/2.f),
-                 (int)std::round(objpos.y - scale/2.f),
-                 (int)std::round(scale),
-                 (int)std::round(scale)};
-    // Apply ROI
-    keepRoiInside(roi, backgroundChannel.size());
-std::cout << roi << std::endl;
-    // if (roi.area() > 0)
-    //     backgroundChannel(roi).setTo(0.5f); // For debugging use 0.5f
 }
 
 void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
@@ -1830,11 +1814,12 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::M
     const int minY = std::max( int(round(std::min(centerAAux.y, centerBAux.y) - threshold)), 0);
     const int maxY = std::min( int(round(std::max(centerAAux.y, centerBAux.y) + threshold)), gridY);
 
-    const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
+    // const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
+    cv::Point2f bc = centerBAux - centerAAux;
+    bc *= (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
     // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
     if (!isnan(bc.x) && !isnan(bc.y))
     {
-
         // const float x_p = (centerAAux.x + centerBAux.x) / 2;
         // const float y_p = (centerAAux.y + centerBAux.y) / 2;
         // const float angle = atan2f(centerBAux.y - centerAAux.y, centerBAux.x - centerAAux.x);
