@@ -57,7 +57,7 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
     // OpenPose: added
     mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_));
-    mOPDataTransformer->InitRand();
+    // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
     if ((forceColor && DecodeDatum(&datum, true)) || DecodeDatumNative(&datum))
