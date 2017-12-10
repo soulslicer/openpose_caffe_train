@@ -56,12 +56,12 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
 
     cv::rectangle(imageToVisualize, metaData.objPos-cv::Point2f{3.f,3.f}, metaData.objPos+cv::Point2f{3.f,3.f},
                   cv::Scalar{255,255,0}, CV_FILLED);
-    const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-    for (auto part = 0 ; part < numberBodyPAFParts ; part++)
+    const auto numberBpPafChannels = getNumberBodyAndPafChannels(poseModel);
+    for (auto part = 0 ; part < numberBpPafChannels ; part++)
     {
         const auto currentPoint = metaData.jointsSelf.points[part];
         // Hand case
-        if (numberBodyPAFParts == 21)
+        if (numberBpPafChannels == 21)
         {
             if (part < 4)
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
@@ -76,7 +76,7 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
             else
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,100,100}, -1);
         }
-        else if (numberBodyPAFParts == 9)
+        else if (numberBpPafChannels == 9)
         {
             if (part==0 || part==1 || part==2 || part==6)
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
@@ -86,7 +86,7 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
                 cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
         }
         // Body case (CPM)
-        else if (numberBodyPAFParts == 14 || numberBodyPAFParts == 28)
+        else if (numberBpPafChannels == 14 || numberBpPafChannels == 28)
         {
             if (part < 14)
             {
@@ -130,7 +130,7 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
         cv::rectangle(imageToVisualize,
                       metaData.objPosOthers[person]-cv::Point2f{3.f,3.f},
                       metaData.objPosOthers[person]+cv::Point2f{3.f,3.f}, cv::Scalar{0,255,255}, CV_FILLED);
-        for (auto part = 0 ; part < numberBodyPAFParts ; part++)
+        for (auto part = 0 ; part < numberBpPafChannels ; part++)
             if (metaData.jointsOthers[person].isVisible[part] <= 1)
                 cv::circle(imageToVisualize, metaData.jointsOthers[person].points[part], 3, cv::Scalar{0,0,255}, -1);
     }
@@ -283,10 +283,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     if (mPoseCategory == PoseCategory::DOME)
         readMetaData<Dtype>(metaData, data.c_str(), datumWidth, mPoseCategory, mPoseModel);
     else
-    {
         readMetaData<Dtype>(metaData, &data[3 * datumArea], datumWidth, mPoseCategory, mPoseModel);
-        metaData.depthEnabled = false;
-    }
     const auto depthEnabled = metaData.depthEnabled;
 
     // Read image (LMDB channel 1)
@@ -534,17 +531,17 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // const auto gridX = rezX / stride;
     // const auto gridY = rezY / stride;
     // const auto channelOffset = gridY * gridX;
-    // const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF(mPoseModel);
-    // for (auto part = 0; part < 2*numberBodyBkgPAFParts; part++)
+    // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+    // for (auto part = 0; part < 2*numberTotalChannels; part++)
     // {
     //     // Original image
     //     // char imagename [100];
     //     // sprintf(imagename, "visualize/augment_%04d_label_part_000.jpg", metaData.writeNumber);
     //     // cv::imwrite(imagename, imageAugmented);
-    //     // Reduce #images saved (ideally images from 0 to numberBodyBkgPAFParts should be the same)
+    //     // Reduce #images saved (ideally images from 0 to numberTotalChannels should be the same)
     //     // if (mPoseModel == PoseModel::COCO_23_18)
     //     {
-    //         if (part < 3 || part >= numberBodyBkgPAFParts - 3)
+    //         if (part < 3 || part >= numberTotalChannels - 3)
     //         {
     //             cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
     //             for (auto gY = 0; gY < gridY; gY++)
@@ -581,7 +578,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto gridX = (int)depth.cols;
     const auto gridY = (int)depth.rows;
     const auto channelOffset = gridY * gridX;
-    const auto numberBodyPAFParts = getNumberBodyAndPafChannels(mPoseModel);
+    const auto numberBpPafChannels = getNumberBodyAndPafChannels(mPoseModel);
     // generate depth
     for (auto gY = 0; gY < gridY; gY++)
     {
@@ -592,8 +589,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
             auto depth_val = depth.at<uint16_t>(gY, gX);
 
-            transformedLabel[(2*numberBodyPAFParts+2)*channelOffset + xyOffset] = (depth_val>0)?1.0:0.0;
-            transformedLabel[(2*numberBodyPAFParts+3)*channelOffset + xyOffset] = float(depth_val)/1000.0;
+            transformedLabel[(2*numberBpPafChannels+2)*channelOffset + xyOffset] = (depth_val>0)?1.0:0.0;
+            transformedLabel[(2*numberBpPafChannels+3)*channelOffset + xyOffset] = float(depth_val)/1000.0;
         }
     }
 }
@@ -656,13 +653,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto gridX = rezX / stride;
     const auto gridY = rezY / stride;
     const auto channelOffset = gridY * gridX;
-    const auto numberBodyPAFParts = getNumberBodyAndPafChannels(mPoseModel);
-    const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF(mPoseModel);
-    const auto numberPAFChannels = getNumberPafChannels(mPoseModel);
-    const auto numberBodyParts = getNumberBodyParts(mPoseModel);
+    const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
+    const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
+    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel); // numberBodyParts + numberPafChannels + 1
 
     // Labels to 0
-    std::fill(transformedLabel, transformedLabel + 2*numberBodyBkgPAFParts * gridY * gridX, 0.f);
+    std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * gridY * gridX, 0.f);
 
     // Initialize labels to 0 or 1 (depending on maskMiss)
     // Label size = image size / stride
@@ -673,11 +669,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             const auto xyOffset = yOffset + gX;
             const float weight = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
-            // Body part & PAFs
-            for (auto part = 0; part < numberBodyPAFParts; part++)
+            // Body part & PAFs & background channel & distance
+            for (auto part = 0; part < numberTotalChannels; part++)
                 transformedLabel[part*channelOffset + xyOffset] = weight;
-            // Background channel
-            transformedLabel[numberBodyPAFParts*channelOffset + xyOffset] = weight;
         }
     }
 
@@ -696,7 +690,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Body parts
         for (auto index : {11, 12, 16, 17})
         {
-            const auto indexBase = numberPAFChannels + index;
+            const auto indexBase = numberPafChannels + index;
             indexesToRemove.emplace_back(indexBase);
         }
         // Dome data: Exclude (unlabeled) foot keypoints
@@ -712,7 +706,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Background
         if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_18)
         {
-            const auto backgroundIndex = numberPAFChannels + numberBodyParts;
+            const auto backgroundIndex = numberPafChannels + numberBodyParts;
             int type;
             if (sizeof(Dtype) == sizeof(float))
                 type = CV_32F;
@@ -776,12 +770,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             // if (visualize)
             // {
             //     // Visualizing
-            //     for (auto part = 0; part < 2*numberBodyBkgPAFParts; part++)
+            //     for (auto part = 0; part < 2*numberTotalChannels; part++)
             //     {
-            //         // Reduce #images saved (ideally images from 0 to numberBodyBkgPAFParts should be the same)
+            //         // Reduce #images saved (ideally images from 0 to numberTotalChannels should be the same)
             //         // if (part >= 11*2)
-            //         if (part >= 22 && part <= numberBodyBkgPAFParts)
-            //         // if (part < 3 || part >= numberBodyBkgPAFParts - 3)
+            //         if (part >= 22 && part <= numberTotalChannels)
+            //         // if (part < 3 || part >= numberTotalChannels - 3)
             //         {
             //             cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
             //             for (auto gY = 0; gY < gridY; gY++)
@@ -804,7 +798,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 
     // Parameters
-    const auto numberPAFChannelsP1 = getNumberPafChannels(mPoseModel)+1;
     const auto& labelMapA = getPafIndexA(mPoseModel);
     const auto& labelMapB = getPafIndexB(mPoseModel);
 
@@ -817,8 +810,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         if (joints.isVisible[labelMapA[i]]<=1 && joints.isVisible[labelMapB[i]]<=1)
         {
             // putVectorMaps
-            putVectorMaps(transformedLabel + (numberBodyBkgPAFParts + 2*i)*channelOffset,
-                          transformedLabel + (numberBodyBkgPAFParts + 2*i + 1)*channelOffset,
+            putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
+                          transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
                           count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                           param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
         }
@@ -830,8 +823,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (jointsOthers.isVisible[labelMapA[i]]<=1 && jointsOthers.isVisible[labelMapB[i]]<=1)
             {
                 //putVectorMaps
-                putVectorMaps(transformedLabel + (numberBodyBkgPAFParts + 2*i)*channelOffset,
-                              transformedLabel + (numberBodyBkgPAFParts + 2*i + 1)*channelOffset,
+                putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
+                              transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
                               count, jointsOthers.points[labelMapA[i]], jointsOthers.points[labelMapB[i]],
                               param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
             }
@@ -844,7 +837,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         if (metaData.jointsSelf.isVisible[part] <= 1)
         {
             const auto& centerPoint = metaData.jointsSelf.points[part];
-            putGaussianMaps(transformedLabel + (part+numberBodyPAFParts+numberPAFChannelsP1)*channelOffset,
+            putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
                             centerPoint, param_.stride(), gridX, gridY, param_.sigma()); //self
         }
         //for every other person
@@ -853,7 +846,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
-                putGaussianMaps(transformedLabel + (part+numberBodyPAFParts+numberPAFChannelsP1)*channelOffset,
+                putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
                                 centerPoint, param_.stride(), gridX, gridY, param_.sigma());
             }
         }
@@ -867,13 +860,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             const auto xyOffset = yOffset + gX;
             Dtype maximum = 0.;
-            for (auto p = numberBodyPAFParts+numberPAFChannelsP1 ; p < numberBodyPAFParts+numberBodyBkgPAFParts ; p++)
+            for (auto p = numberTotalChannels+numberPafChannels ; p < 2*numberTotalChannels-1 ; p++)
             {
                 const auto index = p * channelOffset + xyOffset;
                 maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
             }
-            transformedLabel[(2*numberBodyPAFParts+1)*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum,
-                                                                                           Dtype(0.));
+            transformedLabel[(2*numberTotalChannels-1)*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum,
+                                                                                            Dtype(0.));
         }
     }
 }

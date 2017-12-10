@@ -202,6 +202,8 @@ namespace caffe {
             if (metaData.depthEnabled)
                 metaData.depthSource = decodeString(&data[(currentLine+2) * offsetPerLine]);
         }
+        else
+            metaData.depthEnabled = false;
 
         // Transform joints in metaData from getNumberBodyPartsLmdb(mPoseModel) (specified in prototxt)
         // to getNumberBodyAndPafChannels(mPoseModel) (specified in prototxt)
