@@ -21,6 +21,59 @@ namespace caffe {
         return result;
     }
 
+    void lmdbJointsToOurModel(Joints& joints, const PoseModel poseModel)
+    {
+        // Transform joints in metaData from getNumberBodyPartsLmdb(poseModel) (specified in prototxt)
+        // to getNumberBodyAndPafChannels(poseModel) (specified in prototxt)
+        auto jointsOld = joints;
+
+        // Common operations
+        const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
+        joints.points.resize(numberBodyPAFParts);
+        joints.isVisible.resize(numberBodyPAFParts);
+
+        // From COCO/DomeDB to OP keypoint indexes
+        const auto& lmdbToOurModel = getLmdbToOpenPoseKeypoints(poseModel);
+        for (auto i = 0 ; i < lmdbToOurModel.size() ; i++)
+        {
+            // Original COCO:
+            //     v=0: not labeled
+            //     v=1: labeled but not visible
+            //     v=2: labeled and visible
+            // OpenPose:
+            //     v=0: labeled but not visible
+            //     v=1: labeled and visible
+            //     v=2: out of image / unlabeled
+            // Get joints.points[i]
+            joints.points[i] = cv::Point2f{0.f, 0.f};
+            for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+                joints.points[i] += jointsOld.points[lmdbToOurModelIndex];
+            joints.points[i] *= (1.f / (float)lmdbToOurModel[i].size());
+            // Get joints.isVisible[i]
+            joints.isVisible[i] = 1;
+            for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+            {
+                // If any of them is 2 --> 2 (not in the image or unlabeled)
+                if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                {
+                    joints.isVisible[i] = 2;
+                    break;
+                }
+                // If no 2 but 0 -> 0 (ocluded but located)
+                else if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
+                    joints.isVisible[i] = 0;
+                // Else 1 (if all are 1s)
+            }
+        }
+    }
+
+    void lmdbJointsToOurModel(MetaData& metaData, const PoseModel poseModel)
+    {
+        lmdbJointsToOurModel(metaData.jointsSelf, poseModel);
+        for (auto& joints : metaData.jointsOthers)
+            lmdbJointsToOurModel(joints, poseModel);
+    }
+
     // Public functions
     //very specific to genLMDB.py
     std::atomic<int> sCurrentEpoch{-1};
@@ -55,15 +108,15 @@ namespace caffe {
         }
 
         // Objpos
-        metaData.objpos.x = decodeNumber<Dtype>(&data[3*offsetPerLine]);
-        metaData.objpos.y = decodeNumber<Dtype>(&data[3*offsetPerLine+4]);
+        metaData.objPos.x = decodeNumber<Dtype>(&data[3*offsetPerLine]);
+        metaData.objPos.y = decodeNumber<Dtype>(&data[3*offsetPerLine+4]);
         // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
         if (poseCategory == PoseCategory::COCO)
-            metaData.objpos -= cv::Point2f{1.f,1.f};
+            metaData.objPos -= cv::Point2f{1.f,1.f};
         // scaleSelf, jointsSelf
         metaData.scaleSelf = decodeNumber<Dtype>(&data[4*offsetPerLine]);
         auto& jointSelf = metaData.jointsSelf;
-        const auto numberPartsInLmdb = NUMBER_PARTS_LMDB[(int)poseModel];
+        const auto numberPartsInLmdb = getNumberBodyPartsLmdb(poseModel);
         jointSelf.points.resize(numberPartsInLmdb);
         jointSelf.isVisible.resize(numberPartsInLmdb);
         for (auto part = 0 ; part < numberPartsInLmdb; part++)
@@ -149,52 +202,10 @@ namespace caffe {
             if (metaData.depthEnabled)
                 metaData.depthSource = decodeString(&data[(currentLine+2) * offsetPerLine]);
         }
-    }
 
-    void transformJoints(Joints& joints, const PoseModel poseModel)
-    {
-        // Transform joints in metaData from NUMBER_PARTS_LMDB[(int)poseModel] (specified in prototxt)
-        // to getNumberBodyAndPafChannels(poseModel) (specified in prototxt)
-        auto jointsOld = joints;
-
-        // Common operations
-        const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-        joints.points.resize(numberBodyPAFParts);
-        joints.isVisible.resize(numberBodyPAFParts);
-
-        // From COCO/DomeDB to OP keypoint indexes
-        const auto& modelToOurs = TRANSFORM_MODEL_TO_OURS[(int)poseModel];
-        for (auto i = 0 ; i < modelToOurs.size() ; i++)
-        {
-            // Original COCO:
-            //     v=0: not labeled
-            //     v=1: labeled but not visible
-            //     v=2: labeled and visible
-            // OpenPose:
-            //     v=0: labeled but not visible
-            //     v=1: labeled and visible
-            //     v=2: out of image / unlabeled
-            // Get joints.points[i]
-            joints.points[i] = cv::Point2f{0.f, 0.f};
-            for (auto& modelToOursIndex : modelToOurs[i])
-                joints.points[i] += jointsOld.points[modelToOursIndex];
-            joints.points[i] *= (1.f / (float)modelToOurs[i].size());
-            // Get joints.isVisible[i]
-            joints.isVisible[i] = 1;
-            for (auto& modelToOursIndex : modelToOurs[i])
-            {
-                // If any of them is 2 --> 2 (not in the image or unlabeled)
-                if (jointsOld.isVisible[modelToOursIndex] == 2)
-                {
-                    joints.isVisible[i] = 2;
-                    break;
-                }
-                // If no 2 but 0 -> 0 (ocluded but located)
-                else if (jointsOld.isVisible[modelToOursIndex] == 0)
-                    joints.isVisible[i] = 0;
-                // Else 1 (if all are 1s)
-            }
-        }
+        // Transform joints in metaData from getNumberBodyPartsLmdb(mPoseModel) (specified in prototxt)
+        // to getNumberBodyAndPafChannels(mPoseModel) (specified in prototxt)
+        lmdbJointsToOurModel(metaData, poseModel);
     }
 
     template void readMetaData<float>(MetaData& metaData, const char* data, const size_t offsetPerLine,

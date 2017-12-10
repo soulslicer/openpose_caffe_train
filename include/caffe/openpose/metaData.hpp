@@ -22,7 +22,7 @@ namespace caffe {
         int writeNumber;
         int totalWriteNumber;
         int epoch;
-        cv::Point2f objpos; //objpos_x(float), objpos_y (float)
+        cv::Point2f objPos; //objPos_x(float), objPos_y (float)
         float scaleSelf;
         Joints jointsSelf; //(3*16)
         std::vector<cv::Point2f> objPosOthers; //length is numberOtherPeople
@@ -41,7 +41,6 @@ namespace caffe {
     template<typename Dtype>
     void readMetaData(MetaData& metaData, const char* data, const size_t offsetPerLine,
                       const PoseCategory poseCategory, const PoseModel poseModel);
-    void transformJoints(Joints& joints, const PoseModel poseModel);
 
 }  // namespace caffe
 

@@ -54,7 +54,7 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
 {
     cv::Mat imageToVisualize = image.clone();
 
-    cv::rectangle(imageToVisualize, metaData.objpos-cv::Point2f{3.f,3.f}, metaData.objpos+cv::Point2f{3.f,3.f},
+    cv::rectangle(imageToVisualize, metaData.objPos-cv::Point2f{3.f,3.f}, metaData.objPos+cv::Point2f{3.f,3.f},
                   cv::Scalar{255,255,0}, CV_FILLED);
     const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
     for (auto part = 0 ; part < numberBodyPAFParts ; part++)
@@ -116,14 +116,14 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
         }
     }
 
-    cv::line(imageToVisualize, metaData.objpos + cv::Point2f{-368/2.f,-368/2.f},
-             metaData.objpos + cv::Point2f{368/2.f,-368/2.f}, cv::Scalar{0,255,0}, 2);
-    cv::line(imageToVisualize, metaData.objpos + cv::Point2f{368/2.f,-368/2.f},
-             metaData.objpos + cv::Point2f{368/2.f,368/2.f}, cv::Scalar{0,255,0}, 2);
-    cv::line(imageToVisualize, metaData.objpos + cv::Point2f{368/2.f,368/2.f},
-             metaData.objpos + cv::Point2f{-368/2.f,368/2.f}, cv::Scalar{0,255,0}, 2);
-    cv::line(imageToVisualize, metaData.objpos + cv::Point2f{-368/2.f,368/2.f},
-             metaData.objpos + cv::Point2f{-368/2.f,-368/2.f}, cv::Scalar{0,255,0}, 2);
+    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{-368/2.f,-368/2.f},
+             metaData.objPos + cv::Point2f{368/2.f,-368/2.f}, cv::Scalar{0,255,0}, 2);
+    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{368/2.f,-368/2.f},
+             metaData.objPos + cv::Point2f{368/2.f,368/2.f}, cv::Scalar{0,255,0}, 2);
+    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{368/2.f,368/2.f},
+             metaData.objPos + cv::Point2f{-368/2.f,368/2.f}, cv::Scalar{0,255,0}, 2);
+    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{-368/2.f,368/2.f},
+             metaData.objPos + cv::Point2f{-368/2.f,-368/2.f}, cv::Scalar{0,255,0}, 2);
 
     for (auto person=0;person<metaData.numberOtherPeople;person++)
     {
@@ -287,11 +287,6 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         readMetaData<Dtype>(metaData, &data[3 * datumArea], datumWidth, mPoseCategory, mPoseModel);
         metaData.depthEnabled = false;
     }
-    // Transform joints in metaData from NUMBER_PARTS_LMDB[(int)mPoseModel] (specified in prototxt)
-    // to getNumberBodyAndPafChannels(mPoseModel) (specified in prototxt)
-    transformJoints(metaData.jointsSelf, mPoseModel);
-    for (auto& joints : metaData.jointsOthers)
-        transformJoints(joints, mPoseModel);
     const auto depthEnabled = metaData.depthEnabled;
 
     // Read image (LMDB channel 1)
@@ -664,7 +659,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto numberBodyPAFParts = getNumberBodyAndPafChannels(mPoseModel);
     const auto numberBodyBkgPAFParts = getNumberBodyBkgAndPAF(mPoseModel);
     const auto numberPAFChannels = getNumberPafChannels(mPoseModel);
-    const auto numberBodyParts = NUMBER_BODY_PARTS[(int)mPoseModel];
+    const auto numberBodyParts = getNumberBodyParts(mPoseModel);
 
     // Labels to 0
     std::fill(transformedLabel, transformedLabel + 2*numberBodyBkgPAFParts * gridY * gridX, 0.f);
@@ -717,7 +712,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Background
         if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_18)
         {
-            const auto backgroundIndex = numberPAFChannels + NUMBER_BODY_PARTS[(int)mPoseModel];
+            const auto backgroundIndex = numberPAFChannels + numberBodyParts;
             int type;
             if (sizeof(Dtype) == sizeof(float))
                 type = CV_32F;
@@ -810,8 +805,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
     // Parameters
     const auto numberPAFChannelsP1 = getNumberPafChannels(mPoseModel)+1;
-    const auto& labelMapA = LABEL_MAP_A[(int)mPoseModel];
-    const auto& labelMapB = LABEL_MAP_B[(int)mPoseModel];
+    const auto& labelMapA = getPafIndexA(mPoseModel);
+    const auto& labelMapB = getPafIndexB(mPoseModel);
 
     // PAFs
     const auto threshold = 1;

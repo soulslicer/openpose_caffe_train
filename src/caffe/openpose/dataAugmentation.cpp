@@ -1,12 +1,6 @@
 #include <fstream> // std::ifstream
 #include <stdexcept> // std::runtime_error
 #include <opencv2/contrib/contrib.hpp> // cv::CLAHE, CV_Lab2BGR
-// #include <opencv2/highgui/highgui.hpp>
-// #include <caffe/data_transformer.hpp>
-// #include <caffe/util/io.hpp>
-// #include <caffe/util/math_functions.hpp>
-// #include <caffe/util/rng.hpp>
-// #include <caffe/util/benchmark.hpp>
 #include <caffe/openpose/getLine.hpp>
 #include <caffe/openpose/dataAugmentation.hpp>
 
@@ -18,17 +12,25 @@ namespace caffe {
                 && point.x < imageSize.width && point.y < imageSize.height);
     }
 
-    void swapLeftRight(Joints& joints, const PoseModel poseModel)
+    void swapLeftRightKeypoints(Joints& joints, const PoseModel poseModel)
     {
-        const auto& vectorLeft = SWAP_LEFTS[(int)poseModel];
-        const auto& vectorRight = SWAP_RIGHTS[(int)poseModel];
-        for (auto i = 0 ; i < vectorLeft.size() ; i++)
+        const auto& swapLeftRightKeypoints = getSwapLeftRightKeypoints(poseModel);
+        for (const auto& swapLeftRightKeypoint : swapLeftRightKeypoints)
         {
-            const auto li = vectorLeft[i];
-            const auto ri = vectorRight[i];
+            const auto li = swapLeftRightKeypoint[0];
+            const auto ri = swapLeftRightKeypoint[1];
             std::swap(joints.points[ri], joints.points[li]);
             std::swap(joints.isVisible[ri], joints.isVisible[li]);
         }
+    }
+
+    void flipKeypoints(Joints& joints, cv::Point2f& objPos, const int numberBodyPAFParts, const int widthMinusOne,
+                       const PoseModel poseModel)
+    {
+        objPos.x = widthMinusOne - objPos.x;
+        for (auto part = 0 ; part < numberBodyPAFParts ; part++)
+            joints.points[part].x = widthMinusOne - joints.points[part].x;
+        swapLeftRightKeypoints(joints, poseModel);
     }
 
     // Public functions
@@ -61,7 +63,7 @@ namespace caffe {
     void DataAugmentation::applyScale(MetaData& metaData, const float scale, const PoseModel poseModel) const
     {
         // Update metaData
-        metaData.objpos *= scale;
+        metaData.objPos *= scale;
         const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
         for (auto part = 0; part < numberBodyPAFParts ; part++)
             metaData.jointsSelf.points[part] *= scale;
@@ -103,7 +105,7 @@ namespace caffe {
     void DataAugmentation::applyRotation(MetaData& metaData, const cv::Mat& Rot, const PoseModel poseModel) const
     {
         // Update metaData
-        rotatePoint(metaData.objpos, Rot);
+        rotatePoint(metaData.objPos, Rot);
         const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
         for (auto part = 0 ; part < numberBodyPAFParts ; part++)
             rotatePoint(metaData.jointsSelf.points[part], Rot);
@@ -124,8 +126,8 @@ namespace caffe {
         const cv::Size pointOffset{int((diceX - 0.5f) * 2.f * param_.center_perterb_max()),
                                    int((diceY - 0.5f) * 2.f * param_.center_perterb_max())};
         const cv::Point2i cropCenter{
-            (int)(metaData.objpos.x + pointOffset.width),
-            (int)(metaData.objpos.y + pointOffset.height),
+            (int)(metaData.objPos.x + pointOffset.width),
+            (int)(metaData.objPos.y + pointOffset.height),
         };
         return cropCenter;
     }
@@ -201,7 +203,7 @@ namespace caffe {
         const int offsetLeft = -(cropCenter.x - (cropX/2));
         const int offsetUp = -(cropCenter.y - (cropY/2));
         const cv::Point2f offsetPoint{(float)offsetLeft, (float)offsetUp};
-        metaData.objpos += offsetPoint;
+        metaData.objPos += offsetPoint;
         const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
         for (auto part = 0 ; part < numberBodyPAFParts ; part++)
             metaData.jointsSelf.points[part] += offsetPoint;
@@ -236,18 +238,13 @@ namespace caffe {
         // Update metaData
         if (flip)
         {
-            metaData.objpos.x = imageWidth - 1 - metaData.objpos.x;
             const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-            for (auto part = 0 ; part < numberBodyPAFParts ; part++)
-                metaData.jointsSelf.points[part].x = imageWidth - 1 - metaData.jointsSelf.points[part].x;
-            swapLeftRight(metaData.jointsSelf, poseModel);
+            const auto widthMinusOne = imageWidth - 1;
+            // Main keypoints
+            flipKeypoints(metaData.jointsSelf, metaData.objPos, numberBodyPAFParts, widthMinusOne, poseModel);
+            // Other keypoints
             for (auto p = 0 ; p < metaData.numberOtherPeople ; p++)
-            {
-                metaData.objPosOthers[p].x = imageWidth - 1 - metaData.objPosOthers[p].x;
-                for (auto part = 0 ; part < numberBodyPAFParts ; part++)
-                    metaData.jointsOthers[p].points[part].x = imageWidth - 1 - metaData.jointsOthers[p].points[part].x;
-                swapLeftRight(metaData.jointsOthers[p], poseModel);
-            }
+                flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], numberBodyPAFParts, widthMinusOne, poseModel);
         }
     }
 
