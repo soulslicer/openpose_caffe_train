@@ -415,8 +415,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Data augmentation
     timer1.Start();
     AugmentSelection augmentSelection;
-    // Debug - Visualize original
-    debugVisualize(image, metaData, augmentSelection, mPoseModel, phase_, param_);
+    // // Debug - Visualize original
+    // debugVisualize(image, metaData, augmentSelection, mPoseModel, phase_, param_);
     // Augmentation
     cv::Mat imageAugmented;
     cv::Mat backgroundImageAugmented;
@@ -495,8 +495,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         if (depthEnabled)
             cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
     }
-    // Debug - Visualize final (augmented) image
-    debugVisualize(imageAugmented, metaData, augmentSelection, mPoseModel, phase_, param_);
+    // // Debug - Visualize final (augmented) image
+    // debugVisualize(imageAugmented, metaData, augmentSelection, mPoseModel, phase_, param_);
     // Augmentation time
     VLOG(2) << "  Aug: " << timer1.MicroSeconds()*1e-3 << " ms";
     // Data copy
@@ -519,7 +519,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Generate and copy label
     generateLabelMap(transformedLabel, imageAugmented, maskMissAugmented, metaData);
     if (depthEnabled)
-        generateLabelMap(transformedLabel, depthAugmented);
+        generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
@@ -527,7 +527,6 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // // 2. Comment the following if statement
     // const auto rezX = (int)imageAugmented.cols;
     // const auto rezY = (int)imageAugmented.rows;
-    // const auto stride = (int)param_.stride();
     // const auto gridX = rezX / stride;
     // const auto gridY = rezY / stride;
     // const auto channelOffset = gridY * gridX;
@@ -541,7 +540,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //     // Reduce #images saved (ideally images from 0 to numberTotalChannels should be the same)
     //     // if (mPoseModel == PoseModel::COCO_23_18)
     //     {
-    //         if (part < 3 || part >= numberTotalChannels - 3)
+    //         // if (part < 3 || part >= numberTotalChannels - 3)
     //         {
     //             cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
     //             for (auto gY = 0; gY < gridY; gY++)
@@ -573,7 +572,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 }
 
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const
+void OPDataTransformer<Dtype>::generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const
 {
     const auto gridX = (int)depth.cols;
     const auto gridY = (int)depth.rows;
@@ -806,27 +805,26 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     for (auto i = 0 ; i < labelMapA.size() ; i++)
     {
         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        // Self
         const auto& joints = metaData.jointsSelf;
-        if (joints.isVisible[labelMapA[i]]<=1 && joints.isVisible[labelMapB[i]]<=1)
+        if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
         {
-            // putVectorMaps
             putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
                           transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
                           count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                          param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
+                          param_.stride(), gridX, gridY, param_.sigma(), threshold);
         }
 
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
         {
-            const auto& jointsOthers = metaData.jointsOthers[otherPerson];
-            if (jointsOthers.isVisible[labelMapA[i]]<=1 && jointsOthers.isVisible[labelMapB[i]]<=1)
+            const auto& joints = metaData.jointsOthers[otherPerson];
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
             {
-                //putVectorMaps
                 putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
                               transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
-                              count, jointsOthers.points[labelMapA[i]], jointsOthers.points[labelMapB[i]],
-                              param_.stride(), gridX, gridY, param_.sigma(), threshold); //self
+                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                              param_.stride(), gridX, gridY, param_.sigma(), threshold);
             }
         }
     }
@@ -834,13 +832,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Body parts
     for (auto part = 0; part < numberBodyParts; part++)
     {
+        // Self
         if (metaData.jointsSelf.isVisible[part] <= 1)
         {
             const auto& centerPoint = metaData.jointsSelf.points[part];
             putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                            centerPoint, param_.stride(), gridX, gridY, param_.sigma()); //self
+                            centerPoint, param_.stride(), gridX, gridY, param_.sigma());
         }
-        //for every other person
+        // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
         {
             if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
@@ -860,13 +859,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             const auto xyOffset = yOffset + gX;
             Dtype maximum = 0.;
-            for (auto p = numberTotalChannels+numberPafChannels ; p < 2*numberTotalChannels-1 ; p++)
+            const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
+            for (auto part = numberTotalChannels+numberPafChannels ; part < backgroundIndex ; part++)
             {
-                const auto index = p * channelOffset + xyOffset;
+                const auto index = part * channelOffset + xyOffset;
                 maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
             }
-            transformedLabel[(2*numberTotalChannels-1)*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum,
-                                                                                            Dtype(0.));
+            transformedLabel[backgroundIndex*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
         }
     }
 }
@@ -906,49 +905,44 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::M
                                              const cv::Point2f& centerB, const int stride, const int gridX,
                                              const int gridY, const float sigma, const int threshold) const
 {
-    const auto centerAAux = 0.125f * centerA;
-    const auto centerBAux = 0.125f * centerB;
-    const int minX = std::max( int(round(std::min(centerAAux.x, centerBAux.x) - threshold)), 0);
-    const int maxX = std::min( int(round(std::max(centerAAux.x, centerBAux.x) + threshold)), gridX);
+    const auto scaleLabel = Dtype(1)/Dtype(stride);
+    const auto centerALabelScale = scaleLabel * centerA;
+    const auto centerBLabelScale = scaleLabel * centerB;
+    cv::Point2f directionAB = centerBLabelScale - centerALabelScale;
+    const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y);
+    directionAB *= (Dtype(1) / distanceAB);
 
-    const int minY = std::max( int(round(std::min(centerAAux.y, centerBAux.y) - threshold)), 0);
-    const int maxY = std::min( int(round(std::max(centerAAux.y, centerBAux.y) + threshold)), gridY);
-
-    // const cv::Point2f bc = (centerBAux - centerAAux) * (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
-    cv::Point2f bc = centerBAux - centerAAux;
-    bc *= (1.f / std::sqrt(bc.x*bc.x + bc.y*bc.y));
     // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
-    if (!isnan(bc.x) && !isnan(bc.y))
+    if (!isnan(directionAB.x) && !isnan(directionAB.y))
     {
-        // const float x_p = (centerAAux.x + centerBAux.x) / 2;
-        // const float y_p = (centerAAux.y + centerBAux.y) / 2;
-        // const float angle = atan2f(centerBAux.y - centerAAux.y, centerBAux.x - centerAAux.x);
-        // const float sine = sinf(angle);
-        // const float cosine = cosf(angle);
-        // const float a_sqrt = (centerAAux.x - x_p) * (centerAAux.x - x_p)
-        //                    + (centerAAux.y - y_p) * (centerAAux.y - y_p);
-        // const float b_sqrt = 10; //fixed
-
+        const int minX = std::max(0,
+                                  int(std::round(std::min(centerALabelScale.x, centerBLabelScale.x) - threshold)));
+        const int maxX = std::min(gridX,
+                                  int(std::round(std::max(centerALabelScale.x, centerBLabelScale.x) + threshold)));
+        const int minY = std::max(0,
+                                  int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
+        const int maxY = std::min(gridY,
+                                  int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
         for (auto gY = minY; gY < maxY; gY++)
         {
             const auto yOffset = gY*gridX;
             for (auto gX = minX; gX < maxX; gX++)
             {
                 const auto xyOffset = yOffset + gX;
-                const cv::Point2f ba{gX - centerAAux.x, gY - centerAAux.y};
-                const float distance = std::abs(ba.x*bc.y - ba.y*bc.x);
+                const cv::Point2f ba{gX - centerALabelScale.x, gY - centerALabelScale.y};
+                const float distance = std::abs(ba.x*directionAB.y - ba.y*directionAB.x);
                 if (distance <= threshold)
                 {
                     auto& counter = count.at<uchar>(gY, gX);
                     if (counter == 0)
                     {
-                        entryX[xyOffset] = bc.x;
-                        entryY[xyOffset] = bc.y;
+                        entryX[xyOffset] = directionAB.x;
+                        entryY[xyOffset] = directionAB.y;
                     }
                     else
                     {
-                        entryX[xyOffset] = (entryX[xyOffset]*counter + bc.x) / (counter + 1);
-                        entryY[xyOffset] = (entryY[xyOffset]*counter + bc.y) / (counter + 1);
+                        entryX[xyOffset] = (entryX[xyOffset]*counter + directionAB.x) / (counter + 1);
+                        entryY[xyOffset] = (entryY[xyOffset]*counter + directionAB.y) / (counter + 1);
                     }
                     counter++;
                 }
