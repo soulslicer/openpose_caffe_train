@@ -36,33 +36,44 @@ namespace caffe {
         const auto& lmdbToOurModel = getLmdbToOpenPoseKeypoints(poseModel);
         for (auto i = 0 ; i < lmdbToOurModel.size() ; i++)
         {
-            // Original COCO:
-            //     v=0: not labeled
-            //     v=1: labeled but not visible
-            //     v=2: labeled and visible
-            // OpenPose:
-            //     v=0: labeled but not visible
-            //     v=1: labeled and visible
-            //     v=2: out of image / unlabeled
-            // Get joints.points[i]
-            joints.points[i] = cv::Point2f{0.f, 0.f};
-            for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
-                joints.points[i] += jointsOld.points[lmdbToOurModelIndex];
-            joints.points[i] *= (1.f / (float)lmdbToOurModel[i].size());
-            // Get joints.isVisible[i]
-            joints.isVisible[i] = 1;
-            for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+            // If point defined
+            if (!lmdbToOurModel[i].empty())
             {
-                // If any of them is 2 --> 2 (not in the image or unlabeled)
-                if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                // Initialize point
+                joints.points[i] = cv::Point2f{0.f, 0.f};
+                // Get and average joints.points[i]
+                for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+                    joints.points[i] += jointsOld.points[lmdbToOurModelIndex];
+                joints.points[i] *= (1.f / (float)lmdbToOurModel[i].size());
+                // Get joints.isVisible[i]
+                // Original COCO:
+                //     v=0: not labeled
+                //     v=1: labeled but not visible
+                //     v=2: labeled and visible
+                // OpenPose:
+                //     v=0: labeled but not visible
+                //     v=1: labeled and visible
+                //     v=2: out of image / unlabeled
+                joints.isVisible[i] = 1;
+                for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
                 {
-                    joints.isVisible[i] = 2;
-                    break;
+                    // If any of them is 2 --> 2 (not in the image or unlabeled)
+                    if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                    {
+                        joints.isVisible[i] = 2;
+                        break;
+                    }
+                    // If no 2 but 0 -> 0 (ocluded but located)
+                    else if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
+                        joints.isVisible[i] = 0;
+                    // Else 1 (if all are 1s)
                 }
-                // If no 2 but 0 -> 0 (ocluded but located)
-                else if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
-                    joints.isVisible[i] = 0;
-                // Else 1 (if all are 1s)
+            }
+            // If point not defined
+            else
+            {
+                joints.points[i] = cv::Point2f{0.f, 0.f};
+                joints.isVisible[i] = 2;
             }
         }
     }
