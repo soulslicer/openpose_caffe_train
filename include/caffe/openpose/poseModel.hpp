@@ -15,16 +15,18 @@ enum class PoseModel : unsigned short
     DOME_19 = 3,
     COCO_23 = 4,
     DOME_23_19 = 5,
-    COCO_23_18 = 6,
+    COCO_23_17 = 6,
     DOME_23 = 7,
     DOME_59 = 8,
     COCO_59_17 = 9,
+    MPII_59 = 10,
     Size,
 };
-enum class PoseCategory : bool
+enum class PoseCategory : unsigned short
 {
     COCO,
-    DOME
+    DOME,
+    MPII
 };
 
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString);
@@ -46,6 +48,8 @@ const std::vector<std::array<int,2>>& getSwapLeftRightKeypoints(const PoseModel 
 const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
+
+const std::vector<int> getMissingChannels(const PoseModel poseModel);
 
 }  // namespace caffe
 

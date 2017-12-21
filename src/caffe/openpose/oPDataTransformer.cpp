@@ -177,7 +177,8 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
 template<typename Dtype>
 OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param,
         Phase phase)
-        : param_(param), phase_(phase) {
+        // : param_(param), phase_(phase) {
+        : param_(param), phase_(phase), mCurrentEpoch{-1} {
     // OpenPose: commented
     // // check if we want to use mean_file
     // if (param_.has_mean_file()) {
@@ -280,14 +281,17 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read meta data (LMDB channel 3)
     MetaData metaData;
+    // DOME
     if (mPoseCategory == PoseCategory::DOME)
-        readMetaData<Dtype>(metaData, data.c_str(), datumWidth, mPoseCategory, mPoseModel);
+        readMetaData<Dtype>(metaData, mCurrentEpoch, data.c_str(), datumWidth, mPoseCategory, mPoseModel);
+    // COCO & MPII
     else
-        readMetaData<Dtype>(metaData, &data[3 * datumArea], datumWidth, mPoseCategory, mPoseModel);
+        readMetaData<Dtype>(metaData, mCurrentEpoch, &data[3 * datumArea], datumWidth, mPoseCategory, mPoseModel);
     const auto depthEnabled = metaData.depthEnabled;
 
     // Read image (LMDB channel 1)
     cv::Mat image;
+    // DOME
     if (mPoseCategory == PoseCategory::DOME)
     {
         const auto imageFullPath = param_.media_directory() + metaData.imageSource;
@@ -295,6 +299,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         if (image.empty())
             throw std::runtime_error{"Empty image at " + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
     }
+    // COCO & MPII
     else
     {
         image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
@@ -363,9 +368,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Read mask miss (LMDB channel 2)
     cv::Mat maskMiss;
-    if (mPoseCategory == PoseCategory::DOME)
-        maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
-    else
+    // COCO
+    if (mPoseCategory == PoseCategory::COCO)
     {
         maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{0});
         for (auto y = 0; y < maskMiss.rows; y++)
@@ -386,6 +390,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             }
         }
     }
+    // DOME & MPII
+    else
+        maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
 
     // Time measurement
     VLOG(2) << "  rgb[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
@@ -523,51 +530,61 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
-    // // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
-    // // 2. Comment the following if statement
-    // const auto rezX = (int)imageAugmented.cols;
-    // const auto rezY = (int)imageAugmented.rows;
-    // const auto gridX = rezX / stride;
-    // const auto gridY = rezY / stride;
-    // const auto channelOffset = gridY * gridX;
-    // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
-    // for (auto part = 0; part < 2*numberTotalChannels; part++)
+    // if (metaData.writeNumber < 5)
     // {
-    //     // Original image
-    //     // char imagename [100];
-    //     // sprintf(imagename, "visualize/augment_%04d_label_part_000.jpg", metaData.writeNumber);
-    //     // cv::imwrite(imagename, imageAugmented);
-    //     // Reduce #images saved (ideally images from 0 to numberTotalChannels should be the same)
-    //     // if (mPoseModel == PoseModel::COCO_23_18)
+    //     // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
+    //     // 2. Comment the following if statement
+    //     const auto rezX = (int)imageAugmented.cols;
+    //     const auto rezY = (int)imageAugmented.rows;
+    //     const auto gridX = rezX / stride;
+    //     const auto gridY = rezY / stride;
+    //     const auto channelOffset = gridY * gridX;
+    //     const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+    //     for (auto part = 0; part < numberTotalChannels; part++)
     //     {
+    //         // Reduce #images saved (ideally mask images should be the same)
     //         // if (part < 3 || part >= numberTotalChannels - 3)
     //         {
-    //             cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-    //             for (auto gY = 0; gY < gridY; gY++)
+    //             // if (mPoseModel == PoseModel::COCO_23_17)
     //             {
-    //                 const auto yOffset = gY*gridX;
-    //                 for (auto gX = 0; gX < gridX; gX++)
-    //                     labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+    //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
+    //                 for (auto subPart = 0; subPart < 2; subPart++)
+    //                 {
+    //                     cv::Mat labelMap = finalImage(cv::Rect{subPart*gridX, 0, gridX, gridY});
+    //                     for (auto gY = 0; gY < gridY; gY++)
+    //                     {
+    //                         const auto yOffset = gY*gridX;
+    //                         for (auto gX = 0; gX < gridX; gX++)
+    //                         {
+    //                             const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
+    //                             labelMap.at<uchar>(gY,gX) = (int)(255*transformedLabel[channelIndex + yOffset + gX]);
+    //                         }
+    //                     }
+    //                 }
+    //                 cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+    //                 cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
+    //                 for (auto subPart = 0; subPart < 2; subPart++)
+    //                 {
+    //                     cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
+    //                     cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
+    //                 }
+    //                 // Write on disk
+    //                 char imagename [100];
+    //                 sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", param_.model().c_str(),
+    //                         metaData.writeNumber, part);
+    //                 cv::imwrite(imagename, finalImage);
     //             }
-    //             cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //             cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
-    //             cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
-    //             // Write on disk
-    //             char imagename [100];
-    //             sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", param_.model().c_str(),
-    //                     metaData.writeNumber, part);
-    //             cv::imwrite(imagename, labelMap);
     //         }
     //     }
-    // }
-    // if (depthEnabled)
-    // {
-    //     cv::Mat depthMap;
-    //     cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //     char imagename [100];
-    //     sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
-    //             metaData.writeNumber);
-    //     cv::imwrite(imagename, depthMap);
+    //     if (depthEnabled)
+    //     {
+    //         cv::Mat depthMap;
+    //         cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+    //         char imagename [100];
+    //         sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
+    //                 metaData.writeNumber);
+    //         cv::imwrite(imagename, depthMap);
+    //     }
     // }
 }
 
@@ -617,6 +634,43 @@ void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
     roi.height = std::max(0, roi.height);
 }
 
+float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
+{
+    const auto difference = pointA - pointB;
+    return std::sqrt(difference.x*difference.x + difference.y*difference.y);
+}
+
+void maskHands(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
+              const float stride, const float ratio)
+{
+    for (auto part = 0 ; part < 2 ; part++)
+    {
+        const auto shoulderIndex = (part == 0 ? 5:2);
+        const auto elbowIndex = shoulderIndex+1;
+        const auto wristIndex = elbowIndex+1;
+        if (isVisible.at(shoulderIndex) != 2 && isVisible.at(elbowIndex) != 2 && isVisible.at(wristIndex) != 2)
+        {
+            const auto ratioStride = 1.f / stride;
+            const auto wrist = ratioStride * points.at(wristIndex);
+            const auto elbow = ratioStride * points.at(elbowIndex);
+            const auto shoulder = ratioStride * points.at(shoulderIndex);
+
+            const auto distance = (int)std::round(ratio*std::max(getNorm(wrist, elbow), getNorm(elbow, shoulder)));
+            const cv::Point momentum = (wrist-elbow)*0.25f;
+            cv::Rect roi{(int)std::round(wrist.x + momentum.x - distance /*- wrist.x/2.f*/),
+                         (int)std::round(wrist.y + momentum.y - distance /*- wrist.y/2.f*/),
+                         2*distance, 2*distance};
+            // Apply ROI
+            keepRoiInside(roi, maskMiss.size());
+            if (roi.area() > 0)
+                maskMiss(roi).setTo(0.f); // For debugging use 0.5f
+        }
+        // // If there is no visible desired keypoints, mask out the whole background
+        // else
+        //     maskMiss.setTo(0.f); // For debugging use 0.5f
+    }
+}
+
 void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
               const float stride, const float ratio)
 {
@@ -626,10 +680,10 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
         const auto ankleIndex = kneeIndex+1;
         if (isVisible.at(kneeIndex) != 2 && isVisible.at(ankleIndex) != 2)
         {
-            const auto knee = points.at(kneeIndex) * (1.f / stride);
-            const auto ankle = points.at(ankleIndex) * (1.f / stride);
-            const int distance = (int)std::round(ratio*std::sqrt((knee.x - ankle.x)*(knee.x - ankle.x)
-                                                                 + (knee.y - ankle.y)*(knee.y - ankle.y)));
+            const auto ratioStride = 1.f / stride;
+            const auto knee = ratioStride * points.at(kneeIndex);
+            const auto ankle = ratioStride * points.at(ankleIndex);
+            const auto distance = (int)std::round(ratio*getNorm(knee, ankle));
             const cv::Point momentum = (ankle-knee)*0.15f;
             cv::Rect roi{(int)std::round(ankle.x + momentum.x)-distance,
                          (int)std::round(ankle.y + momentum.y)-distance,
@@ -639,6 +693,9 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
             if (roi.area() > 0)
                 maskMiss(roi).setTo(0.f); // For debugging use 0.5f
         }
+        // // If there is no visible desired keypoints, mask out the whole background
+        // else
+        //     maskMiss.setTo(0.f); // For debugging use 0.5f
     }
 }
 
@@ -674,51 +731,90 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         }
     }
 
+    // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
+    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel))
+    {
+        // Remove BP/PAF non-labeled channels
+        const auto missingChannels = getMissingChannels(mPoseModel);
+        for (const auto& index : missingChannels)
+        {
+            std::fill(&transformedLabel[index*channelOffset],
+                      &transformedLabel[index*channelOffset + channelOffset], 0);
+        }
+
+        // Background
+        int type;
+        if (sizeof(Dtype) == sizeof(float))
+            type = CV_32F;
+        else if (sizeof(Dtype) == sizeof(double))
+            type = CV_64F;
+        else
+            throw std::runtime_error{"Only float or double"
+                                     + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        const auto backgroundIndex = numberPafChannels + numberBodyParts;
+        cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
+        // If hands
+        if (numberBodyParts == 59)
+        {
+            maskHands(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            for (const auto& jointsOther : metaData.jointsOthers)
+                maskHands(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+        }
+        // If foot
+        if (numberBodyParts == 23)
+        {
+            maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            for (const auto& jointsOther : metaData.jointsOthers)
+                maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+        }
+    }
+
+// TODO: Remove, temporary hack to get foot data, do nicely for 6-keypoint foot
     // Remove if required RBigToe, RSmallToe, LBigToe, LSmallToe, and Background
-// TODO: Remove, temporary hack to get foot data
-    if (mPoseModel == PoseModel::COCO_23 || mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_18)
+    if (mPoseModel == PoseModel::COCO_23 || mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
     {
         std::vector<int> indexesToRemove;
         // PAFs
-        for (auto index : {11, 12, 15, 16})
+        for (const auto& index : {11, 12, 15, 16})
         {
             const auto indexBase = 2*index;
             indexesToRemove.emplace_back(indexBase);
             indexesToRemove.emplace_back(indexBase+1);
         }
         // Body parts
-        for (auto index : {11, 12, 16, 17})
+        for (const auto& index : {11, 12, 16, 17})
         {
             const auto indexBase = numberPafChannels + index;
             indexesToRemove.emplace_back(indexBase);
         }
-        // Dome data: Exclude (unlabeled) foot keypoints
-        if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_18)
-        {
-            // Remove those channels
-            for (auto index : indexesToRemove)
-            {
-                std::fill(&transformedLabel[index*channelOffset],
-                          &transformedLabel[index*channelOffset + channelOffset], 0);
-            }
-        }
-        // Background
-        if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_18)
-        {
-            const auto backgroundIndex = numberPafChannels + numberBodyParts;
-            int type;
-            if (sizeof(Dtype) == sizeof(float))
-                type = CV_32F;
-            else if (sizeof(Dtype) == sizeof(double))
-                type = CV_64F;
-            else
-                throw std::runtime_error{"Only float or double"
-                                         + getLine(__LINE__, __FUNCTION__, __FILE__)};
-            cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
-            maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
-            for (const auto& jointsOther : metaData.jointsOthers)
-                maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
-        }
+        // Included in code 10-30 lines above...
+        // // Dome data: Exclude (unlabeled) foot keypoints
+        // if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
+        // {
+        //     // Remove those channels
+        //     for (const auto& index : indexesToRemove)
+        //     {
+        //         std::fill(&transformedLabel[index*channelOffset],
+        //                   &transformedLabel[index*channelOffset + channelOffset], 0);
+        //     }
+        // }
+        // // Background
+        // if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
+        // {
+        //     const auto backgroundIndex = numberPafChannels + numberBodyParts;
+        //     int type;
+        //     if (sizeof(Dtype) == sizeof(float))
+        //         type = CV_32F;
+        //     else if (sizeof(Dtype) == sizeof(double))
+        //         type = CV_64F;
+        //     else
+        //         throw std::runtime_error{"Only float or double"
+        //                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        //     cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
+        //     maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+        //     for (const auto& jointsOther : metaData.jointsOthers)
+        //         maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+        // }
         // Mask foot region over person whose feet are not anotated with a square
         if (mPoseModel == PoseModel::COCO_23)
         {

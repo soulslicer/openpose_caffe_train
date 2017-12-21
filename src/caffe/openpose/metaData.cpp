@@ -1,4 +1,3 @@
-#include <atomic>
 #include <caffe/openpose/getLine.hpp>
 #include <caffe/openpose/metaData.hpp>
 #include <glog/logging.h>
@@ -86,11 +85,9 @@ namespace caffe {
     }
 
     // Public functions
-    //very specific to genLMDB.py
-    std::atomic<int> sCurrentEpoch{-1};
     template<typename Dtype>
-    void readMetaData(MetaData& metaData, const char* data, const size_t offsetPerLine,
-                      const PoseCategory poseCategory, const PoseModel poseModel)
+    void readMetaData(MetaData& metaData, int& currentEpoch, const char* data,
+                      const size_t offsetPerLine, const PoseCategory poseCategory, const PoseModel poseModel)
     {
         // Dataset name
         metaData.datasetString = decodeString(data);
@@ -107,8 +104,8 @@ namespace caffe {
 
         // Count epochs according to counters
         if (metaData.writeNumber == 0)
-            sCurrentEpoch++;
-        metaData.epoch = sCurrentEpoch;
+            currentEpoch++;
+        metaData.epoch = currentEpoch;
         if (metaData.writeNumber % 1000 == 0)
         {
             LOG(INFO) << "datasetString: " << metaData.datasetString <<"; imageSize: " << metaData.imageSize
@@ -221,8 +218,8 @@ namespace caffe {
         lmdbJointsToOurModel(metaData, poseModel);
     }
 
-    template void readMetaData<float>(MetaData& metaData, const char* data, const size_t offsetPerLine,
+    template void readMetaData<float>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
                                       const PoseCategory poseCategory, const PoseModel poseModel);
-    template void readMetaData<double>(MetaData& metaData, const char* data, const size_t offsetPerLine,
+    template void readMetaData<double>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
                                        const PoseCategory poseCategory, const PoseModel poseModel);
 }  // namespace caffe

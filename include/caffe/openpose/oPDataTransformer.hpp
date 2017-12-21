@@ -83,7 +83,7 @@ protected:
 protected:
     PoseModel mPoseModel;
     PoseCategory mPoseCategory;
-    bool mIsTableSet;
+    int mCurrentEpoch;
     DataAugmentation mDataAugmentation;
 
     // Label generation
