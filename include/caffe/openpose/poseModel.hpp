@@ -49,7 +49,7 @@ const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
-const std::vector<int> getMissingChannels(const PoseModel poseModel);
+const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {});
 
 }  // namespace caffe
 

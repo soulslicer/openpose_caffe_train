@@ -382,7 +382,7 @@ namespace caffe {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
     }
 
-    const std::vector<int> getMissingChannels(const PoseModel poseModel)
+    const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible)
     {
         std::vector<int> missingChannels;
         // Missing body parts
@@ -391,6 +391,14 @@ namespace caffe {
         for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
             if (lmdbToOpenPoseKeypoints[i].empty())
                 missingBodyParts.emplace_back(i);
+        // If masking also non visible points
+        if (!isVisible.empty())
+        {
+            for (auto i = 0u ; i < isVisible.size() ; i++)
+                if (isVisible[i] == 2.f)
+                    missingBodyParts.emplace_back(i);
+            std::sort(missingBodyParts.begin(), missingBodyParts.end());
+        }
         // Missing PAF channels
         if (!missingBodyParts.empty())
         {

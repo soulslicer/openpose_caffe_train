@@ -410,7 +410,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // timer1.Start();
     // // Clahe
     // if (param_.do_clahe())
-    //     mDataAugmentation.clahe(image, param_.clahe_tile_size(), param_.clahe_clip_limit());
+    //     clahe(image, param_.clahe_tile_size(), param_.clahe_clip_limit());
     // BGR --> Gray --> BGR
     // if image is grey
     // cv::cvtColor(image, image, CV_GRAY2BGR);
@@ -440,39 +440,39 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         cv::Mat maskBackgroundImageTemp;
         cv::Mat maskMissTemp;
         cv::Mat depthTemp;
+        // Swap center?
+        swapCenterPoint(metaData, param_, mPoseModel);
         // Scale
-        augmentSelection.scale = mDataAugmentation.estimateScale(metaData, param_);
-        mDataAugmentation.applyScale(imageTemp, augmentSelection.scale, image);
-        mDataAugmentation.applyScale(maskBackgroundImageTemp, augmentSelection.scale, maskBackgroundImage);
-        mDataAugmentation.applyScale(maskMissTemp, augmentSelection.scale, maskMiss);
-        mDataAugmentation.applyScale(depthTemp, augmentSelection.scale, depth);
-        mDataAugmentation.applyScale(metaData, augmentSelection.scale, mPoseModel);
+        augmentSelection.scale = estimateScale(metaData, param_);
+        applyScale(imageTemp, augmentSelection.scale, image);
+        applyScale(maskBackgroundImageTemp, augmentSelection.scale, maskBackgroundImage);
+        applyScale(maskMissTemp, augmentSelection.scale, maskMiss);
+        applyScale(depthTemp, augmentSelection.scale, depth);
+        applyScale(metaData, augmentSelection.scale, mPoseModel);
         // Rotation
-        augmentSelection.RotAndFinalSize = mDataAugmentation.estimateRotation(metaData, imageTemp.size(), param_);
-        mDataAugmentation.applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, 0);
-        mDataAugmentation.applyRotation(maskBackgroundImageTemp, augmentSelection.RotAndFinalSize,
-                                        maskBackgroundImageTemp, 255);
-        mDataAugmentation.applyRotation(maskMissTemp, augmentSelection.RotAndFinalSize, maskMissTemp, 255);
-        mDataAugmentation.applyRotation(depthTemp, augmentSelection.RotAndFinalSize, depthTemp, 0);
-        mDataAugmentation.applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
+        augmentSelection.RotAndFinalSize = estimateRotation(metaData, imageTemp.size(), param_);
+        applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, 0);
+        applyRotation(maskBackgroundImageTemp, augmentSelection.RotAndFinalSize, maskBackgroundImageTemp, 255);
+        applyRotation(maskMissTemp, augmentSelection.RotAndFinalSize, maskMissTemp, 255);
+        applyRotation(depthTemp, augmentSelection.RotAndFinalSize, depthTemp, 0);
+        applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
         // Cropping
-        augmentSelection.cropCenter = mDataAugmentation.estimateCrop(metaData, param_);
+        augmentSelection.cropCenter = estimateCrop(metaData, param_);
         const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
-        mDataAugmentation.applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, 0, param_);
-        mDataAugmentation.applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, param_);
-        mDataAugmentation.applyCrop(maskBackgroundImage, augmentSelection.cropCenter, maskBackgroundImageTemp, 255,
-                                    param_);
-        mDataAugmentation.applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, 255, param_);
-        mDataAugmentation.applyCrop(depthAugmented, augmentSelection.cropCenter, depthTemp, 0, param_);
-        mDataAugmentation.applyCrop(metaData, augmentSelection.cropCenter, param_, mPoseModel);
+        applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, 0, param_);
+        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, param_);
+        applyCrop(maskBackgroundImage, augmentSelection.cropCenter, maskBackgroundImageTemp, 255, param_);
+        applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, 255, param_);
+        applyCrop(depthAugmented, augmentSelection.cropCenter, depthTemp, 0, param_);
+        applyCrop(metaData, augmentSelection.cropCenter, param_, mPoseModel);
         // Flipping
-        augmentSelection.flip = mDataAugmentation.estimateFlip(metaData, param_);
-        mDataAugmentation.applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
-        mDataAugmentation.applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
-        mDataAugmentation.applyFlip(maskBackgroundImage, augmentSelection.flip, maskBackgroundImage);
-        mDataAugmentation.applyFlip(maskMissAugmented, augmentSelection.flip, maskMissAugmented);
-        mDataAugmentation.applyFlip(depthAugmented, augmentSelection.flip, depthAugmented);
-        mDataAugmentation.applyFlip(metaData, augmentSelection.flip, imageAugmented.cols, param_, mPoseModel);
+        augmentSelection.flip = estimateFlip(metaData, param_);
+        applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
+        applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
+        applyFlip(maskBackgroundImage, augmentSelection.flip, maskBackgroundImage);
+        applyFlip(maskMissAugmented, augmentSelection.flip, maskMissAugmented);
+        applyFlip(depthAugmented, augmentSelection.flip, depthAugmented);
+        applyFlip(metaData, augmentSelection.flip, imageAugmented.cols, param_, mPoseModel);
         // Resize mask
         if (!maskMissTemp.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
@@ -530,22 +530,24 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
-    // if (metaData.writeNumber < 5)
+    // if (mPoseModel == PoseModel::DOME_59)
     // {
-    //     // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
-    //     // 2. Comment the following if statement
-    //     const auto rezX = (int)imageAugmented.cols;
-    //     const auto rezY = (int)imageAugmented.rows;
-    //     const auto gridX = rezX / stride;
-    //     const auto gridY = rezY / stride;
-    //     const auto channelOffset = gridY * gridX;
-    //     const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
-    //     for (auto part = 0; part < numberTotalChannels; part++)
+    //     // if (metaData.writeNumber < 5)
+    //     if (metaData.writeNumber < 100)
     //     {
-    //         // Reduce #images saved (ideally mask images should be the same)
-    //         // if (part < 3 || part >= numberTotalChannels - 3)
+    //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
+    //         // 2. Comment the following if statement
+    //         const auto rezX = (int)imageAugmented.cols;
+    //         const auto rezY = (int)imageAugmented.rows;
+    //         const auto gridX = rezX / stride;
+    //         const auto gridY = rezY / stride;
+    //         const auto channelOffset = gridY * gridX;
+    //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+    //         for (auto part = 0; part < numberTotalChannels; part++)
     //         {
-    //             // if (mPoseModel == PoseModel::COCO_23_17)
+    //             // Reduce #images saved (ideally mask images should be the same)
+    //             if (part < 1)
+    //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
     //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
     //                 for (auto subPart = 0; subPart < 2; subPart++)
@@ -575,15 +577,15 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //                 cv::imwrite(imagename, finalImage);
     //             }
     //         }
-    //     }
-    //     if (depthEnabled)
-    //     {
-    //         cv::Mat depthMap;
-    //         cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //         char imagename [100];
-    //         sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
-    //                 metaData.writeNumber);
-    //         cv::imwrite(imagename, depthMap);
+    //         if (depthEnabled)
+    //         {
+    //             cv::Mat depthMap;
+    //             cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+    //             char imagename [100];
+    //             sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
+    //                     metaData.writeNumber);
+    //             cv::imwrite(imagename, depthMap);
+    //         }
     //     }
     // }
 }
@@ -732,16 +734,17 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 
     // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
-    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel))
+    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
     {
         // Remove BP/PAF non-labeled channels
-        const auto missingChannels = getMissingChannels(mPoseModel);
+        const auto missingChannels = getMissingChannels(mPoseModel, (mPoseModel == PoseModel::MPII_59
+                                                                        ? metaData.jointsSelf.isVisible
+                                                                        : std::vector<float>{}));
         for (const auto& index : missingChannels)
         {
             std::fill(&transformedLabel[index*channelOffset],
                       &transformedLabel[index*channelOffset + channelOffset], 0);
         }
-
         // Background
         int type;
         if (sizeof(Dtype) == sizeof(float))
@@ -754,7 +757,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
         cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
-        if (numberBodyParts == 59)
+        if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
         {
             maskHands(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)

@@ -1,3 +1,4 @@
+#include <iostream>
 #include <fstream> // std::ifstream
 #include <stdexcept> // std::runtime_error
 #include <opencv2/contrib/contrib.hpp> // cv::CLAHE, CV_Lab2BGR
@@ -34,7 +35,31 @@ namespace caffe {
     }
 
     // Public functions
-    float DataAugmentation::estimateScale(const MetaData& metaData, const OPTransformationParameter& param_) const
+    void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const PoseModel poseModel)
+    {
+        // Estimate random scale
+        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+        if (dice < param_.center_swap_prob())
+        {
+            // const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+            if (poseModel == PoseModel::DOME_59)
+            {
+                const auto& isVisible = metaData.jointsSelf.isVisible;
+                const auto& points = metaData.jointsSelf.points;
+                if (isVisible[4] <= 1 && isVisible[7] <= 1)
+                    metaData.objPos = (points[4] + points[7]) * 0.5f;
+                else if (isVisible[4] <= 1)
+                    metaData.objPos = points[4];
+                else if (isVisible[7] <= 1)
+                    metaData.objPos = points[7];
+            }
+            else
+                throw std::runtime_error{"Only implemented for DOME_59"
+                                         + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        }
+    }
+
+    float estimateScale(const MetaData& metaData, const OPTransformationParameter& param_)
     {
         // Estimate random scale
         const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
@@ -53,14 +78,22 @@ namespace caffe {
         return scaleAbs * scaleMultiplier;
     }
 
-    void DataAugmentation::applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image) const
+    void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image)
     {
         // Scale image
         if (!image.empty())
             cv::resize(image, imageAugmented, cv::Size{}, scale, scale, cv::INTER_CUBIC);
+        // Not used given that net makes x8 pooling anyway...
+        //     // Image sharpening
+        //     if (scale > 2.5 && imageAugmented.channels() == 3)
+        //     {
+        //         cv::Mat gaussianImage;
+        //         cv::GaussianBlur(imageAugmented, gaussianImage, cv::Size(0, 0), 3);
+        //         cv::addWeighted(imageAugmented, 1.5, gaussianImage, -0.5, 0, imageAugmented);
+        //     }
     }
 
-    void DataAugmentation::applyScale(MetaData& metaData, const float scale, const PoseModel poseModel) const
+    void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel)
     {
         // Update metaData
         metaData.objPos *= scale;
@@ -75,9 +108,8 @@ namespace caffe {
         }
     }
 
-    std::pair<cv::Mat, cv::Size> DataAugmentation::estimateRotation(const MetaData& metaData,
-                                                                    const cv::Size& imageSize,
-                                                                    const OPTransformationParameter& param_) const
+    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
+                                                  const OPTransformationParameter& param_)
     {
         // Estimate random rotation
         float rotation;
@@ -93,8 +125,8 @@ namespace caffe {
         return std::make_pair(Rot, bbox.size());
     }
 
-    void DataAugmentation::applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size> RotAndFinalSize,
-                                         const cv::Mat& image, const unsigned char defaultBorderValue) const
+    void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size> RotAndFinalSize,
+                       const cv::Mat& image, const unsigned char defaultBorderValue)
     {
         // Rotate image
         if (!image.empty())
@@ -102,7 +134,7 @@ namespace caffe {
                            cv::BORDER_CONSTANT, cv::Scalar{(double)defaultBorderValue});
     }
 
-    void DataAugmentation::applyRotation(MetaData& metaData, const cv::Mat& Rot, const PoseModel poseModel) const
+    void applyRotation(MetaData& metaData, const cv::Mat& Rot, const PoseModel poseModel)
     {
         // Update metaData
         rotatePoint(metaData.objPos, Rot);
@@ -117,7 +149,7 @@ namespace caffe {
         }
     }
 
-    cv::Point2i DataAugmentation::estimateCrop(const MetaData& metaData, const OPTransformationParameter& param_) const
+    cv::Point2i estimateCrop(const MetaData& metaData, const OPTransformationParameter& param_)
     {
         // Estimate random crop
         const float diceX = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
@@ -132,9 +164,8 @@ namespace caffe {
         return cropCenter;
     }
 
-    void DataAugmentation::applyCrop(cv::Mat& imageAugmented, const cv::Point2i& cropCenter,
-                                     const cv::Mat& image, const unsigned char defaultBorderValue,
-                                     const OPTransformationParameter& param_) const
+    void applyCrop(cv::Mat& imageAugmented, const cv::Point2i& cropCenter, const cv::Mat& image,
+                   const unsigned char defaultBorderValue, const OPTransformationParameter& param_)
     {
         if (!image.empty())
         {
@@ -194,8 +225,8 @@ namespace caffe {
         }
     }
 
-    void DataAugmentation::applyCrop(MetaData& metaData, const cv::Point2i& cropCenter,
-                                     const OPTransformationParameter& param_, const PoseModel poseModel) const
+    void applyCrop(MetaData& metaData, const cv::Point2i& cropCenter,
+                   const OPTransformationParameter& param_, const PoseModel poseModel)
     {
         // Update metaData
         const auto cropX = (int) param_.crop_size_x();
@@ -215,14 +246,14 @@ namespace caffe {
         }
     }
 
-    bool DataAugmentation::estimateFlip(const MetaData& metaData, const OPTransformationParameter& param_) const
+    bool estimateFlip(const MetaData& metaData, const OPTransformationParameter& param_)
     {
         // Estimate random flip
         const auto dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         return (dice <= param_.flip_prob());
     }
 
-    void DataAugmentation::applyFlip(cv::Mat& imageAugmented, const bool flip, const cv::Mat& image) const
+    void applyFlip(cv::Mat& imageAugmented, const bool flip, const cv::Mat& image)
     {
         // Flip image
         if (flip && !image.empty())
@@ -232,8 +263,8 @@ namespace caffe {
             imageAugmented = image.clone();
     }
 
-    void DataAugmentation::applyFlip(MetaData& metaData, const bool flip, const int imageWidth,
-                                     const OPTransformationParameter& param_, const PoseModel poseModel) const
+    void applyFlip(MetaData& metaData, const bool flip, const int imageWidth,
+                   const OPTransformationParameter& param_, const PoseModel poseModel)
     {
         // Update metaData
         if (flip)
@@ -244,11 +275,12 @@ namespace caffe {
             flipKeypoints(metaData.jointsSelf, metaData.objPos, numberBodyPAFParts, widthMinusOne, poseModel);
             // Other keypoints
             for (auto p = 0 ; p < metaData.numberOtherPeople ; p++)
-                flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], numberBodyPAFParts, widthMinusOne, poseModel);
+                flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], numberBodyPAFParts, widthMinusOne,
+                              poseModel);
         }
     }
 
-    void DataAugmentation::rotatePoint(cv::Point2f& point2f, const cv::Mat& R) const
+    void rotatePoint(cv::Point2f& point2f, const cv::Mat& R)
     {
         cv::Mat cvMatPoint(3,1, CV_64FC1);
         cvMatPoint.at<double>(0,0) = point2f.x;
@@ -259,7 +291,7 @@ namespace caffe {
         point2f.y = newPoint.at<double>(1,0);
     }
 
-    void DataAugmentation::clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit) const
+    void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit)
     {
         cv::Mat labImage;
         cvtColor(bgrImage, labImage, CV_BGR2Lab);

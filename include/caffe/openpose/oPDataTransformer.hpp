@@ -84,7 +84,6 @@ protected:
     PoseModel mPoseModel;
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
-    DataAugmentation mDataAugmentation;
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
