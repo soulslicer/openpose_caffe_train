@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream> // std::ifstream
 #include <stdexcept> // std::runtime_error
-#include <opencv2/contrib/contrib.hpp> // cv::CLAHE, CV_Lab2BGR
+#include <opencv2/opencv.hpp>
+// #include <opencv2/contrib/contrib.hpp> // cv::CLAHE, CV_Lab2BGR
 #include <caffe/openpose/getLine.hpp>
 #include <caffe/openpose/dataAugmentation.hpp>
 

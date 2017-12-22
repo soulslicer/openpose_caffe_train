@@ -196,12 +196,13 @@ ifeq ($(USE_LMDB), 1)
 endif
 ifeq ($(USE_OPENCV), 1)
 	LIBRARIES += opencv_core opencv_highgui opencv_imgproc
-	# OpenPose: adding contrib module
-	LIBRARIES += opencv_contrib
-	# OpenPose: end modified
 
 	ifeq ($(OPENCV_VERSION), 3)
 		LIBRARIES += opencv_imgcodecs
+	# OpenPose: adding contrib module
+	else
+		LIBRARIES += opencv_contrib
+	# OpenPose: end modified
 	endif
 
 endif

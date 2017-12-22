@@ -1,8 +1,10 @@
 #ifdef USE_OPENCV
     #include <opencv2/core/core.hpp>
     // OpenPose: added
-    #include <opencv2/contrib/contrib.hpp>
-    #include <opencv2/highgui/highgui.hpp>
+    // #include <opencv2/contrib/contrib.hpp>
+    // #include <opencv2/contrib/imgproc.hpp>
+    // #include <opencv2/highgui/highgui.hpp>
+    #include <opencv2/opencv.hpp>
     // OpenPose: added end
 #endif  // USE_OPENCV
 
@@ -249,6 +251,8 @@ template <typename Dtype>
 int OPDataTransformer<Dtype>::getNumberChannels() const
 {
     return 2 * getNumberBodyBkgAndPAF(mPoseModel);
+    // // For Distance
+    // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberPafChannels(mPoseModel)/2);
 }
 // OpenPose: end
 
@@ -714,6 +718,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
     const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
     const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel); // numberBodyParts + numberPafChannels + 1
+    // // For Distance
+    // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2); // numberBodyParts + numberPafChannels + 1
 
     // Labels to 0
     std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * gridY * gridX, 0.f);
@@ -729,6 +735,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             const float weight = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
             // Body part & PAFs & background channel & distance
             for (auto part = 0; part < numberTotalChannels; part++)
+            // // For Distance
+            // for (auto part = 0; part < numberTotalChannels - numberPafChannels/2; part++)
                 transformedLabel[part*channelOffset + xyOffset] = weight;
         }
     }
@@ -910,6 +918,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
                           transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                          // // For Distance
+                          // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                          // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                           count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                           param_.stride(), gridX, gridY, param_.sigma(), threshold);
         }
@@ -922,6 +933,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
                               transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                               param_.stride(), gridX, gridY, param_.sigma(), threshold);
             }
@@ -1003,6 +1017,10 @@ template<typename Dtype>
 void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
                                              const cv::Point2f& centerB, const int stride, const int gridX,
                                              const int gridY, const float sigma, const int threshold) const
+// void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
+//                                              cv::Mat& count, const cv::Point2f& centerA,
+//                                              const cv::Point2f& centerB, const int stride, const int gridX,
+//                                              const int gridY, const float sigma, const int threshold) const
 {
     const auto scaleLabel = Dtype(1)/Dtype(stride);
     const auto centerALabelScale = scaleLabel * centerA;
@@ -1010,6 +1028,12 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::M
     cv::Point2f directionAB = centerBLabelScale - centerALabelScale;
     const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y);
     directionAB *= (Dtype(1) / distanceAB);
+
+    // // For Distance
+    // const auto dMin = Dtype(0);
+    // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
+    // const auto dRange = dMax - dMin;
+    // const auto entryDValue = 2*(distanceAB - dMin)/dRange - 1; // Main range: [-1, 1], -1 is 0px-distance, 1 is 368 / stride x sqrt(2) px of distance
 
     // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
     if (!isnan(directionAB.x) && !isnan(directionAB.y))
@@ -1037,11 +1061,16 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::M
                     {
                         entryX[xyOffset] = directionAB.x;
                         entryY[xyOffset] = directionAB.y;
+                        // // For Distance
+                        // entryD[xyOffset] = entryDValue;
+                        // entryDMask[xyOffset] = Dtype(1);
                     }
                     else
                     {
                         entryX[xyOffset] = (entryX[xyOffset]*counter + directionAB.x) / (counter + 1);
                         entryY[xyOffset] = (entryY[xyOffset]*counter + directionAB.y) / (counter + 1);
+                        // // For Distance
+                        // entryD[xyOffset] = (entryD[xyOffset]*counter + entryDValue) / (counter + 1);
                     }
                     counter++;
                 }
