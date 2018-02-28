@@ -123,6 +123,13 @@ void BasePrefetchingDataLayer<Dtype>::Forward_cpu(
     // Reshape to loaded labels.
     top[1]->ReshapeLike(prefetch_current_->label_);
     top[1]->set_cpu_data(prefetch_current_->label_.mutable_cpu_data());
+    // OpenPose added
+    if (top.size() > 2)
+    {
+      top[2]->ReshapeLike(prefetch_current_->labelBig_);
+      top[2]->set_cpu_data(prefetch_current_->labelBig_.mutable_cpu_data());
+    }
+    // OpenPose added ended
   }
 }
 

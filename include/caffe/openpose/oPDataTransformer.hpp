@@ -65,7 +65,10 @@ protected:
     // OpenPose: added
     // Image and label
 public:
-    void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
+    // void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
+    //                const Datum* datumNegative = nullptr);
+    void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
+                   Blob<Dtype>* transformedLabelBig, const Datum& datum,
                    const Datum* datumNegative = nullptr);
     int getNumberChannels() const;
 protected:
@@ -88,6 +91,8 @@ protected:
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
                               const Datum* datumNegative);
+    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, Dtype* transformedLabelBig,
+                              const Datum& datum, const Datum* datumNegative);
     void generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss,
                           const MetaData& metaData) const;

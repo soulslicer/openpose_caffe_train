@@ -29,7 +29,7 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual inline const char* type() const { return "OPData"; }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int MinTopBlobs() const { return 1; }
-  virtual inline int MaxTopBlobs() const { return 2; }
+  virtual inline int MaxTopBlobs() const { return 3; }
 
  protected:
   void Next();
@@ -41,10 +41,12 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   uint64_t offset_;
 
   // OpenPose: added
+  bool secondLabelChannel;
   bool backgroundDb;
   shared_ptr<db::DB> dbBackground;
   shared_ptr<db::Cursor> cursorBackground;
   Blob<Dtype> transformed_label_;
+  Blob<Dtype> transformed_labelBig_;
   OPTransformationParameter op_transform_param_;
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformer;
   // OpenPose: added end

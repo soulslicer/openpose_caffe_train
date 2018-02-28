@@ -31,6 +31,7 @@
 
 namespace caffe {
 // OpenPose: added ended
+const auto sAntiStride = 2;
 struct AugmentSelection
 {
     bool flip = false;
@@ -174,6 +175,22 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
     //LOG(INFO) << "filename is " << imagename;
     cv::imwrite(imagename, imageToVisualize);
 }
+
+template<typename Dtype>
+int getType(Dtype dtype)
+{
+    dtype++;
+    if (sizeof(Dtype) == sizeof(float))
+        return CV_32F;
+    else if (sizeof(Dtype) == sizeof(double))
+        return CV_64F;
+    else
+    {
+        throw std::runtime_error{"Only float or double"
+                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        return CV_32F;
+    }
+}
 // OpenPose: added ended
 
 template<typename Dtype>
@@ -225,8 +242,31 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
 // }
 
 // OpenPose: added
+// template<typename Dtype>
+// void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
+//                                          const Datum& datum, const Datum* datumNegative)
+// {
+//     // Secuirty checks
+//     const int datumChannels = datum.channels();
+//     const int imageNum = transformedData->num();
+//     const int imageChannels = transformedData->channels();
+//     const int labelNum = transformedLabel->num();
+//     CHECK_GE(datumChannels, 1);
+//     CHECK_EQ(imageChannels, 3);
+//     CHECK_EQ(imageNum, labelNum);
+//     CHECK_GE(imageNum, 1);
+
+//     auto* transformedDataPtr = transformedData->mutable_cpu_data();
+//     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
+//     CPUTimer timer;
+//     timer.Start();
+//     generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative);
+//     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
+// }
+
 template<typename Dtype>
 void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
+                                         Blob<Dtype>* transformedLabelBig,
                                          const Datum& datum, const Datum* datumNegative)
 {
     // Secuirty checks
@@ -241,9 +281,13 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
 
     auto* transformedDataPtr = transformedData->mutable_cpu_data();
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
+    Dtype* transformedLabelBigPtr = nullptr;
+    if (transformedLabelBig != nullptr)
+        transformedLabelBigPtr = transformedLabelBig->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative);
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, transformedLabelBigPtr,
+                         datum, datumNegative);
     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
 
@@ -268,7 +312,8 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
-                                                    const Datum& datum, const Datum* datumNegative)
+                                                    Dtype* transformedLabelBig, const Datum& datum,
+                                                    const Datum* datumNegative)
 {
     // Parameters
     const std::string& data = datum.data();
@@ -502,9 +547,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         depthAugmented = depth;
         // Resize mask
         if (!maskMissAugmented.empty())
-            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
         if (depthEnabled)
-            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
     }
     // // Debug - Visualize final (augmented) image
     // debugVisualize(imageAugmented, metaData, augmentSelection, mPoseModel, phase_, param_);
@@ -529,28 +574,55 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Generate and copy label
     generateLabelMap(transformedLabel, imageAugmented, maskMissAugmented, metaData);
+    // If required small and big label
+    if (transformedLabelBig != nullptr)
+    {
+        const auto rezX = (int)imageAugmented.cols;
+        const auto rezY = (int)imageAugmented.rows;
+        const auto gridX = rezX / stride;
+        const auto gridY = rezY / stride;
+        const auto area = gridY * gridX;
+        const auto areaBig = gridY * gridX * sAntiStride * sAntiStride;
+        const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+        const auto type = getType(Dtype(0));
+        for (auto c = 0 ; c < 2*numberTotalChannels ; c++)
+        {
+            cv::Mat cvLabel(gridY, gridX, type, &transformedLabel[c*area]);
+            cv::Mat cvLabelBig(gridY*sAntiStride, gridX*sAntiStride, type, &transformedLabelBig[c*areaBig]);
+            cv::resize(cvLabel, cvLabelBig, cvLabelBig.size(), 0, 0, cv::INTER_CUBIC);
+            // cv::resize(cvLabelBig, cvLabel, cvLabel.size(), 0, 0, cv::INTER_AREA);
+        }
+    }
+    // // Default: only small label
+    // else
+    //     generateLabelMap(transformedLabel, imageAugmented, maskMissAugmented, metaData);
     if (depthEnabled)
         generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
-    // if (mPoseModel == PoseModel::DOME_59)
+    // // if (mPoseModel == PoseModel::DOME_59)
     // {
-    //     // if (metaData.writeNumber < 5)
-    //     if (metaData.writeNumber < 100)
+    //     const auto strideToUse = stride / sAntiStride;
+    //     auto* transformedLabelToPrint = transformedLabelBig;
+    //     // const auto strideToUse = stride;
+    //     // auto* transformedLabelToPrint = transformedLabel;
+    //     if (metaData.writeNumber < 3)
+    //     // if (metaData.writeNumber < 100)
     //     {
     //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
     //         // 2. Comment the following if statement
     //         const auto rezX = (int)imageAugmented.cols;
     //         const auto rezY = (int)imageAugmented.rows;
-    //         const auto gridX = rezX / stride;
-    //         const auto gridY = rezY / stride;
+    //         const auto gridX = int(std::round(rezX / strideToUse));
+    //         const auto gridY = int(std::round(rezY / strideToUse));
     //         const auto channelOffset = gridY * gridX;
     //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
     //         for (auto part = 0; part < numberTotalChannels; part++)
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
-    //             if (part < 1)
+    //             // if (part < 1)
+    //             if (part == 59)
     //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
     //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
@@ -563,11 +635,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //                         for (auto gX = 0; gX < gridX; gX++)
     //                         {
     //                             const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-    //                             labelMap.at<uchar>(gY,gX) = (int)(255*transformedLabel[channelIndex + yOffset + gX]);
+    //                             labelMap.at<uchar>(gY,gX) = std::min(255, std::max(0, (int)(255*transformedLabelToPrint[channelIndex + yOffset + gX])));
     //                         }
     //                     }
     //                 }
-    //                 cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+    //                 cv::resize(finalImage, finalImage, cv::Size{2*rezX, rezY}, 0, 0, cv::INTER_LINEAR);
     //                 cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
     //                 for (auto subPart = 0; subPart < 2; subPart++)
     //                 {
@@ -584,7 +656,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         if (depthEnabled)
     //         {
     //             cv::Mat depthMap;
-    //             cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+    //             cv::resize(depthAugmented, depthMap, cv::Size{}, strideToUse, strideToUse, cv::INTER_LINEAR);
     //             char imagename [100];
     //             sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
     //                     metaData.writeNumber);
@@ -592,6 +664,13 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         }
     //     }
     // }
+}
+
+template<typename Dtype>
+void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
+                                                    const Datum& datum, const Datum* datumNegative)
+{
+    generateDataAndLabel(transformedData, transformedLabel, nullptr, datum, datumNegative);
 }
 
 template<typename Dtype>
@@ -754,14 +833,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                       &transformedLabel[index*channelOffset + channelOffset], 0);
         }
         // Background
-        int type;
-        if (sizeof(Dtype) == sizeof(float))
-            type = CV_32F;
-        else if (sizeof(Dtype) == sizeof(double))
-            type = CV_64F;
-        else
-            throw std::runtime_error{"Only float or double"
-                                     + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        const auto type = getType(Dtype(0));
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
         cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
@@ -813,14 +885,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
         // {
         //     const auto backgroundIndex = numberPafChannels + numberBodyParts;
-        //     int type;
-        //     if (sizeof(Dtype) == sizeof(float))
-        //         type = CV_32F;
-        //     else if (sizeof(Dtype) == sizeof(double))
-        //         type = CV_64F;
-        //     else
-        //         throw std::runtime_error{"Only float or double"
-        //                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        //     const auto type = getType(Dtype(0));
         //     cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         //     maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
         //     for (const auto& jointsOther : metaData.jointsOthers)
@@ -858,14 +923,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     {
                         for (auto index : indexesToRemove)
                         {
-                            int type;
-                            if (sizeof(Dtype) == sizeof(float))
-                                type = CV_32F;
-                            else if (sizeof(Dtype) == sizeof(double))
-                                type = CV_64F;
-                            else
-                                throw std::runtime_error{"Only float or double"
-                                                         + getLine(__LINE__, __FUNCTION__, __FILE__)};
+                            const auto type = getType(Dtype(0));
                             cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[index*channelOffset]);
                             maskFeet(maskMiss, otherVisible, otherPoints, stride, 0.6f);
                         }

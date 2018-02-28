@@ -13,6 +13,7 @@
 #include "caffe/util/io.hpp" // DecodeDatum, DecodeDatumNative
 #include "caffe/openpose/getLine.hpp"
 #include "caffe/openpose/layers/oPDataLayer.hpp"
+const auto sAntiStride = 2;
 // OpenPose: added end
 
 namespace caffe {
@@ -77,12 +78,25 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     {
         const int stride = this->layer_param_.op_transform_param().stride();
         const int numberChannels = this->mOPDataTransformer->getNumberChannels();
-        std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
+        const std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
             this->prefetch_[i]->label_.Reshape(labelShape);
         this->transformed_label_.Reshape(1, labelShape[1], labelShape[2], labelShape[3]);
         LOG(INFO) << "Label shape: " << labelShape[0] << ", " << labelShape[1] << ", " << labelShape[2] << ", " << labelShape[3];
+        // Extra label
+        std::vector<int> labelShapeBig{labelShape[0], labelShape[1], height/stride*sAntiStride, width/stride*sAntiStride};
+        if (top.size() > 2)
+        {
+            secondLabelChannel = true;
+            top[2]->Reshape(labelShapeBig);
+            for (int i = 0; i < this->prefetch_.size(); ++i)
+                this->prefetch_[i]->labelBig_.Reshape(labelShapeBig);
+            this->transformed_labelBig_.Reshape(1, labelShapeBig[1], labelShapeBig[2], labelShapeBig[3]);
+            LOG(INFO) << "Label shape big: " << labelShapeBig[0] << ", " << labelShapeBig[1] << ", " << labelShapeBig[2] << ", " << labelShapeBig[3];
+        }
+        else
+            secondLabelChannel = false;
     }
     else
         throw std::runtime_error{"output_labels_ must be set to true" + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -210,15 +224,25 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Label
         const int offsetLabel = batch->label_.offset(item_id);
         this->transformed_label_.set_cpu_data(topLabel + offsetLabel);
+        // LabelBig
+        auto* transformedLabelBigPtr = (secondLabelChannel ? &this->transformed_labelBig_ : nullptr);
+        if (secondLabelChannel)
+        {
+            auto* topLabelBig = batch->labelBig_.mutable_cpu_data();
+            const int offsetLabelBig = batch->labelBig_.offset(item_id);
+            this->transformed_labelBig_.set_cpu_data(topLabelBig + offsetLabelBig);
+        }
         // Process iamge & label
         if (backgroundDb)
             this->mOPDataTransformer->Transform(&(this->transformed_data_),
                                                 &(this->transformed_label_),
+                                                transformedLabelBigPtr,
                                                 datum,
                                                 &datumBackground);
         else
             this->mOPDataTransformer->Transform(&(this->transformed_data_),
                                                 &(this->transformed_label_),
+                                                transformedLabelBigPtr,
                                                 datum);
         // OpenPose: added ended
         // OpenPose: commented
