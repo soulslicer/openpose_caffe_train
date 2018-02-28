@@ -166,7 +166,7 @@ namespace caffe {
     }
 
     void applyCrop(cv::Mat& imageAugmented, const cv::Point2i& cropCenter, const cv::Mat& image,
-                   const unsigned char defaultBorderValue, const OPTransformationParameter& param_)
+                   const unsigned char defaultBorderValue, const cv::Size& cropSize)
     {
         if (!image.empty())
         {
@@ -175,8 +175,8 @@ namespace caffe {
                 throw std::runtime_error{"Input and output images must be different"
                                          + getLine(__LINE__, __FUNCTION__, __FILE__)};
             // Parameters
-            const auto cropX = (int) param_.crop_size_x();
-            const auto cropY = (int) param_.crop_size_y();
+            const auto cropX = (int)cropSize.width;
+            const auto cropY = (int)cropSize.height;
             // Crop image
             // 1. Allocate memory
             imageAugmented = cv::Mat(cropY, cropX, image.type(), cv::Scalar{(double)defaultBorderValue});
@@ -227,11 +227,11 @@ namespace caffe {
     }
 
     void applyCrop(MetaData& metaData, const cv::Point2i& cropCenter,
-                   const OPTransformationParameter& param_, const PoseModel poseModel)
+                   const cv::Size& cropSize, const PoseModel poseModel)
     {
         // Update metaData
-        const auto cropX = (int) param_.crop_size_x();
-        const auto cropY = (int) param_.crop_size_y();
+        const auto cropX = (int)cropSize.width;
+        const auto cropY = (int)cropSize.height;
         const int offsetLeft = -(cropCenter.x - (cropX/2));
         const int offsetUp = -(cropCenter.y - (cropY/2));
         const cv::Point2f offsetPoint{(float)offsetLeft, (float)offsetUp};

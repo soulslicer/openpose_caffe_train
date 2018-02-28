@@ -24,9 +24,9 @@ namespace caffe {
     // Cropping
     cv::Point2i estimateCrop(const MetaData& metaData, const OPTransformationParameter& param_);
     void applyCrop(cv::Mat& imageAugmented, const cv::Point2i& cropCenter, const cv::Mat& image,
-                   const unsigned char defaultBorderValue, const OPTransformationParameter& param_);
+                   const unsigned char defaultBorderValue, const cv::Size& cropSize);
     void applyCrop(MetaData& metaData, const cv::Point2i& cropCenter,
-                   const OPTransformationParameter& param_, const PoseModel poseModel);
+                   const cv::Size& cropSize, const PoseModel poseModel);
     // Flipping
     bool estimateFlip(const MetaData& metaData,
                       const OPTransformationParameter& param_);

@@ -39,7 +39,21 @@ struct AugmentSelection
     float scale = 1.f;
 };
 
-void setLabel(cv::Mat& image, const std::string label, const cv::Point& org)
+void doAugmentation(cv::Mat& imageAugmented, const AugmentSelection& augmentSelection, const cv::Mat& originaImage,
+                    const unsigned char defaultBorderValue, const cv::Size& finalCropSize)
+{
+    cv::Mat imageTemp;
+    // Scale
+    applyScale(imageTemp, augmentSelection.scale, originaImage);
+    // Rotation
+    applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, defaultBorderValue);
+    // Cropping
+    applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, defaultBorderValue, finalCropSize);
+    // Flipping
+    applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
+}
+
+void setLabel(cv::Mat& image, const std::string& label, const cv::Point& org)
 {
     const int fontface = cv::FONT_HERSHEY_SIMPLEX;
     const double scale = 0.5;
@@ -289,6 +303,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     const int datumHeight = datum.height();
     const int datumWidth = datum.width();
     const auto datumArea = (int)(datumHeight * datumWidth);
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
 
     // Time measurement
     CPUTimer timer1;
@@ -321,67 +341,109 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     else
     {
         image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
-        const auto imageArea = (int)(image.rows * image.cols);
-        CHECK_EQ(imageArea, datumArea);
-        for (auto y = 0; y < image.rows; ++y)
+        const auto initImageArea = (int)(image.rows * image.cols);
+        CHECK_EQ(initImageArea, datumArea);
+        // for (auto y = 0; y < image.rows; y++)
+        // {
+        //     const auto yOffset = (int)(y*image.cols);
+        //     for (auto x = 0; x < image.cols; x++)
+        //     {
+        //         const auto xyOffset = yOffset + x;
+        //         cv::Vec3b& bgr = image.at<cv::Vec3b>(y, x);
+        //         for (auto c = 0; c < 3; c++)
+        //         {
+        //             const auto dIndex = (int)(c*initImageArea + xyOffset);
+        //             // if (hasUInt8)
+        //                 bgr[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+        //             // else
+        //                 // bgr[c] = datum.float_data(dIndex);
+        //         }
+        //     }
+        // }
+        auto* uCharPtrCvMat = (unsigned char*)(image.data);
+        for (auto y = 0; y < image.rows; y++)
         {
             const auto yOffset = (int)(y*image.cols);
-            for (auto x = 0; x < image.cols; ++x)
+            for (auto x = 0; x < image.cols; x++)
             {
                 const auto xyOffset = yOffset + x;
-                cv::Vec3b& bgr = image.at<cv::Vec3b>(y, x);
-                for (auto c = 0; c < 3; c++)
-                {
-                    const auto dIndex = (int)(c*imageArea + xyOffset);
-                    // if (hasUInt8)
-                        bgr[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                    // else
-                        // bgr[c] = datum.float_data(dIndex);
-                }
+                const auto baseIndex = 3*xyOffset;
+                uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
+                uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + initImageArea]));
+                uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*initImageArea]));
             }
         }
     }
+    const auto initImageWidth = (int)image.cols;
+    const auto initImageHeight = (int)image.rows;
 
+    // Mask for background image
+    // Image size, not backgroundImage
+    cv::Mat maskBackgroundImage = (datumNegative != nullptr
+        ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
     // Read background image
     cv::Mat backgroundImage;
-    cv::Mat maskBackgroundImage;
     if (datumNegative != nullptr)
     {
         const std::string& data = datumNegative->data();
-        const int datumNegativeHeight = datumNegative->height();
         const int datumNegativeWidth = datumNegative->width();
+        const int datumNegativeHeight = datumNegative->height();
         const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
         // Background image
         backgroundImage = cv::Mat(datumNegativeHeight, datumNegativeWidth, CV_8UC3);
-        const auto imageArea = (int)(backgroundImage.rows * backgroundImage.cols);
-        CHECK_EQ(imageArea, datumNegativeArea);
-        for (auto y = 0; y < backgroundImage.rows; ++y)
+        // for (auto y = 0; y < datumNegativeHeight; y++)
+        // {
+        //     const auto yOffset = (int)(y*datumNegativeWidth);
+        //     for (auto x = 0; x < datumNegativeWidth; x++)
+        //     {
+        //         const auto xyOffset = yOffset + x;
+        //         cv::Vec3b& bgr = backgroundImage.at<cv::Vec3b>(y, x);
+        //         for (auto c = 0; c < 3; c++)
+        //         {
+        //             const auto dIndex = (int)(c*datumNegativeArea + xyOffset);
+        //             bgr[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+        //         }
+        //     }
+        // }
+        auto* uCharPtrCvMat = (unsigned char*)(backgroundImage.data);
+        for (auto y = 0; y < datumNegativeHeight; y++)
         {
-            const auto yOffset = (int)(y*backgroundImage.cols);
-            for (auto x = 0; x < backgroundImage.cols; ++x)
+            const auto yOffset = (int)(y*datumNegativeWidth);
+            for (auto x = 0; x < datumNegativeWidth; x++)
             {
                 const auto xyOffset = yOffset + x;
-                cv::Vec3b& bgr = backgroundImage.at<cv::Vec3b>(y, x);
-                for (auto c = 0; c < 3; c++)
-                {
-                    const auto dIndex = (int)(c*imageArea + xyOffset);
-                    bgr[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                }
+                const auto baseIndex = 3*xyOffset;
+                uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
+                uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + datumNegativeArea]));
+                uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*datumNegativeArea]));
             }
         }
-        // Resize
-        if (backgroundImage.cols < param_.crop_size_x() || backgroundImage.rows < param_.crop_size_y())
+        // Included data augmentation: cropping
+        // Disable data augmentation --> minX = minY = 0
+        // Data augmentation: cropping
+        if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
         {
-            const auto scaleX = param_.crop_size_x() / (double)backgroundImage.cols;
-            const auto scaleY = param_.crop_size_y() / (double)backgroundImage.rows;
-            const auto scale = std::max(scaleX, scaleY) * 1.1; // 1.1 to avoid truncating final size down
+            const auto xDiff = datumNegativeWidth - finalImageWidth;
+            const auto yDiff = datumNegativeHeight - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+            );
             cv::Mat backgroundImageTemp;
-            cv::resize(backgroundImage, backgroundImageTemp, cv::Size{}, scale, scale, CV_INTER_CUBIC);
-            backgroundImage = backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
         }
-        // Mask fro background image
-        // Image size, not backgroundImage
-        maskBackgroundImage = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{0});
+        // Resize (if smaller than final crop size)
+        // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+        else
+        {
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+        }
     }
 
     // Read mask miss (LMDB channel 2)
@@ -389,11 +451,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // COCO
     if (mPoseCategory == PoseCategory::COCO)
     {
-        maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{0});
+        maskMiss = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0});
         for (auto y = 0; y < maskMiss.rows; y++)
         {
-            const auto yOffset = (int)(y*image.cols);
-            for (auto x = 0; x < maskMiss.cols; x++)
+            const auto yOffset = (int)(y*initImageWidth);
+            for (auto x = 0; x < initImageWidth; x++)
             {
                 const auto xyOffset = yOffset + x;
                 const auto dIndex = (int)(4*datumArea + xyOffset);
@@ -410,7 +472,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     }
     // DOME & MPII
     else
-        maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
+        maskMiss = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
 
     // Time measurement
     VLOG(2) << "  bgr[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
@@ -447,53 +509,39 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     cv::Mat backgroundImageAugmented;
     cv::Mat maskMissAugmented;
     cv::Mat depthAugmented;
-    VLOG(2) << "   input size (" << image.cols << ", " << image.rows << ")";
-    const int stride = param_.stride();
+    VLOG(2) << "   input size (" << initImageWidth << ", " << initImageHeight << ")";
     // We only do random transform augmentSelection augmentation when training.
     if (phase_ == TRAIN)
     {
-        // Temporary variables
-        cv::Mat imageTemp; // Size determined by scale
-        cv::Mat backgroundImageTemp;
-        cv::Mat maskBackgroundImageTemp;
-        cv::Mat maskMissTemp;
-        cv::Mat depthTemp;
         // Swap center?
         swapCenterPoint(metaData, param_, mPoseModel);
-        // Scale
+        // Augmentation (scale, rotation, cropping, and flipping)
+        // Order does matter, otherwise code will fail doing augmentation
         augmentSelection.scale = estimateScale(metaData, param_);
-        applyScale(imageTemp, augmentSelection.scale, image);
-        applyScale(maskBackgroundImageTemp, augmentSelection.scale, maskBackgroundImage);
-        applyScale(maskMissTemp, augmentSelection.scale, maskMiss);
-        applyScale(depthTemp, augmentSelection.scale, depth);
         applyScale(metaData, augmentSelection.scale, mPoseModel);
-        // Rotation
-        augmentSelection.RotAndFinalSize = estimateRotation(metaData, imageTemp.size(), param_);
-        applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, 0);
-        applyRotation(maskBackgroundImageTemp, augmentSelection.RotAndFinalSize, maskBackgroundImageTemp, 255);
-        applyRotation(maskMissTemp, augmentSelection.RotAndFinalSize, maskMissTemp, 255);
-        applyRotation(depthTemp, augmentSelection.RotAndFinalSize, depthTemp, 0);
+        augmentSelection.RotAndFinalSize = estimateRotation(
+            metaData,
+            cv::Size{(int)std::round(image.cols * augmentSelection.scale),
+                     (int)std::round(image.rows * augmentSelection.scale)},
+            param_);
         applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
-        // Cropping
         augmentSelection.cropCenter = estimateCrop(metaData, param_);
-        const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
-        applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, 0, param_);
-        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, param_);
-        applyCrop(maskBackgroundImage, augmentSelection.cropCenter, maskBackgroundImageTemp, 255, param_);
-        applyCrop(maskMissAugmented, augmentSelection.cropCenter, maskMissTemp, 255, param_);
-        applyCrop(depthAugmented, augmentSelection.cropCenter, depthTemp, 0, param_);
-        applyCrop(metaData, augmentSelection.cropCenter, param_, mPoseModel);
-        // Flipping
+        applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, mPoseModel);
         augmentSelection.flip = estimateFlip(metaData, param_);
-        applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
+        applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+        // Aug on images
+        doAugmentation(imageAugmented, augmentSelection, image, 0, finalCropSize);
+        doAugmentation(maskBackgroundImage, augmentSelection, maskBackgroundImage, 255, finalCropSize);
+        doAugmentation(maskMissAugmented, augmentSelection, maskMiss, 255, finalCropSize);
+        doAugmentation(depthAugmented, augmentSelection, depth, 0, finalCropSize);
+        // backgroundImage augmentation (no scale/rotation)
+        const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
+        cv::Mat backgroundImageTemp;
+        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
         applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
-        applyFlip(maskBackgroundImage, augmentSelection.flip, maskBackgroundImage);
-        applyFlip(maskMissAugmented, augmentSelection.flip, maskMissAugmented);
-        applyFlip(depthAugmented, augmentSelection.flip, depthAugmented);
-        applyFlip(metaData, augmentSelection.flip, imageAugmented.cols, param_, mPoseModel);
         // Resize mask
-        if (!maskMissTemp.empty())
-            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
+        if (!maskMissAugmented.empty())
+            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
         // Final background image - elementwise multiplication
         if (!backgroundImageAugmented.empty() && !maskBackgroundImage.empty())
         {
@@ -505,8 +553,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
             imageAugmented = imageAugmentedTemp;
         }
-        if (depthEnabled && !depthTemp.empty())
-            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
+        if (depthEnabled && !depthAugmented.empty())
+            cv::resize(depthAugmented, depthAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
     }
     // Test
     else
@@ -516,9 +564,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         depthAugmented = depth;
         // Resize mask
         if (!maskMissAugmented.empty())
-            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
+            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
         if (depthEnabled)
-            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
+            cv::resize(depthAugmented, depthAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
     }
     // // Debug - Visualize final (augmented) image
     // debugVisualize(imageAugmented, metaData, augmentSelection, mPoseModel, phase_, param_);
@@ -528,19 +576,21 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     timer1.Start();
     // Copy imageAugmented into transformedData + mean-subtraction
     const int imageAugmentedArea = imageAugmented.rows * imageAugmented.cols;
+    auto* uCharPtrCvMat = (unsigned char*)(imageAugmented.data);
     // x/256 - 0.5
     if (param_.normalization() == 0)
     {
-        for (auto y = 0; y < imageAugmented.rows ; y++)
+        for (auto y = 0; y < imageAugmented.rows; y++)
         {
-            const auto rowOffet = y*imageAugmented.cols;
-            for (auto x = 0; x < imageAugmented.cols ; x++)
+            const auto yOffset = y*imageAugmented.cols;
+            for (auto x = 0; x < imageAugmented.cols; x++)
             {
-                const auto totalOffet = rowOffet + x;
-                const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
-                transformedData[totalOffet] = (bgr[0] - 128)/256.0;
-                transformedData[totalOffet + imageAugmentedArea] = (bgr[1] - 128)/256.0;
-                transformedData[totalOffet + 2*imageAugmentedArea] = (bgr[2] - 128)/256.0;
+                const auto xyOffset = yOffset + x;
+                // const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+                auto* bgr = &uCharPtrCvMat[3*xyOffset];
+                transformedData[xyOffset] = (bgr[0] - 128) / 256.0;
+                transformedData[xyOffset + imageAugmentedArea] = (bgr[1] - 128) / 256.0;
+                transformedData[xyOffset + 2*imageAugmentedArea] = (bgr[2] - 128) / 256.0;
             }
         }
     }
@@ -549,14 +599,15 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     {
         for (auto y = 0; y < imageAugmented.rows ; y++)
         {
-            const auto rowOffet = y*imageAugmented.cols;
+            const auto yOffset = y*imageAugmented.cols;
             for (auto x = 0; x < imageAugmented.cols ; x++)
             {
-                const auto totalOffet = rowOffet + x;
-                const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
-                transformedData[totalOffet] = bgr[0] - 102.9801;
-                transformedData[totalOffet + imageAugmentedArea] = bgr[1] - 115.9465;
-                transformedData[totalOffet + 2*imageAugmentedArea] = bgr[2] - 122.7717;
+                const auto xyOffset = yOffset + x;
+                // const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+                auto* bgr = &uCharPtrCvMat[3*xyOffset];
+                transformedData[xyOffset] = bgr[0] - 102.9801;
+                transformedData[xyOffset + imageAugmentedArea] = bgr[1] - 115.9465;
+                transformedData[xyOffset + 2*imageAugmentedArea] = bgr[2] - 122.7717;
             }
         }
     }
@@ -565,13 +616,13 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
     // Generate and copy label
-    generateLabelMap(transformedLabel, imageAugmented, maskMissAugmented, metaData);
+    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData);
     if (depthEnabled)
         generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
-    // if (mPoseModel == PoseModel::DOME_59)
+    // // if (mPoseModel == PoseModel::DOME_59)
     // {
     //     // if (metaData.writeNumber < 5)
     //     if (metaData.writeNumber < 100)
@@ -587,7 +638,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         for (auto part = 0; part < numberTotalChannels; part++)
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
-    //             if (part < 1)
+    //             // if (part < 1)
+    //             if (part == numberTotalChannels-1)
     //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
     //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
@@ -743,11 +795,11 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
 }
 
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Mat& image, const cv::Mat& maskMiss,
+void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                                                 const MetaData& metaData) const
 {
-    const auto rezX = (int)image.cols;
-    const auto rezY = (int)image.rows;
+    const auto rezX = (int)imageSize.width;
+    const auto rezY = (int)imageSize.height;
     const auto stride = (int)param_.stride();
     const auto gridX = rezX / stride;
     const auto gridY = rezY / stride;
