@@ -477,6 +477,7 @@ message OPTransformationParameter {
   optional string model = 21 [default = "COCO"];
   optional string media_directory = 22 [default = ""];
   optional string source_background = 23 [default = ""];
+  optional uint32 normalization = 24 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
   // // CLAHE
   // optional float clahe_tile_size = 24 [default = 8.0];
   // optional float clahe_clip_limit = 25 [default = 4.0];

@@ -174,6 +174,20 @@ void debugVisualize(const cv::Mat& image, const MetaData& metaData, const Augmen
     //LOG(INFO) << "filename is " << imagename;
     cv::imwrite(imagename, imageToVisualize);
 }
+template<typename Dtype>
+int getType(Dtype dtype)
+{
+    (void)dtype;
+    if (sizeof(Dtype) == sizeof(float))
+        return CV_32F;
+    else if (sizeof(Dtype) == sizeof(double))
+        return CV_64F;
+    else
+    {
+        throw std::runtime_error{"Only float or double" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        return CV_32F;
+    }
+}
 // OpenPose: added ended
 
 template<typename Dtype>
@@ -315,14 +329,14 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             for (auto x = 0; x < image.cols; ++x)
             {
                 const auto xyOffset = yOffset + x;
-                cv::Vec3b& rgb = image.at<cv::Vec3b>(y, x);
+                cv::Vec3b& bgr = image.at<cv::Vec3b>(y, x);
                 for (auto c = 0; c < 3; c++)
                 {
                     const auto dIndex = (int)(c*imageArea + xyOffset);
                     // if (hasUInt8)
-                        rgb[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                        bgr[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
                     // else
-                        // rgb[c] = datum.float_data(dIndex);
+                        // bgr[c] = datum.float_data(dIndex);
                 }
             }
         }
@@ -347,11 +361,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             for (auto x = 0; x < backgroundImage.cols; ++x)
             {
                 const auto xyOffset = yOffset + x;
-                cv::Vec3b& rgb = backgroundImage.at<cv::Vec3b>(y, x);
+                cv::Vec3b& bgr = backgroundImage.at<cv::Vec3b>(y, x);
                 for (auto c = 0; c < 3; c++)
                 {
                     const auto dIndex = (int)(c*imageArea + xyOffset);
-                    rgb[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+                    bgr[c] = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
                 }
             }
         }
@@ -399,7 +413,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         maskMiss = cv::Mat(image.rows, image.cols, CV_8UC1, cv::Scalar{255});
 
     // Time measurement
-    VLOG(2) << "  rgb[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
+    VLOG(2) << "  bgr[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // Depth image
     cv::Mat depth;
@@ -479,7 +493,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyFlip(metaData, augmentSelection.flip, imageAugmented.cols, param_, mPoseModel);
         // Resize mask
         if (!maskMissTemp.empty())
-            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
         // Final background image - elementwise multiplication
         if (!backgroundImageAugmented.empty() && !maskBackgroundImage.empty())
         {
@@ -492,7 +506,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             imageAugmented = imageAugmentedTemp;
         }
         if (depthEnabled && !depthTemp.empty())
-            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
     }
     // Test
     else
@@ -502,9 +516,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         depthAugmented = depth;
         // Resize mask
         if (!maskMissAugmented.empty())
-            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
         if (depthEnabled)
-            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_CUBIC);
+            cv::resize(depthAugmented, depthAugmented, cv::Size{}, 1./stride, 1./stride, cv::INTER_AREA);
     }
     // // Debug - Visualize final (augmented) image
     // debugVisualize(imageAugmented, metaData, augmentSelection, mPoseModel, phase_, param_);
@@ -514,18 +528,41 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     timer1.Start();
     // Copy imageAugmented into transformedData + mean-subtraction
     const int imageAugmentedArea = imageAugmented.rows * imageAugmented.cols;
-    for (auto y = 0; y < imageAugmented.rows ; y++)
+    // x/256 - 0.5
+    if (param_.normalization() == 0)
     {
-        const auto rowOffet = y*imageAugmented.cols;
-        for (auto x = 0; x < imageAugmented.cols ; x++)
+        for (auto y = 0; y < imageAugmented.rows ; y++)
         {
-            const auto totalOffet = rowOffet + x;
-            const cv::Vec3b& rgb = imageAugmented.at<cv::Vec3b>(y, x);
-            transformedData[totalOffet] = (rgb[0] - 128)/256.0;
-            transformedData[totalOffet + imageAugmentedArea] = (rgb[1] - 128)/256.0;
-            transformedData[totalOffet + 2*imageAugmentedArea] = (rgb[2] - 128)/256.0;
+            const auto rowOffet = y*imageAugmented.cols;
+            for (auto x = 0; x < imageAugmented.cols ; x++)
+            {
+                const auto totalOffet = rowOffet + x;
+                const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+                transformedData[totalOffet] = (bgr[0] - 128)/256.0;
+                transformedData[totalOffet + imageAugmentedArea] = (bgr[1] - 128)/256.0;
+                transformedData[totalOffet + 2*imageAugmentedArea] = (bgr[2] - 128)/256.0;
+            }
         }
     }
+    // x - channel average
+    else if (param_.normalization() == 1)
+    {
+        for (auto y = 0; y < imageAugmented.rows ; y++)
+        {
+            const auto rowOffet = y*imageAugmented.cols;
+            for (auto x = 0; x < imageAugmented.cols ; x++)
+            {
+                const auto totalOffet = rowOffet + x;
+                const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+                transformedData[totalOffet] = bgr[0] - 102.9801;
+                transformedData[totalOffet + imageAugmentedArea] = bgr[1] - 115.9465;
+                transformedData[totalOffet + 2*imageAugmentedArea] = bgr[2] - 122.7717;
+            }
+        }
+    }
+    // Unknown
+    else
+        throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
     // Generate and copy label
     generateLabelMap(transformedLabel, imageAugmented, maskMissAugmented, metaData);
@@ -754,14 +791,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                       &transformedLabel[index*channelOffset + channelOffset], 0);
         }
         // Background
-        int type;
-        if (sizeof(Dtype) == sizeof(float))
-            type = CV_32F;
-        else if (sizeof(Dtype) == sizeof(double))
-            type = CV_64F;
-        else
-            throw std::runtime_error{"Only float or double"
-                                     + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        const auto type = getType(Dtype(0));
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
         cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
@@ -814,13 +844,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // {
         //     const auto backgroundIndex = numberPafChannels + numberBodyParts;
         //     int type;
-        //     if (sizeof(Dtype) == sizeof(float))
-        //         type = CV_32F;
-        //     else if (sizeof(Dtype) == sizeof(double))
-        //         type = CV_64F;
-        //     else
-        //         throw std::runtime_error{"Only float or double"
-        //                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        //     const auto type = getType(Dtype(0));
         //     cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         //     maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
         //     for (const auto& jointsOther : metaData.jointsOthers)
@@ -858,14 +882,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     {
                         for (auto index : indexesToRemove)
                         {
-                            int type;
-                            if (sizeof(Dtype) == sizeof(float))
-                                type = CV_32F;
-                            else if (sizeof(Dtype) == sizeof(double))
-                                type = CV_64F;
-                            else
-                                throw std::runtime_error{"Only float or double"
-                                                         + getLine(__LINE__, __FUNCTION__, __FILE__)};
+                            const auto type = getType(Dtype(0));
                             cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[index*channelOffset]);
                             maskFeet(maskMiss, otherVisible, otherPoints, stride, 0.6f);
                         }
