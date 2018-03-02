@@ -1135,7 +1135,11 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
                                   int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
         const int maxY = std::min(gridY,
                                   int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
-        const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
+(void)diagonalProportion;
+(void)diagonal;
+(void)entryX;
+(void)entryY;
+        // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
         for (auto gY = minY; gY < maxY; gY++)
         {
             const auto yOffset = gY*gridX;
@@ -1153,8 +1157,8 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
                         entryX[xyOffset] = directionAB.x;
                         entryY[xyOffset] = directionAB.y;
                         // Weight makes small PAFs as important as big PAFs
-                        maskX[xyOffset] *= weight;
-                        maskY[xyOffset] *= weight;
+                        // maskX[xyOffset] *= weight;
+                        // maskY[xyOffset] *= weight;
                         // // For Distance
                         // entryD[xyOffset] = entryDValue;
                         // entryDMask[xyOffset] = Dtype(1);
