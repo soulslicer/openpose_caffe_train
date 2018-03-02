@@ -202,12 +202,14 @@ namespace caffe {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
         if (numberBodyParts == 18)
             return 0;
-        else if (numberBodyParts == 19)
+        else if (numberBodyParts == 19 && poseModel != PoseModel::COCO_19_V2)
             return 1;
         else if (numberBodyParts == 23)
             return 2;
         else if (numberBodyParts == 59)
             return 3;
+        else if (poseModel == PoseModel::COCO_19_V2)
+            return 4;
         // else
         throw std::runtime_error{"PoseModel does not have corresponding index yet."
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -219,9 +221,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -263,6 +265,9 @@ namespace caffe {
             {19},{20},{21},{22}, {23},{24},{25},{26}, {27},{28},{29},{30}, {31},{32},{33},{34}, {35},{36},{37},{38},// Left hand
             {39},{40},{41},{42}, {43},{44},{45},{46}, {47},{48},{49},{50}, {51},{52},{53},{54}, {55},{56},{57},{58} // Right hand
         },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19_V2
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -272,6 +277,8 @@ namespace caffe {
             return std::make_pair(PoseModel::COCO_18, PoseCategory::COCO);
         else if (poseModeString == "COCO_19")
             return std::make_pair(PoseModel::COCO_19, PoseCategory::COCO);
+        else if (poseModeString == "COCO_19_V2")
+            return std::make_pair(PoseModel::COCO_19_V2, PoseCategory::COCO);
         else if (poseModeString == "COCO_23")
             return std::make_pair(PoseModel::COCO_23, PoseCategory::COCO);
         else if (poseModeString == "COCO_23_17")
@@ -320,7 +327,8 @@ namespace caffe {
         std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},                    // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16,                        // 59 (DOME_59), COCO_59_17, MPII_59
                          7,19,20,21, 7,23,24,25, 7,27,28,29, 7,31,32,33, 7,35,36,37, // Left hand
-                         4,39,40,41, 4,43,44,45, 4,47,48,49, 4,51,52,53, 4,55,56,57} // Right hand
+                         4,39,40,41, 4,43,44,45, 4,47,48,49, 4,51,52,53, 4,55,56,57},// Right hand
+        std::vector<int>{1,1,1,1,1,1,1,1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1},                                             // 19_V2 (COCO_19_V2)
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
@@ -329,7 +337,8 @@ namespace caffe {
         std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},                   // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18,                        // 59 (DOME_59), COCO_59_17, MPII_59
                          19,20,21,22, 23,24,25,26, 27,28,29,30, 31,32,33,34, 35,36,37,38, // Left hand
-                         39,40,41,42, 43,44,45,46, 47,48,49,50, 51,52,53,54, 55,56,57,58} // Right hand
+                         39,40,41,42, 43,44,45,46, 47,48,49,50, 51,52,53,54, 55,56,57,58},// Right hand
+        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // 19_V2 (COCO_19_V2)
     };
 
 

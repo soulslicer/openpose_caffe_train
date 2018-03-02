@@ -624,8 +624,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // // Debugging - Visualize - Write on disk
     // // if (mPoseModel == PoseModel::DOME_59)
     // {
-    //     // if (metaData.writeNumber < 5)
-    //     if (metaData.writeNumber < 100)
+    //     if (metaData.writeNumber < 5)
+    //     // if (metaData.writeNumber < 100)
     //     {
     //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
     //         // 2. Comment the following if statement
@@ -639,7 +639,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
     //             // if (part < 1)
-    //             if (part == numberTotalChannels-1)
+    //             // if (part == numberTotalChannels-1)
     //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
     //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
@@ -972,12 +972,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         }
     }
 
-    // Parameters
+    // PAFs
     const auto& labelMapA = getPafIndexA(mPoseModel);
     const auto& labelMapB = getPafIndexB(mPoseModel);
-
-    // PAFs
     const auto threshold = 1;
+    const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
+    const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
     for (auto i = 0 ; i < labelMapA.size() ; i++)
     {
         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
@@ -987,11 +987,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
                           transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                          transformedLabel + 2*i*channelOffset,
+                          transformedLabel + (2*i + 1)*channelOffset,
                           // // For Distance
                           // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                           // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                           count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                          param_.stride(), gridX, gridY, param_.sigma(), threshold);
+                          param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                          diagonal, diagonalProportion);
         }
 
         // For every other person
@@ -1002,13 +1005,26 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
                               transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                              transformedLabel + 2*i*channelOffset,
+                              transformedLabel + (2*i + 1)*channelOffset,
                               // // For Distance
                               // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                              param_.stride(), gridX, gridY, param_.sigma(), threshold);
+                              param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                              diagonal, diagonalProportion);
             }
         }
+    }
+    // Re-normalize masks (otherwise PAF explodes)
+    const auto finalImageArea = gridX*gridY;
+    for (auto i = 0 ; i < labelMapA.size() ; i++)
+    {
+        auto* initPoint = &transformedLabel[2*i*channelOffset];
+        const auto accumulation = std::accumulate(initPoint, initPoint+channelOffset, 0);
+        const auto ratio = finalImageArea / (float)accumulation;
+        if (ratio > 1.01 || ratio < 0.99)
+            std::transform(initPoint, initPoint + 2*channelOffset, initPoint, std::bind1st(std::multiplies<Dtype>(), ratio)) ;
     }
 
     // Body parts
@@ -1058,15 +1074,17 @@ void OPDataTransformer<Dtype>::putGaussianMaps(Dtype* entry, const cv::Point2f& 
 {
     //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
+    const auto multiplier = 2.0 * sigma * sigma;
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
+        const Dtype y = start + gY * stride;
+        const auto yMenosCenterPointSquared = (y-centerPoint.y)*(y-centerPoint.y);
         for (auto gX = 0; gX < gridX; gX++)
         {
             const Dtype x = start + gX * stride;
-            const Dtype y = start + gY * stride;
-            const Dtype d2 = (x-centerPoint.x)*(x-centerPoint.x) + (y-centerPoint.y)*(y-centerPoint.y);
-            const Dtype exponent = d2 / 2.0 / sigma / sigma;
+            const Dtype d2 = (x-centerPoint.x)*(x-centerPoint.x) + yMenosCenterPointSquared;
+            const Dtype exponent = d2 / multiplier;
             //ln(100) = -ln(1%)
             if (exponent <= 4.6052)
             {
@@ -1083,9 +1101,11 @@ void OPDataTransformer<Dtype>::putGaussianMaps(Dtype* entry, const cv::Point2f& 
 }
 
 template<typename Dtype>
-void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
+void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
+                                             cv::Mat& count, const cv::Point2f& centerA,
                                              const cv::Point2f& centerB, const int stride, const int gridX,
-                                             const int gridY, const float sigma, const int threshold) const
+                                             const int gridY, const float sigma, const int threshold,
+                                             const int diagonal, const float diagonalProportion) const
 // void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
 //                                              cv::Mat& count, const cv::Point2f& centerA,
 //                                              const cv::Point2f& centerB, const int stride, const int gridX,
@@ -1115,13 +1135,15 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::M
                                   int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
         const int maxY = std::min(gridY,
                                   int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
+        const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
         for (auto gY = minY; gY < maxY; gY++)
         {
             const auto yOffset = gY*gridX;
+            const auto gYMenosCenterALabelScale = gY - centerALabelScale.y;
             for (auto gX = minX; gX < maxX; gX++)
             {
                 const auto xyOffset = yOffset + gX;
-                const cv::Point2f ba{gX - centerALabelScale.x, gY - centerALabelScale.y};
+                const cv::Point2f ba{gX - centerALabelScale.x, gYMenosCenterALabelScale};
                 const float distance = std::abs(ba.x*directionAB.y - ba.y*directionAB.x);
                 if (distance <= threshold)
                 {
@@ -1130,6 +1152,9 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, cv::M
                     {
                         entryX[xyOffset] = directionAB.x;
                         entryY[xyOffset] = directionAB.y;
+                        // Weight makes small PAFs as important as big PAFs
+                        maskX[xyOffset] *= weight;
+                        maskY[xyOffset] *= weight;
                         // // For Distance
                         // entryD[xyOffset] = entryDValue;
                         // entryDMask[xyOffset] = Dtype(1);

@@ -93,9 +93,10 @@ protected:
                           const MetaData& metaData) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;
-    void putVectorMaps(Dtype* entryX, Dtype* entryY, cv::Mat& count, const cv::Point2f& centerA,
-                       const cv::Point2f& centerB, const int stride, const int gridX, const int gridY,
-                       const float sigma, const int thre) const;
+    void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY, cv::Mat& count,
+                       const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride,
+                       const int gridX, const int gridY, const float sigma, const int threshold,
+                       const int diagonal, const float diagonalProportion) const;
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,
