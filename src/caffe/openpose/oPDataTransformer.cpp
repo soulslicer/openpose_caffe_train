@@ -1016,16 +1016,16 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             }
         }
     }
-    // Re-normalize masks (otherwise PAF explodes)
-    const auto finalImageArea = gridX*gridY;
-    for (auto i = 0 ; i < labelMapA.size() ; i++)
-    {
-        auto* initPoint = &transformedLabel[2*i*channelOffset];
-        const auto accumulation = std::accumulate(initPoint, initPoint+channelOffset, 0);
-        const auto ratio = finalImageArea / (float)accumulation;
-        if (ratio > 1.01 || ratio < 0.99)
-            std::transform(initPoint, initPoint + 2*channelOffset, initPoint, std::bind1st(std::multiplies<Dtype>(), ratio)) ;
-    }
+    // // Re-normalize masks (otherwise PAF explodes)
+    // const auto finalImageArea = gridX*gridY;
+    // for (auto i = 0 ; i < labelMapA.size() ; i++)
+    // {
+    //     auto* initPoint = &transformedLabel[2*i*channelOffset];
+    //     const auto accumulation = std::accumulate(initPoint, initPoint+channelOffset, 0);
+    //     const auto ratio = finalImageArea / (float)accumulation;
+    //     if (ratio > 1.01 || ratio < 0.99)
+    //         std::transform(initPoint, initPoint + 2*channelOffset, initPoint, std::bind1st(std::multiplies<Dtype>(), ratio)) ;
+    // }
 
     // Body parts
     for (auto part = 0; part < numberBodyParts; part++)
