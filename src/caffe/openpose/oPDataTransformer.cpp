@@ -53,6 +53,68 @@ void doAugmentation(cv::Mat& imageAugmented, const AugmentSelection& augmentSele
     applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
 }
 
+void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
+{
+    // x,y < 0
+    if (roi.x < 0)
+    {
+        roi.width += roi.x;
+        roi.x = 0;
+    }
+    if (roi.y < 0)
+    {
+        roi.height += roi.y;
+        roi.y = 0;
+    }
+    // Bigger than image
+    if (roi.width + roi.x >= imageSize.width)
+        roi.width = imageSize.width - 1 - roi.x;
+    if (roi.height + roi.y >= imageSize.height)
+        roi.height = imageSize.height - 1 - roi.y;
+    // Width/height negative
+    roi.width = std::max(0, roi.width);
+    roi.height = std::max(0, roi.height);
+}
+
+void doOcclusions(cv::Mat& imageAugmented, cv::Mat& backgroundImageAugmented, const MetaData& metaData,
+                  const unsigned int numberMaxOcclusions, const PoseModel poseModel)
+{
+    // For all visible keypoints --> [0, numberMaxOcclusions] oclusions
+    // For 1/n visible keypoints --> [0, numberMaxOcclusions/n] oclusions
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    const auto numberBodyParts = getNumberBodyParts(poseModel);
+    int detectedParts = 0;
+    for (auto i = 0 ; i < numberBodyParts ; i++)
+        if (metaData.jointsSelf.isVisible[i] < 1.5f)
+            detectedParts++;
+    const auto numberOcclusions = (int)std::round(numberMaxOcclusions * dice * detectedParts / numberBodyParts);
+    if (numberOcclusions > 0)
+    {
+        for (auto i = 0 ; i < numberOcclusions ; i++)
+        {
+            // Select occluded part
+            int occludedPart = -1;
+            do
+                occludedPart = std::rand() % numberBodyParts; // [0, #BP-1]
+            while (metaData.jointsSelf.isVisible[occludedPart] > 1.5f);
+            // Select random cropp around it
+            const auto width = (int)std::round(imageAugmented.cols * metaData.scaleSelf/3
+                             * (1+(std::rand() % 1001 - 500)/1000.)); // +- [0.5-1.5] random
+            const auto height = (int)std::round(imageAugmented.rows * metaData.scaleSelf/3
+                              * (1+(std::rand() % 1001 - 500)/1000.)); // +- [0.5-1.5] random
+            const auto random = 1+(std::rand() % 1001 - 500)/1000.; // +- [0-2] random
+            // Estimate ROI rectangle to apply
+            const auto point = metaData.jointsSelf.points[occludedPart];
+            cv::Rect rectangle{(int)std::round(point.x - width/2*random),
+                               (int)std::round(point.y - height/2*random), width, height};
+            keepRoiInside(rectangle, imageAugmented.size());
+            // Apply crop
+            if (rectangle.area() > 0)
+                backgroundImageAugmented(rectangle).copyTo(imageAugmented(rectangle));
+        }
+    }
+}
+
 void setLabel(cv::Mat& image, const std::string& label, const cv::Point& org)
 {
     const int fontface = cv::FONT_HERSHEY_SIMPLEX;
@@ -539,6 +601,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         cv::Mat backgroundImageTemp;
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
         applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
+        // Introduce occlusions
+        doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
+                     mPoseModel);
         // Resize mask
         if (!maskMissAugmented.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
@@ -624,8 +689,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // // Debugging - Visualize - Write on disk
     // // if (mPoseModel == PoseModel::DOME_59)
     // {
-    //     if (metaData.writeNumber < 5)
-    //     // if (metaData.writeNumber < 100)
+    //     // if (metaData.writeNumber < 5)
+    //     if (metaData.writeNumber < 100)
     //     {
     //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
     //         // 2. Comment the following if statement
@@ -639,7 +704,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
     //             // if (part < 1)
-    //             // if (part == numberTotalChannels-1)
+    //             if (part == numberTotalChannels-1)
     //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
     //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
@@ -704,29 +769,6 @@ void OPDataTransformer<Dtype>::generateDepthLabelMap(Dtype* transformedLabel, co
             transformedLabel[(2*numberBpPafChannels+3)*channelOffset + xyOffset] = float(depth_val)/1000.0;
         }
     }
-}
-
-void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
-{
-    // x,y < 0
-    if (roi.x < 0)
-    {
-        roi.width += roi.x;
-        roi.x = 0;
-    }
-    if (roi.y < 0)
-    {
-        roi.height += roi.y;
-        roi.y = 0;
-    }
-    // Bigger than image
-    if (roi.width + roi.x >= imageSize.width)
-        roi.width = imageSize.width - 1 - roi.x;
-    if (roi.height + roi.y >= imageSize.height)
-        roi.height = imageSize.height - 1 - roi.y;
-    // Width/height negative
-    roi.width = std::max(0, roi.width);
-    roi.height = std::max(0, roi.height);
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)

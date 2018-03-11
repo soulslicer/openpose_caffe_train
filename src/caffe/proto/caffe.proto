@@ -471,17 +471,19 @@ message OPTransformationParameter {
   optional float scale_min = 17 [default = 0.9];
   optional float scale_max = 18 [default = 1.1];
   optional float target_dist = 19 [default = 1.0];
+  // Oclussion
+  optional uint32 number_max_occlusions = 20 [default = 0];
   // Label generation
-  optional float sigma = 20 [default = 7.0];
+  optional float sigma = 21 [default = 7.0];
   // Model information
-  optional string model = 21 [default = "COCO"];
-  optional string media_directory = 22 [default = ""];
-  optional string source_background = 23 [default = ""];
-  optional uint32 normalization = 24 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+  optional string model = 22 [default = "COCO"];
+  optional string media_directory = 23 [default = ""];
+  optional string source_background = 24 [default = ""];
+  optional uint32 normalization = 25 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
   // // CLAHE
-  // optional float clahe_tile_size = 24 [default = 8.0];
-  // optional float clahe_clip_limit = 25 [default = 4.0];
-  // optional bool do_clahe = 26 [default = false];
+  // optional float clahe_tile_size = 26 [default = 8.0];
+  // optional float clahe_clip_limit = 27 [default = 4.0];
+  // optional bool do_clahe = 28 [default = false];
 }
 // OpenPose: end new parameter
 

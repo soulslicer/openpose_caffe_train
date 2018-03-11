@@ -98,12 +98,14 @@ namespace caffe {
     {
         // Update metaData
         metaData.objPos *= scale;
+        metaData.scaleSelf *= scale;
         const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
         for (auto part = 0; part < numberBodyPAFParts ; part++)
             metaData.jointsSelf.points[part] *= scale;
         for (auto person=0; person<metaData.numberOtherPeople; person++)
         {
             metaData.objPosOthers[person] *= scale;
+            metaData.scaleOthers[person] *= scale;
             for (auto part = 0; part < numberBodyPAFParts ; part++)
                 metaData.jointsOthers[person].points[part] *= scale;
         }
