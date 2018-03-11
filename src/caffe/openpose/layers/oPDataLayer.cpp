@@ -9,7 +9,8 @@
 #include "caffe/layers/data_layer.hpp"
 #include "caffe/util/benchmark.hpp"
 // OpenPose: added
-#include  <stdexcept>
+#include <chrono>
+#include <stdexcept>
 #include "caffe/util/io.hpp" // DecodeDatum, DecodeDatumNative
 #include "caffe/openpose/getLine.hpp"
 #include "caffe/openpose/layers/oPDataLayer.hpp"
@@ -37,6 +38,9 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     }
     else
         backgroundDb = false;
+    // Timer
+    sDuration = 0;
+    sCounter = 0;
     // OpenPose: added end
 }
 
@@ -210,7 +214,8 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Label
         const int offsetLabel = batch->label_.offset(item_id);
         this->transformed_label_.set_cpu_data(topLabel + offsetLabel);
-        // Process iamge & label
+        // Process image & label
+        const auto begin = std::chrono::high_resolution_clock::now();
         if (backgroundDb)
             this->mOPDataTransformer->Transform(&(this->transformed_data_),
                                                 &(this->transformed_label_),
@@ -220,6 +225,8 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             this->mOPDataTransformer->Transform(&(this->transformed_data_),
                                                 &(this->transformed_label_),
                                                 datum);
+        const auto end = std::chrono::high_resolution_clock::now();
+        sDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
         // OpenPose: added ended
         // OpenPose: commented
         // this->data_transformer_->Transform(datum, &(this->transformed_data_));
@@ -231,6 +238,14 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // OpenPose: commented ended
         trans_time += timer.MicroSeconds();
         Next();
+    }
+    // Timer (every 20 iterations x batch size)
+    sCounter++;
+    if (sCounter == 20)
+    {
+        std::cout << "Time: " << sDuration * 1e-9 << "s" << std::endl;
+        sDuration = 0;
+        sCounter = 0;
     }
     timer.Stop();
     batch_timer.Stop();

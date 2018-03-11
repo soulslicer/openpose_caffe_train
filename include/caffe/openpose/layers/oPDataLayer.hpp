@@ -47,6 +47,9 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   Blob<Dtype> transformed_label_;
   OPTransformationParameter op_transform_param_;
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformer;
+  // Timer
+  int sCounter;
+  double sDuration;
   // OpenPose: added end
 };
 

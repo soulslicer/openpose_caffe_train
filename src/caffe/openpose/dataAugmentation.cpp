@@ -1,7 +1,8 @@
-#include <iostream>
-#include <fstream> // std::ifstream
-#include <stdexcept> // std::runtime_error
 #include <opencv2/opencv.hpp>
+#include <chrono>
+#include <fstream> // std::ifstream
+#include <iostream>
+#include <stdexcept> // std::runtime_error
 // #include <opencv2/contrib/contrib.hpp> // cv::CLAHE, CV_Lab2BGR
 #include <caffe/openpose/getLine.hpp>
 #include <caffe/openpose/dataAugmentation.hpp>
@@ -79,20 +80,20 @@ namespace caffe {
         return scaleAbs * scaleMultiplier;
     }
 
-    void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image)
-    {
-        // Scale image
-        if (!image.empty())
-            cv::resize(image, imageAugmented, cv::Size{}, scale, scale, cv::INTER_CUBIC);
-        // Not used given that net makes x8 pooling anyway...
-        //     // Image sharpening
-        //     if (scale > 2.5 && imageAugmented.channels() == 3)
-        //     {
-        //         cv::Mat gaussianImage;
-        //         cv::GaussianBlur(imageAugmented, gaussianImage, cv::Size(0, 0), 3);
-        //         cv::addWeighted(imageAugmented, 1.5, gaussianImage, -0.5, 0, imageAugmented);
-        //     }
-    }
+    // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image)
+    // {
+    //     // Scale image
+    //     if (!image.empty())
+    //         cv::resize(image, imageAugmented, cv::Size{}, scale, scale, cv::INTER_CUBIC);
+    //     // Not used given that net makes x8 pooling anyway...
+    //     //     // Image sharpening
+    //     //     if (scale > 2.5 && imageAugmented.channels() == 3)
+    //     //     {
+    //     //         cv::Mat gaussianImage;
+    //     //         cv::GaussianBlur(imageAugmented, gaussianImage, cv::Size(0, 0), 3);
+    //     //         cv::addWeighted(imageAugmented, 1.5, gaussianImage, -0.5, 0, imageAugmented);
+    //     //     }
+    // }
 
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel)
     {
@@ -128,14 +129,14 @@ namespace caffe {
         return std::make_pair(Rot, bbox.size());
     }
 
-    void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size> RotAndFinalSize,
-                       const cv::Mat& image, const unsigned char defaultBorderValue)
-    {
-        // Rotate image
-        if (!image.empty())
-            cv::warpAffine(image, imageAugmented, RotAndFinalSize.first, RotAndFinalSize.second, cv::INTER_CUBIC,
-                           cv::BORDER_CONSTANT, cv::Scalar{(double)defaultBorderValue});
-    }
+    // void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size>& RotAndFinalSize,
+    //                    const cv::Mat& image, const unsigned char defaultBorderValue)
+    // {
+    //     // Rotate image
+    //     if (!image.empty())
+    //         cv::warpAffine(image, imageAugmented, RotAndFinalSize.first, RotAndFinalSize.second, cv::INTER_CUBIC,
+    //                        cv::BORDER_CONSTANT, cv::Scalar{(double)defaultBorderValue});
+    // }
 
     void applyRotation(MetaData& metaData, const cv::Mat& Rot, const PoseModel poseModel)
     {
@@ -180,51 +181,93 @@ namespace caffe {
             const auto cropX = (int)cropSize.width;
             const auto cropY = (int)cropSize.height;
             // Crop image
+//             // OpenCV warping - Efficient implementation - x1.5 times faster
+//             cv::Mat matrix = cv::Mat::eye(2,3, CV_64F);
+//             matrix.at<double>(0,2) = -(cropCenter.x - cropSize.width/2.f);
+//             matrix.at<double>(1,2) = -(cropCenter.y - cropSize.height/2.f);
+//             // Apply warping
+//             cv::warpAffine(image, imageAugmented, matrix, cropSize,
+//                            // (scale < 1 ? cv::INTER_AREA : cv::INTER_CUBIC),
+//                            cv::INTER_NEAREST, // CUBIC to consider rotations
+//                            // cv::INTER_CUBIC, // CUBIC to consider rotations
+//                            cv::BORDER_CONSTANT, cv::Scalar{(double)defaultBorderValue});
             // 1. Allocate memory
             imageAugmented = cv::Mat(cropY, cropX, image.type(), cv::Scalar{(double)defaultBorderValue});
             // 2. Fill memory
-            if (imageAugmented.type() == CV_8UC3)
-            {
-                for (auto y = 0 ; y < cropY ; y++)
-                {
-                    for (auto x = 0 ; x < cropX ; x++)
-                    {
-                        const int xOrigin = cropCenter.x - cropX/2 + x;
-                        const int yOrigin = cropCenter.y - cropY/2 + y;
-                        if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
-                            imageAugmented.at<cv::Vec3b>(y,x) = image.at<cv::Vec3b>(yOrigin, xOrigin);
-                    }
-                }
-            }
-            else if (imageAugmented.type() == CV_8UC1)
-            {
-                for (auto y = 0 ; y < cropY ; y++)
-                {
-                    for (auto x = 0 ; x < cropX ; x++)
-                    {
-                        const int xOrigin = cropCenter.x - cropX/2 + x;
-                        const int yOrigin = cropCenter.y - cropY/2 + y;
-                        if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
-                            imageAugmented.at<uchar>(y,x) = image.at<uchar>(yOrigin, xOrigin);
-                    }
-                }
-            }
-            else if (imageAugmented.type() == CV_16UC1)
-            {
-                for (auto y = 0 ; y < cropY ; y++)
-                {
-                    for (auto x = 0 ; x < cropX ; x++)
-                    {
-                        const int xOrigin = cropCenter.x - cropX/2 + x;
-                        const int yOrigin = cropCenter.y - cropY/2 + y;
-                        if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
-                            imageAugmented.at<uint16_t>(y,x) = image.at<uint16_t>(yOrigin, xOrigin);
-                    }
-                }
-            }
-            else
-                throw std::runtime_error{"Not implemented for image.type() == " + std::to_string(imageAugmented.type())
+            // OpenCV wrappering - Efficient implementation - x15 times faster
+            // Estimate ROIs
+            const auto offsetX = std::max(0, cropCenter.x - cropX/2);
+            const auto offsetY = std::max(0, cropCenter.y - cropY/2);
+            const auto offsetXAugmented = offsetX - (cropCenter.x - cropX/2);
+            const auto offsetYAugmented = offsetY - (cropCenter.y - cropY/2);
+            auto width = cropX;
+            auto height = cropY;
+            if (offsetX + cropX > image.cols)
+                width = image.cols - offsetX;
+            if (offsetY + cropY > image.rows)
+                height = image.rows - offsetY;
+            if (offsetXAugmented + cropX > imageAugmented.cols)
+                width = image.cols - offsetX;
+            if (offsetYAugmented + cropY > imageAugmented.rows)
+                height = image.rows - offsetY;
+            if (width < 1 || height < 1)
+                throw std::runtime_error{"width < 1 || height < 1!!!"
                                          + getLine(__LINE__, __FUNCTION__, __FILE__)};
+            cv::Rect roiOrigin{offsetX, offsetY, width, height};
+            cv::Rect roiAugmented{offsetXAugmented, offsetYAugmented, width, height};
+            // Apply ROI copy
+            image(roiOrigin).copyTo(imageAugmented(roiAugmented));
+//             // Naive implementation (~x30 times slower)
+//             cv::Mat imageAugmented2 = cv::Mat(cropY, cropX, image.type(), cv::Scalar{(double)defaultBorderValue});
+//             if (imageAugmented2.type() == CV_8UC3)
+//             {
+//                 for (auto y = 0 ; y < cropY ; y++)
+//                 {
+//                     const int yOrigin = cropCenter.y - cropY/2 + y;
+//                     for (auto x = 0 ; x < cropX ; x++)
+//                     {
+//                         const int xOrigin = cropCenter.x - cropX/2 + x;
+//                         if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
+//                             imageAugmented2.at<cv::Vec3b>(y,x) = image.at<cv::Vec3b>(yOrigin, xOrigin);
+//                     }
+//                 }
+//             }
+//             else if (imageAugmented2.type() == CV_8UC1)
+//             {
+//                 for (auto y = 0 ; y < cropY ; y++)
+//                 {
+//                     const int yOrigin = cropCenter.y - cropY/2 + y;
+//                     for (auto x = 0 ; x < cropX ; x++)
+//                     {
+//                         const int xOrigin = cropCenter.x - cropX/2 + x;
+//                         if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
+//                             imageAugmented2.at<uchar>(y,x) = image.at<uchar>(yOrigin, xOrigin);
+//                     }
+//                 }
+//             }
+//             else if (imageAugmented2.type() == CV_16UC1)
+//             {
+//                 for (auto y = 0 ; y < cropY ; y++)
+//                 {
+//                     const int yOrigin = cropCenter.y - cropY/2 + y;
+//                     for (auto x = 0 ; x < cropX ; x++)
+//                     {
+//                         const int xOrigin = cropCenter.x - cropX/2 + x;
+//                         if (onPlane(cv::Point{xOrigin, yOrigin}, image.size()))
+//                             imageAugmented2.at<uint16_t>(y,x) = image.at<uint16_t>(yOrigin, xOrigin);
+//                     }
+//                 }
+//             }
+//             else
+//                 throw std::runtime_error{"Not implemented for image.type() == " + std::to_string(imageAugmented2.type())
+//                                          + getLine(__LINE__, __FUNCTION__, __FILE__)};
+//             if(cv::norm(imageAugmented - imageAugmented2) != 0)
+//             {
+//                 std::cout << "Norm = " << cv::norm(imageAugmented - imageAugmented2) << std::endl;
+//                 cv::imwrite("imagename.png", imageAugmented);
+//                 cv::imwrite("imagename2.png", imageAugmented2);
+//                 throw std::runtime_error{"No 0 norm!!!" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+//             }
         }
     }
 
@@ -292,6 +335,65 @@ namespace caffe {
         const cv::Mat newPoint = R * cvMatPoint;
         point2f.x = newPoint.at<double>(0,0);
         point2f.y = newPoint.at<double>(1,0);
+    }
+
+    void applyAllAugmentation(cv::Mat& imageAugmented, const cv::Mat& rotationMatrix,
+                              const float scale, const bool flip, const cv::Point2i& cropCenter,
+                              const cv::Size& finalSize, const cv::Mat& image,
+                              const unsigned char defaultBorderValue)
+    {
+        // Rotate image
+        if (!image.empty())
+        {
+            // Final affine matrix equal to:
+            // g_final = g_flip * g_crop * g_rot * g_scale
+            // [1||-1, 0, 0||width-1]   [I [x;y]]   [R 0]   [s 0 0]            [sR [x;y]]   [+-sR11 +-sR12 x||(-x+w-1)]
+            // [0,     1, 0         ] * [0 1]     * [0 1] * [0 s 0] = g_flip * [0   1]    = [sR21    sR22        y    ]
+            // [0,     0, 1         ]                       [0 0 1]                         [  0      0          1    ]
+            // Rotation + Scaling + Cropping
+            cv::Mat matrix = rotationMatrix.clone();
+            matrix.at<double>(0,0) *= scale;
+            matrix.at<double>(0,1) *= scale;
+            matrix.at<double>(0,2) -= (cropCenter.x - finalSize.width/2);
+            // Flipping
+            if (flip)
+            {
+                matrix.at<double>(0,0) *= -1;
+                matrix.at<double>(0,1) *= -1;
+                matrix.at<double>(0,2) = -matrix.at<double>(0,2) + finalSize.width-1;
+            }
+            matrix.at<double>(1,0) *= scale;
+            matrix.at<double>(1,1) *= scale;
+            matrix.at<double>(1,2) -= (cropCenter.y - finalSize.height/2);
+            // Apply warping
+            cv::warpAffine(image, imageAugmented, matrix, finalSize,
+                           // (scale < 1 ? cv::INTER_AREA : cv::INTER_CUBIC),
+                           cv::INTER_CUBIC, // CUBIC to consider rotations
+                           cv::BORDER_CONSTANT, cv::Scalar{(double)defaultBorderValue});
+        }
+    }
+
+    void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
+    {
+        // x,y < 0
+        if (roi.x < 0)
+        {
+            roi.width += roi.x;
+            roi.x = 0;
+        }
+        if (roi.y < 0)
+        {
+            roi.height += roi.y;
+            roi.y = 0;
+        }
+        // Bigger than image
+        if (roi.width + roi.x >= imageSize.width)
+            roi.width = imageSize.width - 1 - roi.x;
+        if (roi.height + roi.y >= imageSize.height)
+            roi.height = imageSize.height - 1 - roi.y;
+        // Width/height negative
+        roi.width = std::max(0, roi.width);
+        roi.height = std::max(0, roi.height);
     }
 
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit)

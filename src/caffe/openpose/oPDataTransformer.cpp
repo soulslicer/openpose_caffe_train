@@ -39,43 +39,6 @@ struct AugmentSelection
     float scale = 1.f;
 };
 
-void doAugmentation(cv::Mat& imageAugmented, const AugmentSelection& augmentSelection, const cv::Mat& originaImage,
-                    const unsigned char defaultBorderValue, const cv::Size& finalCropSize)
-{
-    cv::Mat imageTemp;
-    // Scale
-    applyScale(imageTemp, augmentSelection.scale, originaImage);
-    // Rotation
-    applyRotation(imageTemp, augmentSelection.RotAndFinalSize, imageTemp, defaultBorderValue);
-    // Cropping
-    applyCrop(imageAugmented, augmentSelection.cropCenter, imageTemp, defaultBorderValue, finalCropSize);
-    // Flipping
-    applyFlip(imageAugmented, augmentSelection.flip, imageAugmented);
-}
-
-void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize)
-{
-    // x,y < 0
-    if (roi.x < 0)
-    {
-        roi.width += roi.x;
-        roi.x = 0;
-    }
-    if (roi.y < 0)
-    {
-        roi.height += roi.y;
-        roi.y = 0;
-    }
-    // Bigger than image
-    if (roi.width + roi.x >= imageSize.width)
-        roi.width = imageSize.width - 1 - roi.x;
-    if (roi.height + roi.y >= imageSize.height)
-        roi.height = imageSize.height - 1 - roi.y;
-    // Width/height negative
-    roi.width = std::max(0, roi.width);
-    roi.height = std::max(0, roi.height);
-}
-
 void doOcclusions(cv::Mat& imageAugmented, cv::Mat& backgroundImageAugmented, const MetaData& metaData,
                   const unsigned int numberMaxOcclusions, const PoseModel poseModel)
 {
@@ -402,9 +365,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // COCO & MPII
     else
     {
-        image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
-        const auto initImageArea = (int)(image.rows * image.cols);
-        CHECK_EQ(initImageArea, datumArea);
+        // // Naive copy
+        // image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
+        // const auto initImageArea = (int)(image.rows * image.cols);
+        // CHECK_EQ(initImageArea, datumArea);
         // for (auto y = 0; y < image.rows; y++)
         // {
         //     const auto yOffset = (int)(y*image.cols);
@@ -422,27 +386,37 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         //         }
         //     }
         // }
-        auto* uCharPtrCvMat = (unsigned char*)(image.data);
-        for (auto y = 0; y < image.rows; y++)
-        {
-            const auto yOffset = (int)(y*image.cols);
-            for (auto x = 0; x < image.cols; x++)
-            {
-                const auto xyOffset = yOffset + x;
-                const auto baseIndex = 3*xyOffset;
-                uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
-                uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + initImageArea]));
-                uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*initImageArea]));
-            }
-        }
+        // // Naive copy (slightly optimized)
+        // image = cv::Mat(datumHeight, datumWidth, CV_8UC3);
+        // auto* uCharPtrCvMat = (unsigned char*)(image.data);
+        // for (auto y = 0; y < image.rows; y++)
+        // {
+        //     const auto yOffset = (int)(y*image.cols);
+        //     for (auto x = 0; x < image.cols; x++)
+        //     {
+        //         const auto xyOffset = yOffset + x;
+        //         const auto baseIndex = 3*xyOffset;
+        //         uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
+        //         uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + initImageArea]));
+        //         uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*initImageArea]));
+        //     }
+        // }
+        // // Security check - Assert
+        // cv::Mat image2;
+        // std::swap(image, image2);
+        // OpenCV wrapping --> 1.7x speed up naive image.at<cv::Vec3b>, 1.25x speed up with smart speed up
+        const cv::Mat b(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[0]);
+        const cv::Mat g(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[datumArea]);
+        const cv::Mat r(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[2*datumArea]);
+        cv::merge({b,g,r}, image);
+        // // Security checks
+        // const auto initImageArea = (int)(image.rows * image.cols);
+        // CHECK_EQ(initImageArea, datumArea);
+        // CHECK_EQ(cv::norm(image-image2), 0);
     }
     const auto initImageWidth = (int)image.cols;
     const auto initImageHeight = (int)image.rows;
 
-    // Mask for background image
-    // Image size, not backgroundImage
-    cv::Mat maskBackgroundImage = (datumNegative != nullptr
-        ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
     // Read background image
     cv::Mat backgroundImage;
     if (datumNegative != nullptr)
@@ -452,7 +426,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const int datumNegativeHeight = datumNegative->height();
         const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
         // Background image
-        backgroundImage = cv::Mat(datumNegativeHeight, datumNegativeWidth, CV_8UC3);
+        // // Naive copy
+        // backgroundImage = cv::Mat(datumNegativeHeight, datumNegativeWidth, CV_8UC3);
         // for (auto y = 0; y < datumNegativeHeight; y++)
         // {
         //     const auto yOffset = (int)(y*datumNegativeWidth);
@@ -467,19 +442,33 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         //         }
         //     }
         // }
-        auto* uCharPtrCvMat = (unsigned char*)(backgroundImage.data);
-        for (auto y = 0; y < datumNegativeHeight; y++)
-        {
-            const auto yOffset = (int)(y*datumNegativeWidth);
-            for (auto x = 0; x < datumNegativeWidth; x++)
-            {
-                const auto xyOffset = yOffset + x;
-                const auto baseIndex = 3*xyOffset;
-                uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
-                uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + datumNegativeArea]));
-                uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*datumNegativeArea]));
-            }
-        }
+        // // Naive copy (slightly optimized)
+        // backgroundImage = cv::Mat(datumNegativeHeight, datumNegativeWidth, CV_8UC3);
+        // auto* uCharPtrCvMat = (unsigned char*)(backgroundImage.data);
+        // for (auto y = 0; y < datumNegativeHeight; y++)
+        // {
+        //     const auto yOffset = (int)(y*datumNegativeWidth);
+        //     for (auto x = 0; x < datumNegativeWidth; x++)
+        //     {
+        //         const auto xyOffset = yOffset + x;
+        //         const auto baseIndex = 3*xyOffset;
+        //         uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
+        //         uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + datumNegativeArea]));
+        //         uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*datumNegativeArea]));
+        //     }
+        // }
+        // // Security check - Assert
+        // cv::Mat image2;
+        // std::swap(backgroundImage, image2);
+        // OpenCV wrapping --> 1.7x speed up naive image.at<cv::Vec3b>, 1.25x speed up with smart speed up
+        const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
+        const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
+        const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
+        cv::merge({b,g,r}, backgroundImage);
+        // // Security checks
+        // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
+        // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
+        // CHECK_EQ(cv::norm(backgroundImage-image2), 0);
         // Included data augmentation: cropping
         // Disable data augmentation --> minX = minY = 0
         // Data augmentation: cropping
@@ -509,32 +498,40 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     }
 
     // Read mask miss (LMDB channel 2)
-    cv::Mat maskMiss;
-    // COCO
-    if (mPoseCategory == PoseCategory::COCO)
-    {
-        maskMiss = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0});
-        for (auto y = 0; y < maskMiss.rows; y++)
-        {
-            const auto yOffset = (int)(y*initImageWidth);
-            for (auto x = 0; x < initImageWidth; x++)
-            {
-                const auto xyOffset = yOffset + x;
-                const auto dIndex = (int)(4*datumArea + xyOffset);
-                Dtype dElement;
-                // if (hasUInt8)
-                    dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-                // else
-                    // dElement = datum.float_data(dIndex);
-                if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
-                    throw std::runtime_error{"Value out of {0,1}" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-                maskMiss.at<uchar>(y, x) = dElement; //round(dElement/255);
-            }
-        }
-    }
-    // DOME & MPII
-    else
-        maskMiss = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
+    const cv::Mat maskMiss = (mPoseCategory == PoseCategory::COCO
+        // COCO
+        ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
+        // DOME & MPII
+        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
+    // // Naive copy
+    // cv::Mat maskMiss2;
+    // // COCO
+    // if (mPoseCategory == PoseCategory::COCO)
+    // {
+    //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0});
+    //     for (auto y = 0; y < maskMiss2.rows; y++)
+    //     {
+    //         const auto yOffset = (int)(y*initImageWidth);
+    //         for (auto x = 0; x < initImageWidth; x++)
+    //         {
+    //             const auto xyOffset = yOffset + x;
+    //             const auto dIndex = (int)(4*datumArea + xyOffset);
+    //             Dtype dElement;
+    //             // if (hasUInt8)
+    //                 dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+    //             // else
+    //                 // dElement = datum.float_data(dIndex);
+    //             if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
+    //                 throw std::runtime_error{"Value out of {0,1}" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    //             maskMiss2.at<uchar>(y, x) = dElement; //round(dElement/255);
+    //         }
+    //     }
+    // }
+    // // DOME & MPII
+    // else
+    //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
+    // // Security checks
+    // CHECK_EQ(cv::norm(maskMiss-maskMiss2), 0);
 
     // Time measurement
     VLOG(2) << "  bgr[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
@@ -573,8 +570,13 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     cv::Mat depthAugmented;
     VLOG(2) << "   input size (" << initImageWidth << ", " << initImageHeight << ")";
     // We only do random transform augmentSelection augmentation when training.
-    if (phase_ == TRAIN)
+    if (phase_ == TRAIN) // 80% time is spent here
     {
+        // Mask for background image
+        // Image size, not backgroundImage
+        cv::Mat maskBackgroundImage = (datumNegative != nullptr
+            ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
+        cv::Mat maskBackgroundImageAugmented;
         // Swap center?
         swapCenterPoint(metaData, param_, mPoseModel);
         // Augmentation (scale, rotation, cropping, and flipping)
@@ -591,11 +593,19 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, mPoseModel);
         augmentSelection.flip = estimateFlip(metaData, param_);
         applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
-        // Aug on images
-        doAugmentation(imageAugmented, augmentSelection, image, 0, finalCropSize);
-        doAugmentation(maskBackgroundImage, augmentSelection, maskBackgroundImage, 255, finalCropSize);
-        doAugmentation(maskMissAugmented, augmentSelection, maskMiss, 255, finalCropSize);
-        doAugmentation(depthAugmented, augmentSelection, depth, 0, finalCropSize);
+        // Aug on images - ~80% code time spent in the following `applyAllAugmentation` lines
+        applyAllAugmentation(imageAugmented, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, image,
+                             0);
+        applyAllAugmentation(maskBackgroundImageAugmented, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, maskBackgroundImage, 255);
+        applyAllAugmentation(maskMissAugmented, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, maskMiss, 255);
+        applyAllAugmentation(depthAugmented, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, depth, 0);
         // backgroundImage augmentation (no scale/rotation)
         const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
         cv::Mat backgroundImageTemp;
@@ -608,11 +618,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         if (!maskMissAugmented.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
         // Final background image - elementwise multiplication
-        if (!backgroundImageAugmented.empty() && !maskBackgroundImage.empty())
+        if (!backgroundImageAugmented.empty() && !maskBackgroundImageAugmented.empty())
         {
             // Apply mask to background image
             cv::Mat backgroundImageAugmentedTemp;
-            backgroundImageAugmented.copyTo(backgroundImageAugmentedTemp, maskBackgroundImage);
+            backgroundImageAugmented.copyTo(backgroundImageAugmentedTemp, maskBackgroundImageAugmented);
             // Add background image to image augmented
             cv::Mat imageAugmentedTemp;
             addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
@@ -690,7 +700,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // // if (mPoseModel == PoseModel::DOME_59)
     // {
     //     // if (metaData.writeNumber < 5)
-    //     if (metaData.writeNumber < 100)
+    //     if (metaData.writeNumber < 10)
+    //     // if (metaData.writeNumber < 100)
     //     {
     //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
     //         // 2. Comment the following if statement
@@ -762,9 +773,7 @@ void OPDataTransformer<Dtype>::generateDepthLabelMap(Dtype* transformedLabel, co
         for (auto gX = 0; gX < gridX; gX++)
         {
             const auto xyOffset = yOffset + gX;
-
             auto depth_val = depth.at<uint16_t>(gY, gX);
-
             transformedLabel[(2*numberBpPafChannels+2)*channelOffset + xyOffset] = (depth_val>0)?1.0:0.0;
             transformedLabel[(2*numberBpPafChannels+3)*channelOffset + xyOffset] = float(depth_val)/1000.0;
         }
@@ -837,9 +846,47 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
 }
 
 template<typename Dtype>
+void fillMaskChannels(Dtype* transformedLabel, const int gridX, const int gridY, const int numberTotalChannels,
+                      const int channelOffset, const cv::Mat& maskMiss)
+{
+    // Initialize labels to [0, 1] (depending on maskMiss)
+    // // Naive version (very slow)
+    // for (auto gY = 0; gY < gridY; gY++)
+    // {
+    //     const auto yOffset = gY*gridX;
+    //     for (auto gX = 0; gX < gridX; gX++)
+    //     {
+    //         const auto xyOffset = yOffset + gX;
+    //         const float weight = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
+    //         // Body part & PAFs & background channel & distance
+    //         for (auto part = 0; part < numberTotalChannels; part++)
+    //         // // For Distance
+    //         // for (auto part = 0; part < numberTotalChannels - numberPafChannels/2; part++)
+    //             transformedLabel[part*channelOffset + xyOffset] = weight;
+    //     }
+    // }
+    // OpenCV wrapper: ~10x speed up with baseline
+    cv::Mat maskMissFloat;
+    const auto type = getType(Dtype(0));
+    maskMiss.convertTo(maskMissFloat, type);
+    maskMissFloat /= Dtype(255.f);
+    // // For Distance
+    // for (auto part = 0; part < numberTotalChannels - numberPafChannels/2; part++)
+    for (auto part = 0; part < numberTotalChannels; part++)
+    {
+        auto* pointer = &transformedLabel[part*channelOffset];
+        cv::Mat transformedLabel(gridY, gridX, type, (unsigned char*)(pointer));
+        // // Not exactly 0 for limited floating precission
+        // CHECK_LT(std::abs(cv::norm(transformedLabel-maskMissFloat)), 1e-6);
+        maskMissFloat.copyTo(transformedLabel);
+    }
+}
+
+template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                                                 const MetaData& metaData) const
 {
+    // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
     const auto rezY = (int)imageSize.height;
     const auto stride = (int)param_.stride();
@@ -855,22 +902,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Labels to 0
     std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * gridY * gridX, 0.f);
 
-    // Initialize labels to 0 or 1 (depending on maskMiss)
-    // Label size = image size / stride
-    for (auto gY = 0; gY < gridY; gY++)
-    {
-        const auto yOffset = gY*gridX;
-        for (auto gX = 0; gX < gridX; gX++)
-        {
-            const auto xyOffset = yOffset + gX;
-            const float weight = float(maskMiss.at<uchar>(gY, gX)) / 255.f;
-            // Body part & PAFs & background channel & distance
-            for (auto part = 0; part < numberTotalChannels; part++)
-            // // For Distance
-            // for (auto part = 0; part < numberTotalChannels - numberPafChannels/2; part++)
-                transformedLabel[part*channelOffset + xyOffset] = weight;
-        }
-    }
+    // Initialize labels to [0, 1] (depending on maskMiss)
+    fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
 
     // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
     if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
@@ -880,10 +913,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                                                         ? metaData.jointsSelf.isVisible
                                                                         : std::vector<float>{}));
         for (const auto& index : missingChannels)
-        {
             std::fill(&transformedLabel[index*channelOffset],
                       &transformedLabel[index*channelOffset + channelOffset], 0);
-        }
         // Background
         const auto type = getType(Dtype(0));
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
@@ -1092,6 +1123,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 
     // Background channel
+    // Naive implementation
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
