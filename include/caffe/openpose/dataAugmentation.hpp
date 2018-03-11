@@ -13,13 +13,13 @@ namespace caffe {
     void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const PoseModel poseModel);
     // Scale
     float estimateScale(const MetaData& metaData, const OPTransformationParameter& param_);
-    void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image);
+    // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image);
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel);
     // Rotation
     std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
                                                   const OPTransformationParameter& param_);
-    void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size> RotAndFinalSize,
-                       const cv::Mat& image, const unsigned char defaultBorderValue);
+    // void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size>& RotAndFinalSize,
+    //                    const cv::Mat& image, const unsigned char defaultBorderValue);
     void applyRotation(MetaData& metaData, const cv::Mat& Rot, const PoseModel poseModel);
     // Cropping
     cv::Point2i estimateCrop(const MetaData& metaData, const OPTransformationParameter& param_);
@@ -34,7 +34,13 @@ namespace caffe {
     void applyFlip(MetaData& metaData, const bool flip, const int imageWidth,
                    const OPTransformationParameter& param_, const PoseModel poseModel);
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R);
+    // Rotation + scale + cropping + flipping
+    void applyAllAugmentation(cv::Mat& imageAugmented, const cv::Mat& rotationMatrix,
+                              const float scale, const bool flip, const cv::Point2i& cropCenter,
+                              const cv::Size& finalSize, const cv::Mat& image,
+                              const unsigned char defaultBorderValue);
     // Other functions
+    void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize);
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit);
 
 }  // namespace caffe
