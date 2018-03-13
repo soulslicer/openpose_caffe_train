@@ -352,11 +352,18 @@ namespace caffe {
         std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_19_V2
     };
 
-
-
-
+    const std::array<std::vector<float>, (int)PoseModel::Size> SIGMA{
+        std::vector<float>{0},
+        std::vector<float>{0},
+        std::vector<float>{0.26, 0.79, 0.79, 0.72, 0.62, 0.79, 0.72, 0.62, 1.07, 1.07, 0.87, 0.89, 1.07, 0.87, 0.89, 0.25, 0.25, 0.35, 0.35, 0}
+    };
 
     // Fixed functions
+    const std::vector<float>& getSigma(const PoseModel poseModel)
+    {
+        return SIGMA.at((int)poseModel);
+    }
+
     int getNumberBodyParts(const PoseModel poseModel)
     {
         return NUMBER_BODY_PARTS.at((int)poseModel);
