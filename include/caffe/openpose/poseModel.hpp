@@ -20,7 +20,8 @@ enum class PoseModel : unsigned short
     DOME_59 = 8,
     COCO_59_17 = 9,
     MPII_59 = 10,
-    COCO_19_V2 = 11,
+    COCO_19b = 11,
+    COCO_19_V2 = 12,
     Size,
 };
 enum class PoseCategory : unsigned short
