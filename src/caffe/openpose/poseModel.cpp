@@ -118,6 +118,30 @@ namespace caffe {
 //     {18, "LEar"},
 //     {19, "Background"},
 // };
+// OPENPOSE_BODY_PARTS_21 {
+//     {0,  "Nose"},
+//     {1,  "Neck"},
+//     {2,  "RShoulder"},
+//     {3,  "RElbow"},
+//     {4,  "RWrist"},
+//     {5,  "LShoulder"},
+//     {6,  "LElbow"},
+//     {7,  "LWrist"},
+//     {8,  "LowerAbs"},
+//     {9,  "RHip"},
+//     {10, "RKnee"},
+//     {11, "RAnkle"},
+//     {12, "LHip"},
+//     {13, "LKnee"},
+//     {14, "LAnkle"},
+//     {15, "REye"},
+//     {16, "LEye"},
+//     {17, "REar"},
+//     {18, "LEar"},
+//     {19, "RealNeck"},
+//     {20, "Top"},
+//     {21, "Background"},
+// };
 // OPENPOSE_BODY_PARTS_23 {
 //     {0,  "Neck"},
 //     {1,  "RShoulder"},
@@ -212,20 +236,18 @@ namespace caffe {
             return 2;
         else if (numberBodyParts == 59)
             return 3;
+        else if (numberBodyParts == 21)
+            return 6;
         // else
         throw std::runtime_error{"PoseModel does not have corresponding index yet."
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
         return 0;
     }
 
-
-
-
-
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19, 19};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19, 19, 21, 21};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17, 17, 16};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -262,7 +284,7 @@ namespace caffe {
             {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{},                                        // Left hand
             {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{}                                         // Right hand
         },
-        std::vector<std::vector<int>>{                                                                              // MPII_59
+        std::vector<std::vector<int>>{                                                                              // MPII_hands_59
             {},{}, {2},{3},{4},  {5},{6},{7},  {},  {9},{10},{11},  {12},{13},{14},  {},{},{},{},                   // Body
             {19},{20},{21},{22}, {23},{24},{25},{26}, {27},{28},{29},{30}, {31},{32},{33},{34}, {35},{36},{37},{38},// Left hand
             {39},{40},{41},{42}, {43},{44},{45},{46}, {47},{48},{49},{50}, {51},{52},{53},{54}, {55},{56},{57},{58} // Right hand
@@ -272,6 +294,12 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19_V2
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{}   // COCO_21
+        },
+        std::vector<std::vector<int>>{
+            {}, {12,13}, {12},{11},{10}, {13},{14},{15}, {}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {8},{9}         // MPII_21
         },
     };
 
@@ -286,6 +314,8 @@ namespace caffe {
             return std::make_pair(PoseModel::COCO_19b, PoseCategory::COCO);
         else if (poseModeString == "COCO_19_V2")
             return std::make_pair(PoseModel::COCO_19_V2, PoseCategory::COCO);
+        else if (poseModeString == "COCO_21")
+            return std::make_pair(PoseModel::COCO_21, PoseCategory::COCO);
         else if (poseModeString == "COCO_23")
             return std::make_pair(PoseModel::COCO_23, PoseCategory::COCO);
         else if (poseModeString == "COCO_23_17")
@@ -304,8 +334,10 @@ namespace caffe {
         else if (poseModeString == "DOME_59")
             return std::make_pair(PoseModel::DOME_59, PoseCategory::DOME);
         // MPII
-        else if (poseModeString == "MPII_59")
-            return std::make_pair(PoseModel::MPII_59, PoseCategory::MPII);
+        else if (poseModeString == "MPII_21")
+            return std::make_pair(PoseModel::MPII_21, PoseCategory::MPII_hands);
+        else if (poseModeString == "MPII_hands_59")
+            return std::make_pair(PoseModel::MPII_hands_59, PoseCategory::MPII_hands);
         // Unknown
         throw std::runtime_error{"String (" + poseModeString
                                  + ") does not correspond to any model (COCO_18, DOME_18, ...)"
@@ -322,34 +354,37 @@ namespace caffe {
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{11,8},{12,9},{13,10},{15,14},{17,16}},                    // 18 (COCO_18, DOME_18)
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // 19 (COCO_19(b), DOME_19)
         std::vector<std::array<int,2>>{{1,4},{2,5},{3,6},{8,13},{9,14},{10,15},{11,16},{12,17}, {19,21},{20,22}},   // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
-        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},                    // 59 (DOME_59), COCO_59_17, MPII_59
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},                    // 59 (DOME_59), COCO_59_17, MPII_hands_59
                                        {19,39},{20,40},{21,41},{22,42},{23,43},{24,44},{25,45},{26,46},     // 2 fingers
                                        {27,47},{28,48},{29,49},{30,50},{31,51},{32,52},{33,53},{34,54},     // 2 fingers
                                        {35,55},{36,56},{37,57},{38,58}},                                    // 1 finger
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19b
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19_V2
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_21, MPI_21
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
         std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                       // 18 (COCO_18, DOME_18)
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},                       // 19 (COCO_19, DOME_19)
         std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},                    // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
-        std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16,                        // 59 (DOME_59), COCO_59_17, MPII_59
+        std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16,                        // 59 (DOME_59), COCO_59_17, MPII_hands_59
                          7,19,20,21, 7,23,24,25, 7,27,28,29, 7,31,32,33, 7,35,36,37, // Left hand
                          4,39,40,41, 4,43,44,45, 4,47,48,49, 4,51,52,53, 4,55,56,57},// Right hand
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16, 2, 5},                 // COCO_19b
         std::vector<int>{1,1,1,1,1,1,1,1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1},                                             // COCO_19_V2
+        std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16, 1, 19},                // 21 (COCO_21, MPII_21)
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
         std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                       // 18 (COCO_18, DOME_18)
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},                       // 19 (COCO_19, DOME_19)
         std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},                   // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
-        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18,                        // 59 (DOME_59), COCO_59_17, MPII_59
+        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18,                        // 59 (DOME_59), COCO_59_17, MPII_hands_59
                          19,20,21,22, 23,24,25,26, 27,28,29,30, 31,32,33,34, 35,36,37,38, // Left hand
                          39,40,41,42, 43,44,45,46, 47,48,49,50, 51,52,53,54, 55,56,57,58},// Right hand
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 9, 12},                // COCO_19b
         std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_19_V2
+        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 19, 20},               // 21 (COCO_21, MPII_21)
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> SIGMA{

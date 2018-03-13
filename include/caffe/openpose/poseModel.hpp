@@ -19,15 +19,18 @@ enum class PoseModel : unsigned short
     DOME_23 = 7,
     DOME_59 = 8,
     COCO_59_17 = 9,
-    MPII_59 = 10,
+    MPII_hands_59 = 10,
     COCO_19b = 11,
     COCO_19_V2 = 12,
+    COCO_21 = 13,
+    MPII_21 = 14,
     Size,
 };
 enum class PoseCategory : unsigned short
 {
     COCO,
     DOME,
+    MPII_hands,
     MPII
 };
 

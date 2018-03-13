@@ -347,7 +347,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // DOME
     if (mPoseCategory == PoseCategory::DOME)
         readMetaData<Dtype>(metaData, mCurrentEpoch, data.c_str(), datumWidth, mPoseCategory, mPoseModel);
-    // COCO & MPII
+    // COCO & MPII_hands
     else
         readMetaData<Dtype>(metaData, mCurrentEpoch, &data[3 * datumArea], datumWidth, mPoseCategory, mPoseModel);
     const auto depthEnabled = metaData.depthEnabled;
@@ -362,7 +362,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         if (image.empty())
             throw std::runtime_error{"Empty image at " + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
     }
-    // COCO & MPII
+    // COCO & MPII_hands
     else
     {
         // // Naive copy
@@ -498,10 +498,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     }
 
     // Read mask miss (LMDB channel 2)
-    const cv::Mat maskMiss = (mPoseCategory == PoseCategory::COCO
-        // COCO
+    const cv::Mat maskMiss = ((mPoseCategory == PoseCategory::COCO || mPoseCategory == PoseCategory::MPII)
+        // COCO & MPII
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
-        // DOME & MPII
+        // DOME & MPII_hands
         : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
     // // Naive copy
     // cv::Mat maskMiss2;
@@ -527,7 +527,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         }
     //     }
     // }
-    // // DOME & MPII
+    // // DOME & MPII_hands
     // else
     //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
     // // Security checks
@@ -906,10 +906,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
 
     // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
-    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
+    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_hands_59)
     {
         // Remove BP/PAF non-labeled channels
-        const auto missingChannels = getMissingChannels(mPoseModel, (mPoseModel == PoseModel::MPII_59
+        const auto missingChannels = getMissingChannels(mPoseModel, (mPoseModel == PoseModel::MPII_hands_59
                                                                         ? metaData.jointsSelf.isVisible
                                                                         : std::vector<float>{}));
         for (const auto& index : missingChannels)
@@ -920,7 +920,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
         cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
-        if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
+        if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_hands_59)
         {
             maskHands(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)
