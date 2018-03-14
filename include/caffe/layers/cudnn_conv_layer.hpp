@@ -64,6 +64,10 @@ class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
   size_t workspaceSizeInBytes;  // size of underlying storage
   void *workspaceData;  // underlying storage
   void **workspace;  // aliases into workspaceData
+
+  // Binary net added
+  std::unique_ptr<Blob<Dtype>> weight_binary_;
+  // Binary net end
 };
 #endif
 
