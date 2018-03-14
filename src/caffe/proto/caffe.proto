@@ -419,6 +419,9 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
+  // OpenPose: new layer
+  optional OPTransformationParameter op_transform_param = 147;
+  // OpenPose: end new layer
 }
 
 // Message that stores parameters used to apply transformation
@@ -443,6 +446,60 @@ message TransformationParameter {
   // Force the decoded image to have 1 color channels.
   optional bool force_gray = 7 [default = false];
 }
+
+// OpenPose: new parameter
+// Message that stores parameters used to apply transformation
+// to the OPData layer's data
+message OPTransformationParameter {
+  // // For data pre-processing, we can do simple scaling and subtracting the
+  // // data mean, if provided. Note that the mean subtraction is always carried
+  // // out before scaling.
+  // optional float scale = 1 [default = 1];
+  // // Specify if we want to randomly mirror data.
+  // optional bool mirror = 2 [default = false];
+  // // Specify if we would like to randomly crop an image.
+  // optional uint32 crop_size = 3 [default = 0];
+  // // mean_file and mean_value cannot be specified at the same time
+  // optional string mean_file = 4;
+  // // if specified can be repeated once (would substract it from all the channels)
+  // // or can be repeated the same number of times as channels
+  // // (would subtract them from the corresponding channel)
+  // repeated float mean_value = 5;
+  // // Force the decoded image to have 3 color channels.
+  // optional bool force_color = 6 [default = false];
+  // // Force the decoded image to have 1 color channels.
+  // optional bool force_gray = 7 [default = false];
+  // OpenPose parameters
+  optional uint32 stride = 8 [default = 4];
+  // Flipping
+  optional float flip_prob = 9 [default = 0.5];
+  // Rotation
+  optional float max_rotate_degree = 10 [default = 5.0];
+  // Cropping
+  optional uint32 crop_size_x = 12 [default = 368];
+  optional uint32 crop_size_y = 13 [default = 368];
+  optional float center_perterb_max = 14 [default = 10.0];
+  optional float center_swap_prob = 15 [default = 0.0];
+  // Scaling
+  optional float scale_prob = 16 [default = 0.5];
+  optional float scale_min = 17 [default = 0.9];
+  optional float scale_max = 18 [default = 1.1];
+  optional float target_dist = 19 [default = 1.0];
+  // Oclussion
+  optional uint32 number_max_occlusions = 20 [default = 0];
+  // Label generation
+  optional float sigma = 21 [default = 7.0];
+  // Model information
+  optional string model = 22 [default = "COCO"];
+  optional string media_directory = 23 [default = ""];
+  optional string source_background = 24 [default = ""];
+  optional uint32 normalization = 25 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+  // // CLAHE
+  // optional float clahe_tile_size = 26 [default = 8.0];
+  // optional float clahe_clip_limit = 27 [default = 4.0];
+  // optional bool do_clahe = 28 [default = false];
+}
+// OpenPose: end new parameter
 
 // Message that stores parameters shared by loss layers
 message LossParameter {
