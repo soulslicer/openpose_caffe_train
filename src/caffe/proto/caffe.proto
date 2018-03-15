@@ -494,8 +494,9 @@ message OPTransformationParameter {
   optional string media_directory = 23 [default = ""];
   optional string source_background = 24 [default = ""];
   optional string source_secondary = 25 [default = ""];
-  optional float prob_secondary = 26 [default = 0.0];
-  optional uint32 normalization = 27 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+  optional string model_secondary = 26 [default = ""];
+  optional float prob_secondary = 27 [default = 0.0];
+  optional uint32 normalization = 28 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
   // // CLAHE
   // optional float clahe_tile_size = 26 [default = 8.0];
   // optional float clahe_clip_limit = 27 [default = 4.0];

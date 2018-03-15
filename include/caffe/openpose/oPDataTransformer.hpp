@@ -27,7 +27,8 @@ namespace caffe {
 template <typename Dtype>
 class OPDataTransformer {
 public:
-    explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase);
+    explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
+        const std::string& modelString); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
 
     /**
@@ -84,6 +85,7 @@ protected:
     PoseModel mPoseModel;
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
+    std::string mModelString;
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
