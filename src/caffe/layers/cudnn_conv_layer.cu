@@ -10,7 +10,40 @@ __global__ void sync_conv_groups() { }
 template <typename Dtype>
 void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-  const Dtype* weight = this->blobs_[0]->gpu_data();
+    // Binary added
+    if (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN)
+    {
+      // Data to weightReal
+      auto* weightBinaryData = weight_binary_->mutable_cpu_data();
+      auto* weightRealData = this->blobs_[0]->mutable_cpu_data();
+      // Real to binary data
+      // Channel area = volume from axis 2 to final (num, channel, h, w)
+      const auto channelArea = weight_binary_->count(1);
+      const auto imageArea = weight_binary_->count(2);
+      for (auto num = 0 ; num < weight_binary_->shape()[0] ; num++)
+      {
+        const auto offsetNum = num*channelArea;
+        for (auto channel = 0 ; channel < weight_binary_->shape()[1] ; channel++)
+        {
+          const auto offset = offsetNum + channel * imageArea;
+          // L1 norm
+          auto l1Norm = Dtype(0);
+          for (auto i = 0 ; i < imageArea ; i++)
+            l1Norm += (weightRealData[offset+i] < 0
+              ? -weightRealData[offset+i] : weightRealData[offset+i]);
+          const auto sum = l1Norm / imageArea;
+          for (auto i = 0 ; i < imageArea ; i++)
+            weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -sum : sum);
+        }
+      }
+    }
+    // Binary added end
+
+  // const Dtype* weight = this->blobs_[0]->gpu_data(); // Binary commented
+  // Binary added
+  const Dtype* weight = (this->layer_param_.convolution_param().binary()
+    ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+  // Binary added ended
   for (int i = 0; i < bottom.size(); ++i) {
     const Dtype* bottom_data = bottom[i]->gpu_data();
     Dtype* top_data = top[i]->mutable_gpu_data();
@@ -84,7 +117,47 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
               workspace_bwd_filter_sizes_[i],
               cudnn::dataType<Dtype>::one,
               filter_desc_, weight_diff + this->weight_offset_ * g));
+
       }
+      // Binary added
+    }
+
+  if (this->layer_param_.convolution_param().binary())
+  {
+    if (this->param_propagate_down_[0]) {
+      weight = this->blobs_[0]->cpu_data();
+      weight_diff = this->blobs_[0]->mutable_cpu_diff();
+    }
+    // Channel area = volume from axis 2 to final (num, channel, h, w)
+    auto* weight_real = weight;
+    auto* weight_real_diff = weight_diff;
+    const auto channelArea = weight_binary_->count(1);
+    const auto imageArea = weight_binary_->count(2);
+    const auto oneOverN = 1/Dtype(imageArea);
+    for (auto num = 0 ; num < weight_binary_->shape()[0] ; num++)
+    {
+      const auto offsetNum = num*channelArea;
+      for (auto channel = 0 ; channel < weight_binary_->shape()[1] ; channel++)
+      {
+        const auto offset = offsetNum + channel * imageArea;
+        // L1 norm
+        auto l1Norm = Dtype(0);
+        for (auto i = 0 ; i < imageArea ; i++)
+          l1Norm += (weight_real[offset+i] < 0 ? -weight_real[offset+i] : weight_real[offset+i]);
+        // Update weight_real_diff
+        for (auto i = 0 ; i < imageArea ; i++)
+          weight_real_diff[offset+i] = weight_real_diff[offset+i] * oneOverN
+                                     * (1 + l1Norm * std::max(Dtype(-1), std::min(Dtype(1), weight_real[offset+i])));
+      }
+    }
+    if (this->param_propagate_down_[0]) {
+      weight = this->blobs_[0]->gpu_data();
+      weight_diff = this->blobs_[0]->mutable_gpu_diff();
+    }
+  }
+
+    for (int g = 0; g < this->group_; g++) {
+      // Binary added end
 
       // Gradient w.r.t. bottom data.
       if (propagate_down[i]) {
