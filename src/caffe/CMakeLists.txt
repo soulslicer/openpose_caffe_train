@@ -8,7 +8,7 @@ caffe_default_properties(caffeproto)
 target_link_libraries(caffeproto PUBLIC ${PROTOBUF_LIBRARIES})
 target_include_directories(caffeproto PUBLIC ${PROTOBUF_INCLUDE_DIR})
 
-list(INSERT Caffe_LINKER_LIBS 0 PUBLIC caffeproto) # note, crucial to prepend!
+list(INSERT Caffe_LINKER_LIBS 0 PUBLIC caffeproto opencv_contrib) # note, crucial to prepend!
 
 # --[ Caffe library
 
@@ -22,7 +22,7 @@ endif()
 
 add_library(caffe ${srcs})
 caffe_default_properties(caffe)
-target_link_libraries(caffe ${Caffe_LINKER_LIBS})
+target_link_libraries(caffe  ${Caffe_LINKER_LIBS})
 target_include_directories(caffe ${Caffe_INCLUDE_DIRS}
                                  PUBLIC
                                  $<BUILD_INTERFACE:${Caffe_INCLUDE_DIR}>
