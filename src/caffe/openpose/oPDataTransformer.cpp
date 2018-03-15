@@ -27,6 +27,7 @@
 #include "caffe/util/benchmark.hpp"
 #include "caffe/openpose/getLine.hpp"
 #include "caffe/openpose/oPDataTransformer.hpp"
+using namespace std;
 // OpenPose: added end
 
 namespace caffe {
@@ -691,72 +692,76 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
     // Generate and copy label
-    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData);
+    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented);
     if (depthEnabled)
         generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // // if (mPoseModel == PoseModel::DOME_59)
-    // {
-    //     // if (metaData.writeNumber < 5)
-    //     if (metaData.writeNumber < 10)
-    //     // if (metaData.writeNumber < 100)
-    //     {
-    //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
-    //         // 2. Comment the following if statement
-    //         const auto rezX = (int)imageAugmented.cols;
-    //         const auto rezY = (int)imageAugmented.rows;
-    //         const auto gridX = rezX / stride;
-    //         const auto gridY = rezY / stride;
-    //         const auto channelOffset = gridY * gridX;
-    //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
-    //         for (auto part = 0; part < numberTotalChannels; part++)
-    //         {
-    //             // Reduce #images saved (ideally mask images should be the same)
-    //             // if (part < 1)
-    //             if (part == numberTotalChannels-1)
-    //             // if (part < 3 || part >= numberTotalChannels - 3)
-    //             {
-    //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
-    //                 for (auto subPart = 0; subPart < 2; subPart++)
-    //                 {
-    //                     cv::Mat labelMap = finalImage(cv::Rect{subPart*gridX, 0, gridX, gridY});
-    //                     for (auto gY = 0; gY < gridY; gY++)
-    //                     {
-    //                         const auto yOffset = gY*gridX;
-    //                         for (auto gX = 0; gX < gridX; gX++)
-    //                         {
-    //                             const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-    //                             labelMap.at<uchar>(gY,gX) = (int)(255*transformedLabel[channelIndex + yOffset + gX]);
-    //                         }
-    //                     }
-    //                 }
-    //                 cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //                 cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
-    //                 for (auto subPart = 0; subPart < 2; subPart++)
-    //                 {
-    //                     cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
-    //                     cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
-    //                 }
-    //                 // Write on disk
-    //                 char imagename [100];
-    //                 sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", param_.model().c_str(),
-    //                         metaData.writeNumber, part);
-    //                 cv::imwrite(imagename, finalImage);
-    //             }
-    //         }
-    //         if (depthEnabled)
-    //         {
-    //             cv::Mat depthMap;
-    //             cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //             char imagename [100];
-    //             sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
-    //                     metaData.writeNumber);
-    //             cv::imwrite(imagename, depthMap);
-    //         }
-    //     }
-    // }
+     // Debugging - Visualize - Write on disk
+     // if (mPoseModel == PoseModel::DOME_59)
+     if (mPoseModel == PoseModel::MPII_21)
+     {
+         // if (metaData.writeNumber < 5)
+         if (metaData.writeNumber == 4)
+         // if (metaData.writeNumber < 100)
+         {
+             // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
+             // 2. Comment the following if statement
+             const auto rezX = (int)imageAugmented.cols;
+             const auto rezY = (int)imageAugmented.rows;
+             const auto gridX = rezX / stride;
+             const auto gridY = rezY / stride;
+             const auto channelOffset = gridY * gridX;
+             const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+             for (auto part = 0; part < numberTotalChannels; part++)
+             {
+                 // Reduce #images saved (ideally mask images should be the same)
+                 // if (part < 1)
+//                 if (part == numberTotalChannels-1)
+                 // if (part < 3 || part >= numberTotalChannels - 3)
+                 {
+                     cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
+                     for (auto subPart = 0; subPart < 2; subPart++)
+                     {
+                         cv::Mat labelMap = finalImage(cv::Rect{subPart*gridX, 0, gridX, gridY});
+                         for (auto gY = 0; gY < gridY; gY++)
+                         {
+                             const auto yOffset = gY*gridX;
+                             for (auto gX = 0; gX < gridX; gX++)
+                             {
+                                 const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
+                                 labelMap.at<uchar>(gY,gX) = (int)(255*transformedLabel[channelIndex + yOffset + gX]);
+                             }
+                         }
+                     }
+                     cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+                     cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
+                     for (auto subPart = 0; subPart < 2; subPart++)
+                     {
+                         cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
+                         cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
+                     }
+                     // Write on disk
+                     char imagename [100];
+                     sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", param_.model().c_str(),
+                             metaData.writeNumber, part);
+                     cv::imwrite(imagename, finalImage);
+                 }
+             }
+             if (depthEnabled)
+             {
+                 cv::Mat depthMap;
+                 cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+                 char imagename [100];
+                 sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
+                         metaData.writeNumber);
+                 cv::imwrite(imagename, depthMap);
+             }
+
+         }else{
+             //exit(-1);
+         }
+     }
 }
 
 template<typename Dtype>
@@ -882,9 +887,70 @@ void fillMaskChannels(Dtype* transformedLabel, const int gridX, const int gridY,
     }
 }
 
+void maskBetween(const cv::Point2i& a, const cv::Point2i& b, cv::Mat& maskMiss, cv::Mat& img, float sscale){
+    if((a.x >= 0 && a.x < img.size().width && a.y >= 0 && a.y < img.size().height)
+            && (b.x >= 0 && b.x < img.size().width && b.y >= 0 && b.y < img.size().height)){
+        float x1 = a.x; float x2 = b.x;
+        float y1 = a.y; float y2 = b.y;
+        float xc = (x1 + x2)/2  ;  float yc = (y1 + y2)/2  ;    // Center point
+        float xd = (x1 - x2)/2  ;  float yd = (y1 - y2)/2  ;    // Half-diagonal
+        float x3 = xc - yd  ;  float y3 = yc + xd;              // Third corner
+        float x4 = xc + yd  ;  float y4 = yc - xd;              // Fourth corner
+        float dist = sqrt(pow(x2-x1,2)+pow(y2-y1,2));
+        cv::Point2i rp(x3,y3);
+        cv::Point2i lp(x4,y4);
+        cv::Point2i v(rp.x-lp.x, rp.y-lp.y);
+        float iscale = (float)img.size().width/(float)maskMiss.size().width;
+        cv::Point2i rpn(rp.x - v.x*sscale, rp.y - v.y*sscale);
+        cv::Point2i lpn(lp.x + v.x*sscale, lp.y + v.y*sscale);
+        cv::line(maskMiss, cv::Point2i(lpn.x/iscale, lpn.y/iscale), cv::Point2i(rpn.x/iscale, rpn.y/iscale), cv::Scalar(0), dist/2/iscale);
+        cv::line(img, cv::Point2i(lpn.x/1, lpn.y/1), cv::Point2i(rpn.x/1, rpn.y/1), cv::Scalar(255,255,255), dist/2/1);
+    }
+}
+
+void maskFaceMPII(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
+    // Mask Face
+    if(isVisible[20] == 2 || isVisible[19] == 2) return;
+    cv::Point topPoint = points[20];
+    cv::Point neckPoint = points[19];
+    maskBetween(topPoint, neckPoint, maskMiss, img, 0.7);
+    // maybe handle if top missing ?
+
+}
+
+void maskRealNeckCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
+    if(isVisible[0] != 1 || isVisible[1] != 1) return;
+    cv::Point nosePoint = points[0];
+    cv::Point fakeNeckPoint = points[1];
+    maskBetween(nosePoint, fakeNeckPoint, maskMiss, img, 0.5);
+}
+
+void drawPoints(cv::Mat& clone, const MetaData& metaData){
+    int i=0;
+    for(auto p : metaData.jointsSelf.points){
+        int viz = metaData.jointsSelf.isVisible[i];
+        if(p.x >= 0 || p.x < clone.size().width || p.y >= 0 || p.y < clone.size().height){
+            cv::circle(clone, p, 2, cv::Scalar(128*viz,128*viz,128*viz), CV_FILLED);
+            cv::putText(clone, std::to_string(i),  p, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(0, 200, 200), 1);
+        }
+        i++;
+    }
+    for(auto joint : metaData.jointsOthers){
+        i=0;
+        for(auto p : joint.points){
+            int viz = joint.isVisible[i];
+            if(p.x >= 0 || p.x < clone.size().width || p.y >= 0 || p.y < clone.size().height){
+                cv::circle(clone, p, 2, cv::Scalar(128*viz,128*viz,128*viz), CV_FILLED);
+                cv::putText(clone, std::to_string(i),  p, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(0, 200, 200), 1);
+            }
+            i++;
+        }
+    }
+}
+
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                                                const MetaData& metaData) const
+                                                const MetaData& metaData, const cv::Mat& img) const
 {
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
@@ -918,20 +984,52 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Background
         const auto type = getType(Dtype(0));
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
-        cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
+        cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
         if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_hands_59)
         {
-            maskHands(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            maskHands(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)
-                maskHands(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+                maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
         }
         // If foot
         if (numberBodyParts == 23)
         {
-            maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)
-                maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+                maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+        }
+
+        // Change BG for COCO
+        if(mPoseModel == PoseModel::COCO_21){
+            cv::Mat clone = img.clone();
+            maskRealNeckCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            for(auto jointOther : metaData.jointsOthers){
+                maskRealNeckCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
+            }
+
+//            if(metaData.writeNumber == 7){
+//                drawPoints(clone, metaData);
+//                cv::imwrite("/home/ryaadhav/test.png", clone);
+//                cv::imwrite("/home/ryaadhav/mask.png", maskMiss*255);
+//                exit(-1);
+//            }
+        }
+
+        // Change BG for MPII
+        if(mPoseModel == PoseModel::MPII_21){
+            cv::Mat clone = img.clone();
+            maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            for(auto jointOther : metaData.jointsOthers){
+                maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, jointOther.points, clone);
+            }
+
+            if(metaData.writeNumber == 4){
+                drawPoints(clone, metaData);
+                cv::imwrite("/home/ryaadhav/test.png", clone);
+                cv::imwrite("/home/ryaadhav/mask.png", maskMissTemp*255);
+            }
+
         }
     }
 

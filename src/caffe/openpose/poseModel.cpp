@@ -299,7 +299,7 @@ namespace caffe {
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{}   // COCO_21
         },
         std::vector<std::vector<int>>{
-            {}, {12,13}, {12},{11},{10}, {13},{14},{15}, {}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {8},{9}         // MPII_21
+            {}, {12,13}, {12},{11},{10}, {13},{14},{15}, {2,3}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {8},{9}         // MPII_21
         },
     };
 
@@ -335,7 +335,7 @@ namespace caffe {
             return std::make_pair(PoseModel::DOME_59, PoseCategory::DOME);
         // MPII
         else if (poseModeString == "MPII_21")
-            return std::make_pair(PoseModel::MPII_21, PoseCategory::MPII_hands);
+            return std::make_pair(PoseModel::MPII_21, PoseCategory::MPII);
         else if (poseModeString == "MPII_hands_59")
             return std::make_pair(PoseModel::MPII_hands_59, PoseCategory::MPII_hands);
         // Unknown

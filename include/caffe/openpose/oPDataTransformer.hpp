@@ -90,7 +90,7 @@ protected:
                               const Datum* datumNegative);
     void generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                          const MetaData& metaData) const;
+                          const MetaData& metaData, const cv::Mat& img) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;
     void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY, cv::Mat& count,
