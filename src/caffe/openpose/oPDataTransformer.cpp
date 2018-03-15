@@ -61,11 +61,11 @@ void doOcclusions(cv::Mat& imageAugmented, cv::Mat& backgroundImageAugmented, co
                 occludedPart = std::rand() % numberBodyParts; // [0, #BP-1]
             while (metaData.jointsSelf.isVisible[occludedPart] > 1.5f);
             // Select random cropp around it
-            const auto width = (int)std::round(imageAugmented.cols * metaData.scaleSelf/3
+            const auto width = (int)std::round(imageAugmented.cols * metaData.scaleSelf/2
                              * (1+(std::rand() % 1001 - 500)/1000.)); // +- [0.5-1.5] random
-            const auto height = (int)std::round(imageAugmented.rows * metaData.scaleSelf/3
+            const auto height = (int)std::round(imageAugmented.rows * metaData.scaleSelf/2
                               * (1+(std::rand() % 1001 - 500)/1000.)); // +- [0.5-1.5] random
-            const auto random = 1+(std::rand() % 1001 - 500)/1000.; // +- [0-2] random
+            const auto random = 1+(std::rand() % 1001 - 500)/500.; // +- [0-2] random
             // Estimate ROI rectangle to apply
             const auto point = metaData.jointsSelf.points[occludedPart];
             cv::Rect rectangle{(int)std::round(point.x - width/2*random),
