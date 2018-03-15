@@ -918,20 +918,20 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Background
         const auto type = getType(Dtype(0));
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
-        cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
+        cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
         if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
         {
-            maskHands(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            maskHands(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)
-                maskHands(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+                maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
         }
         // If foot
         if (numberBodyParts == 23)
         {
-            maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)
-                maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+                maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
         }
     }
 

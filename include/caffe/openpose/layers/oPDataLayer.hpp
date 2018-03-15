@@ -41,8 +41,9 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   uint64_t offset_;
 
   // OpenPose: added
-  void NextSecond();
   bool SkipSecond();
+  void NextBackground();
+  void NextSecond();
   // Secondary lmdb
   uint64_t offsetSecond;
   bool secondDb;
@@ -60,8 +61,10 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   // Data augmentation class
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformer;
   // Timer
-  int sCounter;
-  double sDuration;
+  unsigned long long mOnes;
+  unsigned long long mTwos;
+  int mCounter;
+  double mDuration;
   // OpenPose: added end
 };
 
