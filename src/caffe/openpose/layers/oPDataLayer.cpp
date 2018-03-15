@@ -22,12 +22,29 @@ template <typename Dtype>
 OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
     offset_(),
+    offsetSecond(), // OpenPose: added
     op_transform_param_(param.op_transform_param()) // OpenPose: added
 {
     db_.reset(db::GetDB(param.data_param().backend()));
     db_->Open(param.data_param().source(), db::READ);
     cursor_.reset(db_->NewCursor());
     // OpenPose: added
+    // Set up secondary DB
+    if (!param.op_transform_param().source_secondary().empty())
+    {
+        secondDb = true;
+        secondProbability = param.op_transform_param().prob_secondary();
+        CHECK_GE(secondProbability, 0.f);
+        CHECK_LE(secondProbability, 1.f);
+        dbSecond.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
+        dbSecond->Open(param.op_transform_param().source_secondary(), db::READ);
+        cursorSecond.reset(dbSecond->NewCursor());
+    }
+    else
+    {
+        secondDb = false;
+        secondProbability = 0.f;
+    }
     // Set up negatives DB
     if (!param.op_transform_param().source_background().empty())
     {
@@ -128,6 +145,19 @@ bool OPDataLayer<Dtype>::Skip()
     return !keep;
 }
 
+// OpenPose: added
+template <typename Dtype>
+bool OPDataLayer<Dtype>::SkipSecond()
+{
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetSecond % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+// OpenPose: end
+
 template<typename Dtype>
 void OPDataLayer<Dtype>::Next()
 {
@@ -138,6 +168,7 @@ void OPDataLayer<Dtype>::Next()
                 << "Restarting data prefetching from start.";
         cursor_->SeekToFirst();
     }
+    offset_++;
     // OpenPose: added
     if (backgroundDb)
     {
@@ -150,8 +181,32 @@ void OPDataLayer<Dtype>::Next()
         }
     }
     // OpenPose: added ended
-    offset_++;
 }
+
+// OpenPose: added
+template<typename Dtype>
+void OPDataLayer<Dtype>::NextSecond()
+{
+    cursorSecond->Next();
+    if (!cursorSecond->valid())
+    {
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting data prefetching from start.";
+        cursorSecond->SeekToFirst();
+    }
+    offsetSecond++;
+    if (backgroundDb)
+    {
+        cursorBackground->Next();
+        if (!cursorSecond->valid())
+        {
+            LOG_IF(INFO, Caffe::root_solver())
+                    << "Restarting negatives data prefetching from start.";
+            cursorBackground->SeekToFirst();
+        }
+    }
+}
+// OpenPose: added ended
 
 // This function is called on prefetch thread
 template<typename Dtype>
@@ -172,13 +227,35 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     Datum datum;
     Datum datumBackground;
+    // OpenPose: added
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    const auto desiredDbIs1 = (dice <= (1-secondProbability));
+    // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
-        while (Skip()) {
-            Next();
-        }
-        datum.ParseFromString(cursor_->value());
+        // OpenPose: commended
+        // while (Skip()) {
+        //     Next();
+        // }
+        // datum.ParseFromString(cursor_->value());
+        // OpenPose: commended ended
         // OpenPose: added
+        // If only main DB or if 2 DBs but 1st must go
+        if (!secondDb || desiredDbIs1)
+        {
+            while (Skip()) {
+                Next();
+            }
+            datum.ParseFromString(cursor_->value());
+        }
+        // If 2 DBs & 2nd one must go
+        else
+        {
+            while (SkipSecond()) {
+                NextSecond();
+            }
+            datum.ParseFromString(cursorSecond->value());
+        }
         if (backgroundDb)
             datumBackground.ParseFromString(cursorBackground->value());
         // OpenPose: added ended
