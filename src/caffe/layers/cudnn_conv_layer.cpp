@@ -231,30 +231,33 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
   }
 
   // Binary added
-  CHECK_EQ(2u, this->blobs_.size());
-  CHECK_GT(this->blobs_[0]->shape().size(), 2u);
-  weight_binary_.reset(new Blob<Dtype>());
-  weight_binary_->Reshape(this->blobs_[0]->shape());
-  // Data to weightReal
-  auto* weightBinaryData = weight_binary_->mutable_cpu_data();
-  // Real to binary data
-  // Channel area = volume from axis 2 to final (num, channel, h, w)
-  const auto channelArea = weight_binary_->count(1);
-  const auto imageArea = weight_binary_->count(2);
-  // CHECK_EQ(imageArea, this->weight_offset_); // 9 vs. 1728
-  for (auto num = 0 ; num < weight_binary_->shape()[0] ; num++)
+  if (this->layer_param_.convolution_param().binary())
   {
-    const auto offsetNum = num*channelArea;
-    for (auto channel = 0 ; channel < weight_binary_->shape()[1] ; channel++)
+    CHECK_EQ(2u, this->blobs_.size());
+    CHECK_GT(this->blobs_[0]->shape().size(), 2u);
+    weight_binary_.reset(new Blob<Dtype>());
+    weight_binary_->Reshape(this->blobs_[0]->shape());
+    // Data to weightReal
+    auto* weightBinaryData = weight_binary_->mutable_cpu_data();
+    // Real to binary data
+    // Channel area = volume from axis 2 to final (num, channel, h, w)
+    const auto channelArea = weight_binary_->count(1);
+    const auto imageArea = weight_binary_->count(2);
+    // CHECK_EQ(imageArea, this->weight_offset_); // 9 vs. 1728
+    for (auto num = 0 ; num < weight_binary_->shape()[0] ; num++)
     {
-      const auto offset = offsetNum + channel * imageArea;
-      // L1 norm
-      auto l1Norm = Dtype(0);
-      for (auto i = 0 ; i < imageArea ; i++)
-        l1Norm += (weightBinaryData[offset+i] < 0 ? -weightBinaryData[offset+i] : weightBinaryData[offset+i]);
-      const auto sum = l1Norm / imageArea;
-      for (auto i = 0 ; i < imageArea ; i++)
-        weightBinaryData[offset+i] = (weightBinaryData[offset+i] < 0 ? -sum : sum);
+      const auto offsetNum = num*channelArea;
+      for (auto channel = 0 ; channel < weight_binary_->shape()[1] ; channel++)
+      {
+        const auto offset = offsetNum + channel * imageArea;
+        // L1 norm
+        auto l1Norm = Dtype(0);
+        for (auto i = 0 ; i < imageArea ; i++)
+          l1Norm += (weightBinaryData[offset+i] < 0 ? -weightBinaryData[offset+i] : weightBinaryData[offset+i]);
+        const auto sum = l1Norm / imageArea;
+        for (auto i = 0 ; i < imageArea ; i++)
+          weightBinaryData[offset+i] = (weightBinaryData[offset+i] < 0 ? -sum : sum);
+      }
     }
   }
   // Binary added end
