@@ -233,7 +233,7 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
   // Binary added
   if (this->layer_param_.convolution_param().binary())
   {
-    CHECK_EQ(2u, this->blobs_.size());
+    CHECK_GE(this->blobs_.size(), 1);
     CHECK_GT(this->blobs_[0]->shape().size(), 2u);
     weight_binary_.reset(new Blob<Dtype>());
     weight_binary_->Reshape(this->blobs_[0]->shape());
