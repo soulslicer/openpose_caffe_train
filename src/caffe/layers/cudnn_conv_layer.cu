@@ -12,44 +12,7 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // Binary added
   if (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN)
-  {
-    // Data to weightReal
-    auto* weightBinaryData = weight_binary_->mutable_cpu_data();
-    auto* weightRealData = this->blobs_[0]->mutable_cpu_data();
-    // Real to binary data
-    // Channel area = volume from axis 2 to final (num, channel, h, w)
-    const auto channelArea = weight_binary_->count(1);
-    const auto imageArea = weight_binary_->count(2);
-    for (auto num = 0 ; num < weight_binary_->shape()[0] ; num++)
-    {
-      const auto offsetNum = num*channelArea;
-      for (auto channel = 0 ; channel < weight_binary_->shape()[1] ; channel++)
-      {
-        const auto offset = offsetNum + channel * imageArea;
-        // XNOR-style
-        // // L1 norm
-        // auto l1Norm = Dtype(0);
-        // for (auto i = 0 ; i < imageArea ; i++)
-        // {
-        //   // truncate to +-1
-        //   weightRealData[offset+i] = std::max(-Dtype(1), std::min(Dtype(1), weightRealData[offset+i]));
-        //   // l1Norm
-        //   l1Norm += (weightRealData[offset+i] < 0
-        //     ? -weightRealData[offset+i] : weightRealData[offset+i]);
-        // }
-        // const auto sum = l1Norm / imageArea;
-        // for (auto i = 0 ; i < imageArea ; i++)
-        //   weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -sum : sum);
-        // Old binary net style
-        // truncate to +-1
-        for (auto i = 0 ; i < imageArea ; i++)
-          weightRealData[offset+i] = std::max(-Dtype(1), std::min(Dtype(1), weightRealData[offset+i]));
-        // Binary approximation
-        for (auto i = 0 ; i < imageArea ; i++)
-          weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -Dtype(1) : Dtype(1));
-      }
-    }
-  }
+    normalizeWeights();
   // Binary added end
 
   // const Dtype* weight = this->blobs_[0]->gpu_data(); // Binary commented
