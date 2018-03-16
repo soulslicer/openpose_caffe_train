@@ -232,7 +232,7 @@ int getType(Dtype dtype)
 
 template<typename Dtype>
 OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param,
-        Phase phase)
+        Phase phase, const std::string& modelString) // OpenPose: Added std::string
         // : param_(param), phase_(phase) {
         : param_(param), phase_(phase), mCurrentEpoch{-1} {
     // OpenPose: commented
@@ -260,7 +260,8 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
     // OpenPose: added
     LOG(INFO) << "OPDataTransformer constructor done.";
     // PoseModel
-    std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(param_.model());
+    std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(modelString);
+    mModelString = modelString;
     // OpenPose: added end
 }
 
@@ -743,7 +744,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      }
                      // Write on disk
                      char imagename [100];
-                     sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", param_.model().c_str(),
+                     sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", mModelString.c_str(),
                              metaData.writeNumber, part);
                      cv::imwrite(imagename, finalImage);
                  }
@@ -753,7 +754,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                  cv::Mat depthMap;
                  cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
                  char imagename [100];
-                 sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", param_.model().c_str(),
+                 sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", mModelString.c_str(),
                          metaData.writeNumber);
                  cv::imwrite(imagename, depthMap);
              }

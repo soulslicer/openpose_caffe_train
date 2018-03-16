@@ -50,6 +50,7 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   float secondProbability;
   shared_ptr<db::DB> dbSecond;
   shared_ptr<db::Cursor> cursorSecond;
+  shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerSecondary;
   // Background lmdb
   bool backgroundDb;
   shared_ptr<db::DB> dbBackground;

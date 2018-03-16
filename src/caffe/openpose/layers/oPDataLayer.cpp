@@ -79,7 +79,9 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     datum.ParseFromString(cursor_->value());
 
     // OpenPose: added
-    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_));
+    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
+    if (secondDb)
+        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
     // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
@@ -234,6 +236,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // OpenPose: commended ended
         // OpenPose: added
         // If only main DB or if 2 DBs but 1st must go
+        auto oPDataTransformerPtr = this->mOPDataTransformer;
         if (desiredDbIs1)
         {
             mOnes++;
@@ -244,6 +247,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // If 2 DBs & 2nd one must go
         else
         {
+            oPDataTransformerPtr = this->mOPDataTransformerSecondary;
             mTwos++;
             while (SkipSecond())
                 NextSecond();
@@ -290,14 +294,14 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Process image & label
         const auto begin = std::chrono::high_resolution_clock::now();
         if (backgroundDb)
-            this->mOPDataTransformer->Transform(&(this->transformed_data_),
-                                                &(this->transformed_label_),
-                                                datum,
-                                                &datumBackground);
+            oPDataTransformerPtr->Transform(&(this->transformed_data_),
+                                            &(this->transformed_label_),
+                                            datum,
+                                            &datumBackground);
         else
-            this->mOPDataTransformer->Transform(&(this->transformed_data_),
-                                                &(this->transformed_label_),
-                                                datum);
+            oPDataTransformerPtr->Transform(&(this->transformed_data_),
+                                            &(this->transformed_label_),
+                                            datum);
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
