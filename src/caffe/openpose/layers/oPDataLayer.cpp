@@ -22,12 +22,31 @@ template <typename Dtype>
 OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
     offset_(),
+    offsetSecond(), // OpenPose: added
     op_transform_param_(param.op_transform_param()) // OpenPose: added
 {
     db_.reset(db::GetDB(param.data_param().backend()));
     db_->Open(param.data_param().source(), db::READ);
     cursor_.reset(db_->NewCursor());
     // OpenPose: added
+    mOnes = 0;
+    mTwos = 0;
+    // Set up secondary DB
+    if (!param.op_transform_param().source_secondary().empty())
+    {
+        secondDb = true;
+        secondProbability = param.op_transform_param().prob_secondary();
+        CHECK_GE(secondProbability, 0.f);
+        CHECK_LE(secondProbability, 1.f);
+        dbSecond.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
+        dbSecond->Open(param.op_transform_param().source_secondary(), db::READ);
+        cursorSecond.reset(dbSecond->NewCursor());
+    }
+    else
+    {
+        secondDb = false;
+        secondProbability = 0.f;
+    }
     // Set up negatives DB
     if (!param.op_transform_param().source_background().empty())
     {
@@ -39,8 +58,8 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     else
         backgroundDb = false;
     // Timer
-    sDuration = 0;
-    sCounter = 0;
+    mDuration = 0;
+    mCounter = 0;
     // OpenPose: added end
 }
 
@@ -138,20 +157,49 @@ void OPDataLayer<Dtype>::Next()
                 << "Restarting data prefetching from start.";
         cursor_->SeekToFirst();
     }
-    // OpenPose: added
+    offset_++;
+}
+
+// OpenPose: added
+template <typename Dtype>
+bool OPDataLayer<Dtype>::SkipSecond()
+{
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetSecond % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+
+template<typename Dtype>
+void OPDataLayer<Dtype>::NextBackground()
+{
     if (backgroundDb)
     {
         cursorBackground->Next();
-        if (!cursor_->valid())
+        if (!cursorBackground->valid())
         {
             LOG_IF(INFO, Caffe::root_solver())
                     << "Restarting negatives data prefetching from start.";
             cursorBackground->SeekToFirst();
         }
     }
-    // OpenPose: added ended
-    offset_++;
 }
+
+template<typename Dtype>
+void OPDataLayer<Dtype>::NextSecond()
+{
+    cursorSecond->Next();
+    if (!cursorSecond->valid())
+    {
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting second data prefetching from start.";
+        cursorSecond->SeekToFirst();
+    }
+    offsetSecond++;
+}
+// OpenPose: added ended
 
 // This function is called on prefetch thread
 template<typename Dtype>
@@ -172,15 +220,40 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     Datum datum;
     Datum datumBackground;
+    // OpenPose: added
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
+    // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
-        while (Skip()) {
-            Next();
-        }
-        datum.ParseFromString(cursor_->value());
+        // OpenPose: commended
+        // while (Skip()) {
+        //     Next();
+        // }
+        // datum.ParseFromString(cursor_->value());
+        // OpenPose: commended ended
         // OpenPose: added
+        // If only main DB or if 2 DBs but 1st must go
+        if (desiredDbIs1)
+        {
+            mOnes++;
+            while (Skip())
+                Next();
+            datum.ParseFromString(cursor_->value());
+        }
+        // If 2 DBs & 2nd one must go
+        else
+        {
+            mTwos++;
+            while (SkipSecond())
+                NextSecond();
+            datum.ParseFromString(cursorSecond->value());
+        }
         if (backgroundDb)
+        {
+            NextBackground();
             datumBackground.ParseFromString(cursorBackground->value());
+        }
         // OpenPose: added ended
         read_time += timer.MicroSeconds();
 
@@ -226,7 +299,15 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                                                 &(this->transformed_label_),
                                                 datum);
         const auto end = std::chrono::high_resolution_clock::now();
-        sDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+        mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+        // DB 1
+        if (desiredDbIs1)
+            Next();
+        // DB 2
+        else
+            NextSecond();
+        trans_time += timer.MicroSeconds();
         // OpenPose: added ended
         // OpenPose: commented
         // this->data_transformer_->Transform(datum, &(this->transformed_data_));
@@ -235,17 +316,19 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         //   Dtype* topLabel = batch->label_.mutable_cpu_data();
         //   topLabel[item_id] = datum.label();
         // }
+        // trans_time += timer.MicroSeconds();
+        // Next();
         // OpenPose: commented ended
-        trans_time += timer.MicroSeconds();
-        Next();
     }
     // Timer (every 20 iterations x batch size)
-    sCounter++;
-    if (sCounter == 20)
+    mCounter++;
+    const auto repeatEveryXVisualizations = 2;
+    if (mCounter == 20*repeatEveryXVisualizations)
     {
-        std::cout << "Time: " << sDuration * 1e-9 << "s" << std::endl;
-        sDuration = 0;
-        sCounter = 0;
+        std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s\t"
+                  << "Ratio: " << mOnes/float(mOnes+mTwos) << std::endl;
+        mDuration = 0;
+        mCounter = 0;
     }
     timer.Stop();
     batch_timer.Stop();

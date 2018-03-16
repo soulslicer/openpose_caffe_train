@@ -27,9 +27,9 @@ namespace caffe {
         auto jointsOld = joints;
 
         // Common operations
-        const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-        joints.points.resize(numberBodyPAFParts);
-        joints.isVisible.resize(numberBodyPAFParts);
+        const auto numberBodyParts = getNumberBodyParts(poseModel);
+        joints.points.resize(numberBodyParts);
+        joints.isVisible.resize(numberBodyParts);
 
         // From COCO/DomeDB to OP keypoint indexes
         const auto& lmdbToOurModel = getLmdbToOpenPoseKeypoints(poseModel);

@@ -41,15 +41,30 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   uint64_t offset_;
 
   // OpenPose: added
+  bool SkipSecond();
+  void NextBackground();
+  void NextSecond();
+  // Secondary lmdb
+  uint64_t offsetSecond;
+  bool secondDb;
+  float secondProbability;
+  shared_ptr<db::DB> dbSecond;
+  shared_ptr<db::Cursor> cursorSecond;
+  // Background lmdb
   bool backgroundDb;
   shared_ptr<db::DB> dbBackground;
   shared_ptr<db::Cursor> cursorBackground;
+  // New label
   Blob<Dtype> transformed_label_;
+  // Data augmentation parameters
   OPTransformationParameter op_transform_param_;
+  // Data augmentation class
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformer;
   // Timer
-  int sCounter;
-  double sDuration;
+  unsigned long long mOnes;
+  unsigned long long mTwos;
+  int mCounter;
+  double mDuration;
   // OpenPose: added end
 };
 

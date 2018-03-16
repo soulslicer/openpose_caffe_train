@@ -27,12 +27,11 @@ namespace caffe {
         }
     }
 
-    void flipKeypoints(Joints& joints, cv::Point2f& objPos, const int numberBodyPAFParts, const int widthMinusOne,
-                       const PoseModel poseModel)
+    void flipKeypoints(Joints& joints, cv::Point2f& objPos, const int widthMinusOne, const PoseModel poseModel)
     {
         objPos.x = widthMinusOne - objPos.x;
-        for (auto part = 0 ; part < numberBodyPAFParts ; part++)
-            joints.points[part].x = widthMinusOne - joints.points[part].x;
+        for (auto& point : joints.points)
+            point.x = widthMinusOne - point.x;
         swapLeftRightKeypoints(joints, poseModel);
     }
 
@@ -100,15 +99,14 @@ namespace caffe {
         // Update metaData
         metaData.objPos *= scale;
         metaData.scaleSelf *= scale;
-        const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-        for (auto part = 0; part < numberBodyPAFParts ; part++)
-            metaData.jointsSelf.points[part] *= scale;
+        for (auto& point : metaData.jointsSelf.points)
+            point *= scale;
         for (auto person=0; person<metaData.numberOtherPeople; person++)
         {
             metaData.objPosOthers[person] *= scale;
             metaData.scaleOthers[person] *= scale;
-            for (auto part = 0; part < numberBodyPAFParts ; part++)
-                metaData.jointsOthers[person].points[part] *= scale;
+            for (auto& point : metaData.jointsOthers[person].points)
+                point *= scale;
         }
     }
 
@@ -142,14 +140,13 @@ namespace caffe {
     {
         // Update metaData
         rotatePoint(metaData.objPos, Rot);
-        const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-        for (auto part = 0 ; part < numberBodyPAFParts ; part++)
-            rotatePoint(metaData.jointsSelf.points[part], Rot);
+        for (auto& point : metaData.jointsSelf.points)
+            rotatePoint(point, Rot);
         for (auto person = 0; person < metaData.numberOtherPeople; person++)
         {
             rotatePoint(metaData.objPosOthers[person], Rot);
-            for (auto part = 0; part < numberBodyPAFParts ; part++)
-                rotatePoint(metaData.jointsOthers[person].points[part], Rot);
+            for (auto& point : metaData.jointsOthers[person].points)
+                rotatePoint(point, Rot);
         }
     }
 
@@ -281,14 +278,13 @@ namespace caffe {
         const int offsetUp = -(cropCenter.y - (cropY/2));
         const cv::Point2f offsetPoint{(float)offsetLeft, (float)offsetUp};
         metaData.objPos += offsetPoint;
-        const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
-        for (auto part = 0 ; part < numberBodyPAFParts ; part++)
-            metaData.jointsSelf.points[part] += offsetPoint;
+        for (auto& point : metaData.jointsSelf.points)
+            point += offsetPoint;
         for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
         {
             metaData.objPosOthers[person] += offsetPoint;
-            for (auto part = 0 ; part < numberBodyPAFParts ; part++)
-                metaData.jointsOthers[person].points[part] += offsetPoint;
+            for (auto& point : metaData.jointsOthers[person].points)
+                point += offsetPoint;
         }
     }
 
@@ -315,14 +311,12 @@ namespace caffe {
         // Update metaData
         if (flip)
         {
-            const auto numberBodyPAFParts = getNumberBodyAndPafChannels(poseModel);
             const auto widthMinusOne = imageWidth - 1;
             // Main keypoints
-            flipKeypoints(metaData.jointsSelf, metaData.objPos, numberBodyPAFParts, widthMinusOne, poseModel);
+            flipKeypoints(metaData.jointsSelf, metaData.objPos, widthMinusOne, poseModel);
             // Other keypoints
             for (auto p = 0 ; p < metaData.numberOtherPeople ; p++)
-                flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], numberBodyPAFParts, widthMinusOne,
-                              poseModel);
+                flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
         }
     }
 
