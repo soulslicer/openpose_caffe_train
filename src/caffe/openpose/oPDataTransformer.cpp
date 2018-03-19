@@ -920,16 +920,122 @@ void maskFaceMPII(cv::Mat& maskMiss, const std::vector<float>& isVisible, const 
 }
 
 void maskRealNeckCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
-    if(isVisible[0] != 1 || isVisible[1] != 1) return;
+    if(isVisible[0] == 2 || isVisible[1] == 2) return;
     cv::Point nosePoint = points[0];
     cv::Point fakeNeckPoint = points[1];
     maskBetween(nosePoint, fakeNeckPoint, maskMiss, img, 0.5);
+}
+
+float l2(cv::Point& p, cv::Point& q) {
+    cv::Point diff = p - q;
+    return sqrt(diff.x*diff.x + diff.y*diff.y);
+}
+
+void maskFaceCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img)
+{
+        int neckIndex = 1;
+        int noseIndex = 0;
+        int lEarIndex = 18;
+        int rEarIndex = 19;
+        int lEyeIndex = 16;
+        int rEyeIndex = 17;
+        float threshold = 0.25f;
+        bool neckVisible = (isVisible[neckIndex] < 2);
+        bool noseVisible = (isVisible[noseIndex] < 2);
+        bool lEarVisible = (isVisible[lEarIndex] < 2);
+        bool rEarVisible = (isVisible[rEarIndex] < 2);
+        bool lEyeVisible = (isVisible[lEyeIndex] < 2);
+        bool rEyeVisible = (isVisible[rEyeIndex] < 2);
+        cv::Point neckPoint = points[neckIndex];
+        cv::Point nosePoint = points[noseIndex];
+        cv::Point lEarPoint = points[lEarIndex];
+        cv::Point rEarPoint = points[rEarIndex];
+        cv::Point lEyePoint = points[lEyeIndex];
+        cv::Point rEyePoint = points[rEyeIndex];
+
+        cv::Point pointTopLeft(0,0);
+        float faceSize = 0.;
+        int counter = 0;
+
+        // Neck and Nose Visible
+        if(noseVisible && neckVisible){
+            // Only Left Eye and Ear Visible
+            if(lEyeVisible && lEarVisible && !rEyeVisible && !rEarVisible){
+                pointTopLeft.x += (lEyePoint.x + lEarPoint.x + nosePoint.x) / 3.f;
+                pointTopLeft.y += (lEyePoint.y + lEarPoint.y + nosePoint.y) / 3.f;
+                faceSize += 0.85f * l2(nosePoint, lEyePoint) + l2(nosePoint, lEarPoint) + l2(nosePoint, neckPoint);
+            }
+            // Only Right Eye and Ear Visible
+            else if(rEyeVisible && rEarVisible && !lEyeVisible && !lEarVisible){
+                pointTopLeft.x += (rEyePoint.x + rEarPoint.x + nosePoint.x) / 3.f;
+                pointTopLeft.y += (rEyePoint.y + rEarPoint.y + nosePoint.y) / 3.f;
+                faceSize += 0.85f * l2(nosePoint, rEyePoint) + l2(nosePoint, rEarPoint) + l2(nosePoint, neckPoint);
+            }
+            // Neck and Nose only
+            else{
+                pointTopLeft.x += (neckPoint.x + nosePoint.x) / 2.f;
+                pointTopLeft.y += (neckPoint.y + nosePoint.y) / 2.f;
+                faceSize += 2.f * l2(neckPoint, nosePoint);
+            }
+            counter++;
+        }
+        // LEye and REye
+        if(lEyeVisible && rEyeVisible){
+            pointTopLeft.x += (lEyePoint.x + rEyePoint.x) / 2.f;
+            pointTopLeft.y += (lEyePoint.y + rEyePoint.y) / 2.f;
+            faceSize += 3.f * l2(lEyePoint, rEyePoint);
+            counter++;
+        }
+        // LEar and REar
+        if(lEarVisible && rEarVisible){
+            pointTopLeft.x += (lEarPoint.x + rEarPoint.x) / 2.f;
+            pointTopLeft.y += (lEarPoint.y + rEarPoint.y) / 2.f;
+            faceSize += 2.f * l2(lEarPoint, rEarPoint);
+            counter++;
+        }
+        if (counter > 0)
+        {
+            pointTopLeft.x =  pointTopLeft.x / (float)counter;
+            pointTopLeft.y =  pointTopLeft.y / (float)counter;
+            faceSize /= counter;
+        }else{
+            return;
+        }
+
+        cv::Rect bigRect(pointTopLeft.x - faceSize / 2, pointTopLeft.y - faceSize / 2, faceSize, faceSize);
+        float iscale = (float)img.size().width/(float)maskMiss.size().width;
+        cv::Rect smallRect(bigRect.x/iscale,bigRect.y/iscale,bigRect.width/iscale,bigRect.height/iscale);
+
+        float xScale = 0.5;
+        float yScale = 1.0;
+        cv::Point a = cv::Point(bigRect.x,bigRect.y);
+        cv::Point b = cv::Point(bigRect.x+bigRect.width,bigRect.y+bigRect.height);
+        cv::Point centroid = cv::Point((a.x+b.x)/2,(a.y+b.y)/2);
+        cv::Point an = cv::Point(((a.x-centroid.x)*xScale)+centroid.x,((a.y-centroid.y)*yScale)+centroid.y);
+        cv::Rect dropRect(an.x, an.y, bigRect.width*xScale, (bigRect.height*yScale)/4);
+
+        // Eye ear check
+        if(!rEarVisible) rEarPoint.y = std::numeric_limits<int>::max();
+        if(!lEarVisible) lEarPoint.y = std::numeric_limits<int>::max();
+        if(!rEyeVisible) rEyePoint.y = std::numeric_limits<int>::max();
+        if(!lEyeVisible) lEyePoint.y = std::numeric_limits<int>::max();
+        if(lEarVisible || rEarVisible || lEyeVisible || rEyeVisible){
+            int minPixY = std::min(lEarPoint.y, std::min(rEarPoint.y, std::min(lEyePoint.y, rEyePoint.y)));
+            minPixY-=5;
+            if(dropRect.y < minPixY)
+                dropRect.height = minPixY - dropRect.y;
+        }
+
+        cv::Rect dropRectScaled(dropRect.x/iscale,dropRect.y/iscale,dropRect.width/iscale,dropRect.height/iscale);
+        cv::rectangle(img, dropRect, cv::Scalar(255,0,0));
+        cv::rectangle(maskMiss, dropRectScaled, cv::Scalar(0), CV_FILLED);
 }
 
 void drawPoints(cv::Mat& clone, const MetaData& metaData){
     int i=0;
     for(auto p : metaData.jointsSelf.points){
         int viz = metaData.jointsSelf.isVisible[i];
+        if(viz == 2) continue;
         if(p.x >= 0 || p.x < clone.size().width || p.y >= 0 || p.y < clone.size().height){
             cv::circle(clone, p, 2, cv::Scalar(128*viz,128*viz,128*viz), CV_FILLED);
             cv::putText(clone, std::to_string(i),  p, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(0, 200, 200), 1);
@@ -940,6 +1046,7 @@ void drawPoints(cv::Mat& clone, const MetaData& metaData){
         i=0;
         for(auto p : joint.points){
             int viz = joint.isVisible[i];
+            if(viz == 2) continue;
             if(p.x >= 0 || p.x < clone.size().width || p.y >= 0 || p.y < clone.size().height){
                 cv::circle(clone, p, 2, cv::Scalar(128*viz,128*viz,128*viz), CV_FILLED);
                 cv::putText(clone, std::to_string(i),  p, cv::FONT_HERSHEY_SIMPLEX, 0.3, cv::Scalar(0, 200, 200), 1);
@@ -1004,15 +1111,17 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Change BG for COCO
         if(mPoseModel == PoseModel::COCO_21){
             cv::Mat clone = img.clone();
+            maskFaceCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
             maskRealNeckCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
             for(auto jointOther : metaData.jointsOthers){
                 maskRealNeckCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
+                maskFaceCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
             }
 
-//            if(metaData.writeNumber == 7){
+//            if(metaData.writeNumber == 8){
 //                drawPoints(clone, metaData);
 //                cv::imwrite("/home/ryaadhav/test.png", clone);
-//                cv::imwrite("/home/ryaadhav/mask.png", maskMiss*255);
+//                cv::imwrite("/home/ryaadhav/mask.png", maskMissTemp*255);
 //                exit(-1);
 //            }
         }
@@ -1025,11 +1134,11 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, jointOther.points, clone);
             }
 
-            if(metaData.writeNumber == 4){
-                drawPoints(clone, metaData);
-                cv::imwrite("/home/ryaadhav/test.png", clone);
-                cv::imwrite("/home/ryaadhav/mask.png", maskMissTemp*255);
-            }
+//            if(metaData.writeNumber == 4){
+//                drawPoints(clone, metaData);
+//                cv::imwrite("/home/ryaadhav/test.png", clone);
+//                cv::imwrite("/home/ryaadhav/mask.png", maskMissTemp*255);
+//            }
 
         }
     }
