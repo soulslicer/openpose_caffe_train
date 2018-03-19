@@ -12,12 +12,12 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // Binary added
   if (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN)
-    normalizeWeights();
+    normalizeWeights(false);
   // Binary added end
 
   // const Dtype* weight = this->blobs_[0]->gpu_data(); // Binary commented
   // Binary added
-  const Dtype* weight = (this->layer_param_.convolution_param().binary()
+  const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN
     ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
   // Binary added ended
   for (int i = 0; i < bottom.size(); ++i) {
