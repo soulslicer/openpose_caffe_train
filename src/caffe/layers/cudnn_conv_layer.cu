@@ -8,29 +8,53 @@ namespace caffe {
 __global__ void sync_conv_groups() { }
 
 template <typename Dtype>
+__global__ void normalizeWeightsGpu(Dtype* weightBinaryData, Dtype* weightRealData, const int count)
+{
+  const auto globalIdx = threadIdx.y * blockDim.x + threadIdx.x;
+  if (globalIdx < count)
+  {
+    weightRealData[globalIdx] = max(-Dtype(1), min(Dtype(1), weightRealData[globalIdx]));
+    weightBinaryData[globalIdx] = (weightRealData[globalIdx] < 0 ? -Dtype(1) : Dtype(1));
+  }
+}
+
+template <typename Dtype>
 void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // Binary added
   if (this->layer_param_.convolution_param().binary())
   {
-    // TRAIN commented
     // // TRAIN
     // if (this->phase_ == TRAIN)
+    // {
+    //     // const auto count = this->blobs_[0]->count();
+    //     // normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+    //     //   weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
     //   normalizeWeights();
+    // }
     // TEST (only first time)
     // else if (!weight_initialized_)
     if (!weight_initialized_)
     {
       weight_initialized_ = true;
-      if (this->phase_ == TEST)
+      // if (this->phase_ == TEST)
       {
         CHECK_GE(this->blobs_.size(), 1);
         CHECK_GT(this->blobs_[0]->shape().size(), 2u);
         weight_binary_.reset(new Blob<Dtype>());
         weight_binary_->Reshape(this->blobs_[0]->shape());
         // Data to weightReal
-        normalizeWeights();
+        const auto count = this->blobs_[0]->count();
+        normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+          weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
+        // normalizeWeights();
       }
+    }
+    if (this->phase_ == TRAIN)
+    {
+      const auto count = this->blobs_[0]->count();
+      normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+        weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
     }
   }
   // Binary added end
@@ -39,10 +63,10 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
   // Binary added
   // const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN
   //   ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
-  // const Dtype* weight = (this->layer_param_.convolution_param().binary()
-  //   ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
-  const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TEST
+  const Dtype* weight = (this->layer_param_.convolution_param().binary()
     ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+  // const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TEST
+  //   ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
   // Binary added ended
   for (int i = 0; i < bottom.size(); ++i) {
     const Dtype* bottom_data = bottom[i]->gpu_data();
@@ -191,7 +215,6 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       const auto lambda = 0.01f;
       const auto* const weight_real = this->blobs_[0]->cpu_data();
       auto* weight_real_diff = this->blobs_[0]->mutable_cpu_diff();
-// std::cout << this->blobs_[0]->count() << ": " << this->blobs_[0]->shape()[0] << " " << this->blobs_[0]->shape()[1] << " " << this->blobs_[0]->shape()[2] << " " << this->blobs_[0]->shape()[3] << std::endl;
       for (auto index = 0 ; index < this->blobs_[0]->count() ; index++)
         weight_real_diff[index] += 2*lambda*(   weight_real[index] - (weight_real[index] < 0 ? -1 : 1)   );
     }
