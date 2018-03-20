@@ -30,7 +30,8 @@ template <typename Dtype>
 class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
  public:
   explicit CuDNNConvolutionLayer(const LayerParameter& param)
-      : ConvolutionLayer<Dtype>(param), handles_setup_(false) {}
+      : ConvolutionLayer<Dtype>(param), handles_setup_(false),
+        weight_initialized_{false} {}// Binary added: weight_initialized_
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
@@ -66,8 +67,9 @@ class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
   void **workspace;  // aliases into workspaceData
 
   // Binary net added
+  bool weight_initialized_;
   std::unique_ptr<Blob<Dtype>> weight_binary_;
-  void normalizeWeights(const bool truncateOriginalWeights);
+  void normalizeWeights();
   // Binary net end
 };
 #endif

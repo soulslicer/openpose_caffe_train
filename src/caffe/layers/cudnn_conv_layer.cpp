@@ -229,19 +229,6 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
     cudnn::setTensor4dDesc<Dtype>(&bias_desc_,
         1, this->num_output_ / this->group_, 1, 1);
   }
-
-  // Binary added
-  if (this->layer_param_.convolution_param().binary())
-  {
-    CHECK_GE(this->blobs_.size(), 1);
-    CHECK_GT(this->blobs_[0]->shape().size(), 2u);
-    weight_binary_.reset(new Blob<Dtype>());
-    weight_binary_->Reshape(this->blobs_[0]->shape());
-    // Data to weightReal
-    const bool truncateOriginalWeights = true;
-    normalizeWeights(true);
-  }
-  // Binary added end
 }
 
 template <typename Dtype>
@@ -278,7 +265,7 @@ CuDNNConvolutionLayer<Dtype>::~CuDNNConvolutionLayer() {
 
 // Binary added
 template <typename Dtype>
-void CuDNNConvolutionLayer<Dtype>::normalizeWeights(const bool truncateOriginalWeights)
+void CuDNNConvolutionLayer<Dtype>::normalizeWeights()
 {
   // Data to weightReal
   auto* weightBinaryData = weight_binary_->mutable_cpu_data();
@@ -293,7 +280,8 @@ void CuDNNConvolutionLayer<Dtype>::normalizeWeights(const bool truncateOriginalW
     for (auto channel = 0 ; channel < weight_binary_->shape()[1] ; channel++)
     {
       const auto offset = offsetNum + channel * imageArea;
-      // XNOR-style
+
+      // // XNOR-style
       // // L1 norm
       // auto l1Norm = Dtype(0);
       // for (auto i = 0 ; i < imageArea ; i++)
@@ -307,17 +295,14 @@ void CuDNNConvolutionLayer<Dtype>::normalizeWeights(const bool truncateOriginalW
       // const auto sum = l1Norm / imageArea;
       // for (auto i = 0 ; i < imageArea ; i++)
       //   weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -sum : sum);
+
       // Old binary net style
       // truncate to +-1
       for (auto i = 0 ; i < imageArea ; i++)
         weightRealData[offset+i] = std::max(-Dtype(1), std::min(Dtype(1), weightRealData[offset+i]));
       // Binary approximation
-      if (truncateOriginalWeights)
-        for (auto i = 0 ; i < imageArea ; i++)
-          weightRealData[offset+i] = (weightRealData[offset+i] < 0 ? -Dtype(1) : Dtype(1));
-      else
-        for (auto i = 0 ; i < imageArea ; i++)
-          weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -Dtype(1) : Dtype(1));
+      for (auto i = 0 ; i < imageArea ; i++)
+        weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -Dtype(1) : Dtype(1));
     }
   }
 }

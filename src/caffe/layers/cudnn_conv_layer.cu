@@ -11,13 +11,31 @@ template <typename Dtype>
 void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // Binary added
-  if (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN)
-    normalizeWeights(false);
+  if (this->layer_param_.convolution_param().binary())
+  {
+    // TRAIN
+    if (this->phase_ == TRAIN)
+      normalizeWeights();
+    // TEST + only first time
+    else if (!weight_initialized_)
+    {
+      weight_initialized_ = true;
+      CHECK_GE(this->blobs_.size(), 1);
+      CHECK_GT(this->blobs_[0]->shape().size(), 2u);
+      weight_binary_.reset(new Blob<Dtype>());
+      weight_binary_->Reshape(this->blobs_[0]->shape());
+      // Data to weightReal
+      normalizeWeights();
+    }
+  }
   // Binary added end
 
   // const Dtype* weight = this->blobs_[0]->gpu_data(); // Binary commented
   // Binary added
-  const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN
+  // const Dtype* weight = weight_binary_->gpu_data();
+  // const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN
+  //   ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+  const Dtype* weight = (this->layer_param_.convolution_param().binary()
     ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
   // Binary added ended
   for (int i = 0; i < bottom.size(); ++i) {
