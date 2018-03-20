@@ -13,29 +13,35 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
   // Binary added
   if (this->layer_param_.convolution_param().binary())
   {
-    // TRAIN
-    if (this->phase_ == TRAIN)
-      normalizeWeights();
-    // TEST + only first time
-    else if (!weight_initialized_)
+    // TRAIN commented
+    // // TRAIN
+    // if (this->phase_ == TRAIN)
+    //   normalizeWeights();
+    // TEST (only first time)
+    // else if (!weight_initialized_)
+    if (!weight_initialized_)
     {
       weight_initialized_ = true;
-      CHECK_GE(this->blobs_.size(), 1);
-      CHECK_GT(this->blobs_[0]->shape().size(), 2u);
-      weight_binary_.reset(new Blob<Dtype>());
-      weight_binary_->Reshape(this->blobs_[0]->shape());
-      // Data to weightReal
-      normalizeWeights();
+      if (this->phase_ == TEST)
+      {
+        CHECK_GE(this->blobs_.size(), 1);
+        CHECK_GT(this->blobs_[0]->shape().size(), 2u);
+        weight_binary_.reset(new Blob<Dtype>());
+        weight_binary_->Reshape(this->blobs_[0]->shape());
+        // Data to weightReal
+        normalizeWeights();
+      }
     }
   }
   // Binary added end
 
   // const Dtype* weight = this->blobs_[0]->gpu_data(); // Binary commented
   // Binary added
-  // const Dtype* weight = weight_binary_->gpu_data();
   // const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TRAIN
   //   ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
-  const Dtype* weight = (this->layer_param_.convolution_param().binary()
+  // const Dtype* weight = (this->layer_param_.convolution_param().binary()
+  //   ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+  const Dtype* weight = (this->layer_param_.convolution_param().binary() && this->phase_ == TEST
     ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
   // Binary added ended
   for (int i = 0; i < bottom.size(); ++i) {
@@ -80,8 +86,11 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   if (this->param_propagate_down_[0]) {
     // weight = this->blobs_[0]->gpu_data(); // Binary commented
     // Binary added
-    weight = (this->layer_param_.convolution_param().binary()
-              ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+    // My binary way
+    weight = this->blobs_[0]->gpu_data();
+    // Plain truncating
+    // weight = (this->layer_param_.convolution_param().binary()
+    //           ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
     // Binary added ended
     weight_diff = this->blobs_[0]->mutable_gpu_diff();
   }
@@ -175,6 +184,18 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   //     }
   //   }
   // }
+  // My binary way (guiding weights to 1)
+  if (this->layer_param_.convolution_param().binary()) // Binary added
+  {
+    if (this->param_propagate_down_[0]) {
+      const auto lambda = 0.01f;
+      const auto* const weight_real = this->blobs_[0]->cpu_data();
+      auto* weight_real_diff = this->blobs_[0]->mutable_cpu_diff();
+// std::cout << this->blobs_[0]->count() << ": " << this->blobs_[0]->shape()[0] << " " << this->blobs_[0]->shape()[1] << " " << this->blobs_[0]->shape()[2] << " " << this->blobs_[0]->shape()[3] << std::endl;
+      for (auto index = 0 ; index < this->blobs_[0]->count() ; index++)
+        weight_real_diff[index] += 2*lambda*(   weight_real[index] - (weight_real[index] < 0 ? -1 : 1)   );
+    }
+  }
   // Binary added end
 }
 
