@@ -55,6 +55,7 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
       const auto count = this->blobs_[0]->count();
       normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
+      // normalizeWeights();
     }
   }
   // Binary added end
@@ -111,10 +112,10 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     // weight = this->blobs_[0]->gpu_data(); // Binary commented
     // Binary added
     // My binary way
-    weight = this->blobs_[0]->gpu_data();
+    // weight = this->blobs_[0]->gpu_data();
     // Plain truncating
-    // weight = (this->layer_param_.convolution_param().binary()
-    //           ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+    weight = (this->layer_param_.convolution_param().binary()
+              ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
     // Binary added ended
     weight_diff = this->blobs_[0]->mutable_gpu_diff();
   }
@@ -208,18 +209,18 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   //     }
   //   }
   // }
-  // My binary way (guiding weights to 1)
-  if (this->layer_param_.convolution_param().binary()) // Binary added
-  {
-    if (this->param_propagate_down_[0]) {
-      const auto lambda = 0.01f;
-      const auto* const weight_real = this->blobs_[0]->cpu_data();
-      auto* weight_real_diff = this->blobs_[0]->mutable_cpu_diff();
-      for (auto index = 0 ; index < this->blobs_[0]->count() ; index++)
-        weight_real_diff[index] += 2*lambda*(   weight_real[index] - (weight_real[index] < 0 ? -1 : 1)   );
-    }
-  }
-  // Binary added end
+  // // My binary way (guiding weights to 1)
+  // if (this->layer_param_.convolution_param().binary()) // Binary added
+  // {
+  //   if (this->param_propagate_down_[0]) {
+  //     const auto lambda = 0.01f;
+  //     const auto* const weight_real = this->blobs_[0]->cpu_data();
+  //     auto* weight_real_diff = this->blobs_[0]->mutable_cpu_diff();
+  //     for (auto index = 0 ; index < this->blobs_[0]->count() ; index++)
+  //       weight_real_diff[index] += 2*lambda*(   weight_real[index] - (weight_real[index] < 0 ? -1 : 1)   );
+  //   }
+  // }
+  // // Binary added end
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(CuDNNConvolutionLayer);
