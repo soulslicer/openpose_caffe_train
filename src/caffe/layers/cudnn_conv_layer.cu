@@ -10,7 +10,7 @@ __global__ void sync_conv_groups() { }
 template <typename Dtype>
 __global__ void normalizeWeightsGpu(Dtype* weightBinaryData, Dtype* weightRealData, const int count)
 {
-  const auto globalIdx = threadIdx.y * blockDim.x + threadIdx.x;
+  const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
   if (globalIdx < count)
   {
     weightRealData[globalIdx] = max(-Dtype(1), min(Dtype(1), weightRealData[globalIdx]));
