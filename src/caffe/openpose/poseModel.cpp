@@ -301,6 +301,10 @@ namespace caffe {
         std::vector<std::vector<int>>{
             {}, {12,13}, {12},{11},{10}, {13},{14},{15}, {2,3}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {8},{9}         // MPII_21
         },
+
+        std::vector<std::vector<int>>{
+            {13}, {8,9}, {8},{7},{6}, {9},{10},{11}, {2,3}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {12},{14}         // PT_21
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -338,6 +342,9 @@ namespace caffe {
             return std::make_pair(PoseModel::MPII_21, PoseCategory::MPII);
         else if (poseModeString == "MPII_hands_59")
             return std::make_pair(PoseModel::MPII_hands_59, PoseCategory::MPII_hands);
+        // PT
+        else if(poseModeString == "PT_21")
+            return std::make_pair(PoseModel::PT_21, PoseCategory::PT);
         // Unknown
         throw std::runtime_error{"String (" + poseModeString
                                  + ") does not correspond to any model (COCO_18, DOME_18, ...)"
@@ -360,7 +367,7 @@ namespace caffe {
                                        {35,55},{36,56},{37,57},{38,58}},                                    // 1 finger
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19b
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19_V2
-        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_21, MPI_21
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_21, MPI_21, PT_21
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
@@ -384,7 +391,7 @@ namespace caffe {
                          39,40,41,42, 43,44,45,46, 47,48,49,50, 51,52,53,54, 55,56,57,58},// Right hand
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 9, 12},                // COCO_19b
         std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_19_V2
-        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 19, 20},               // 21 (COCO_21, MPII_21)
+        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 19, 20},               // 21 (COCO_21, MPII_21, PT_21)
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> SIGMA{
