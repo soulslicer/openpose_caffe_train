@@ -42,6 +42,8 @@ namespace caffe {
     void readMetaData(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
                       const PoseCategory poseCategory, const PoseModel poseModel);
 
+    void lmdbJointsToOurModel(Joints& joints, const PoseModel poseModel);
+
 }  // namespace caffe
 
 #endif  // USE_OPENCV

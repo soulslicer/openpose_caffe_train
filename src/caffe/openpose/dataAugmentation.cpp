@@ -32,6 +32,13 @@ namespace caffe {
         objPos.x = widthMinusOne - objPos.x;
         for (auto& point : joints.points)
             point.x = widthMinusOne - point.x;
+        if(joints.points.size()) swapLeftRightKeypoints(joints, poseModel);
+    }
+
+    void flipKeypoints(Joints& joints, const int widthMinusOne, const PoseModel poseModel)
+    {
+        for (auto& point : joints.points)
+            point.x = widthMinusOne - point.x;
         swapLeftRightKeypoints(joints, poseModel);
     }
 
@@ -103,8 +110,8 @@ namespace caffe {
             point *= scale;
         for (auto person=0; person<metaData.numberOtherPeople; person++)
         {
-            metaData.objPosOthers[person] *= scale;
-            metaData.scaleOthers[person] *= scale;
+            if(metaData.objPosOthers.size()) metaData.objPosOthers[person] *= scale;
+            if(metaData.scaleOthers.size()) metaData.scaleOthers[person] *= scale;
             for (auto& point : metaData.jointsOthers[person].points)
                 point *= scale;
         }
@@ -144,7 +151,7 @@ namespace caffe {
             rotatePoint(point, Rot);
         for (auto person = 0; person < metaData.numberOtherPeople; person++)
         {
-            rotatePoint(metaData.objPosOthers[person], Rot);
+            if(metaData.objPosOthers.size()) rotatePoint(metaData.objPosOthers[person], Rot);
             for (auto& point : metaData.jointsOthers[person].points)
                 rotatePoint(point, Rot);
         }
@@ -282,7 +289,7 @@ namespace caffe {
             point += offsetPoint;
         for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
         {
-            metaData.objPosOthers[person] += offsetPoint;
+            if(metaData.objPosOthers.size()) metaData.objPosOthers[person] += offsetPoint;
             for (auto& point : metaData.jointsOthers[person].points)
                 point += offsetPoint;
         }
@@ -315,8 +322,10 @@ namespace caffe {
             // Main keypoints
             flipKeypoints(metaData.jointsSelf, metaData.objPos, widthMinusOne, poseModel);
             // Other keypoints
-            for (auto p = 0 ; p < metaData.numberOtherPeople ; p++)
-                flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
+            for (auto p = 0 ; p < metaData.numberOtherPeople ; p++){
+                if(metaData.objPosOthers.size()) flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
+                else flipKeypoints(metaData.jointsOthers[p], widthMinusOne, poseModel);
+            }
         }
     }
 

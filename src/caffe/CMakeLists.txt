@@ -8,7 +8,7 @@ caffe_default_properties(caffeproto)
 target_link_libraries(caffeproto PUBLIC ${PROTOBUF_LIBRARIES})
 target_include_directories(caffeproto PUBLIC ${PROTOBUF_INCLUDE_DIR})
 
-list(INSERT Caffe_LINKER_LIBS 0 PUBLIC caffeproto opencv_contrib) # note, crucial to prepend!
+list(INSERT Caffe_LINKER_LIBS 0 PUBLIC caffeproto opencv_contrib jsoncpp) # note, crucial to prepend!
 
 # --[ Caffe library
 
@@ -47,4 +47,3 @@ install(TARGETS caffe caffeproto EXPORT CaffeTargets DESTINATION ${CMAKE_INSTALL
 file(WRITE ${PROJECT_BINARY_DIR}/__init__.py)
 list(APPEND proto_python ${PROJECT_BINARY_DIR}/__init__.py)
 install(PROGRAMS ${proto_python} DESTINATION python/caffe/proto)
-

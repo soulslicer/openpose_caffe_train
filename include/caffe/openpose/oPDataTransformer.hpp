@@ -17,8 +17,19 @@
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
+#include <jsoncpp/json/json.h>
+#include <jsoncpp/json/value.h>
+#include <jsoncpp/json/reader.h>
+#include <unistd.h>
 
 namespace caffe {
+
+struct VSeq{
+    std::vector<cv::Mat> images;
+    std::vector<cv::Mat> imagesAug;
+    std::vector<cv::Mat> masks;
+    std::vector<Json::Value> jsons;
+};
 
 /**
  * @brief Applies common transformations to the input data, such as
@@ -27,6 +38,7 @@ namespace caffe {
 template <typename Dtype>
 class OPDataTransformer {
 public:
+    explicit OPDataTransformer(const std::string& modelString);
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
         const std::string& modelString); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
@@ -68,6 +80,9 @@ protected:
 public:
     void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum* datumNegative = nullptr);
+    void TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
+                   const Datum* datumNegative = nullptr);
+    void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
 protected:
     // OpenPose: added end
