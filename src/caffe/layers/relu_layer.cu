@@ -14,6 +14,14 @@ __global__ void ReLUForward(const int n, const Dtype* in, Dtype* out,
 }
 
 template <typename Dtype>
+__global__ void BinaryReLUForward(const int n, const Dtype* in, Dtype* out,
+    Dtype negative_slope) {
+  CUDA_KERNEL_LOOP(index, n) {
+    out[index] = in[index] > 0 ? 1 : -1;
+  }
+}
+
+template <typename Dtype>
 void ReLULayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
   const Dtype* bottom_data = bottom[0]->gpu_data();
@@ -21,8 +29,18 @@ void ReLULayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const int count = bottom[0]->count();
   Dtype negative_slope = this->layer_param_.relu_param().negative_slope();
   // NOLINT_NEXT_LINE(whitespace/operators)
-  ReLUForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-      count, bottom_data, top_data, negative_slope);
+  // Binary added
+  if (this->layer_param_.relu_param().negative_slope())
+    BinaryReLUForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+        count, bottom_data, top_data, negative_slope);
+  else
+    ReLUForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+        count, bottom_data, top_data, negative_slope);
+  // Binary added end
+  // Binary commented
+  // ReLUForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+  //     count, bottom_data, top_data, negative_slope);
+  // Binary commented end
   CUDA_POST_KERNEL_CHECK;
   // << " count: " << count << " bottom_data: "
   //     << (unsigned long)bottom_data

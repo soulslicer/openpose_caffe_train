@@ -1083,6 +1083,11 @@ message ReLUParameter {
     CUDNN = 2;
   }
   optional Engine engine = 2 [default = DEFAULT];
+
+  // Binary added
+  // Whether to use binary conv layer
+  optional bool binary = 3 [default = false];
+  // Binary added ended
 }
 
 message ReshapeParameter {
