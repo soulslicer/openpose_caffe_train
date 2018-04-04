@@ -273,7 +273,7 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     //auto oPDataTransformerPtr = this->mOPDataTransformer;
     //oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
-    std::cout << "Loaded Data" << std::endl;
+    //std::cout << "Loaded Data" << std::endl;
 
     // Timer (every 20 iterations x batch size)
     mCounter++;
