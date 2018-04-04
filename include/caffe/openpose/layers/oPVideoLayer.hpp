@@ -68,7 +68,7 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   int mCounter;
   double mDuration;
 
-  const int frame_size = 6;
+  int frame_size = 6;
   // OpenPose: added end
 };
 

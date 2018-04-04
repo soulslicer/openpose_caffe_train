@@ -471,6 +471,8 @@ message OPTransformationParameter {
   // optional bool force_gray = 7 [default = false];
   // OpenPose parameters
   optional uint32 stride = 8 [default = 4];
+  // For OPVideo
+  optional uint32 frame_size = 6 [default = 6];
   // Flipping
   optional float flip_prob = 9 [default = 0.5];
   // Rotation

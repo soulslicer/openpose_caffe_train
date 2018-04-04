@@ -444,7 +444,6 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
     vs.images.clear();
     vs.masks.clear();
     vs.jsons.clear();
-    std::cout << startIndex << std::endl;
     for(int i=startIndex; i<startIndex+frames; i++){
         //cout << "Looking at frame: " << i << endl;
         vs.images.emplace_back(cv::imread(jsonVideoData[i]["image_path_full"].asString()));

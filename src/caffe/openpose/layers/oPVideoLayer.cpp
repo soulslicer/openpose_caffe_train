@@ -76,6 +76,8 @@ template <typename Dtype>
 void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
 {
+    frame_size = this->layer_param_.op_transform_param().frame_size();
+
     const int batch_size = this->layer_param_.data_param().batch_size();
     // Read a data point, and use it to initialize the top blob.
     Datum datum;
@@ -270,7 +272,7 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // Testing Optional
     //auto oPDataTransformerPtr = this->mOPDataTransformer;
     //oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
+    //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
     std::cout << "Loaded Data" << std::endl;
 
     // Timer (every 20 iterations x batch size)
