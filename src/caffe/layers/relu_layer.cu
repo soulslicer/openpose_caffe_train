@@ -30,7 +30,7 @@ void ReLULayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   Dtype negative_slope = this->layer_param_.relu_param().negative_slope();
   // NOLINT_NEXT_LINE(whitespace/operators)
   // Binary added
-  if (this->layer_param_.relu_param().negative_slope())
+  if (this->layer_param_.relu_param().binary())
     BinaryReLUForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
         count, bottom_data, top_data, negative_slope);
   else
@@ -62,7 +62,7 @@ template <typename Dtype>
 __global__ void BinaryReLUBackward(const int n, const Dtype* in_diff,
     const Dtype* in_data, Dtype* out_diff, Dtype negative_slope) {
   CUDA_KERNEL_LOOP(index, n) {
-    out_diff[index] = in_diff[index];
+    out_diff[index] = max(Dtype(-1), min(Dtype(1), in_diff[index]));
   }
 }
 
@@ -78,11 +78,11 @@ void ReLULayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     Dtype negative_slope = this->layer_param_.relu_param().negative_slope();
     // NOLINT_NEXT_LINE(whitespace/operators)
     // Binary added
-    if (this->layer_param_.relu_param().negative_slope())
-      ReLUBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+    if (this->layer_param_.relu_param().binary())
+      BinaryReLUBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
           count, top_diff, bottom_data, bottom_diff, negative_slope);
     else
-      BinaryReLUBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
+      ReLUBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
           count, top_diff, bottom_data, bottom_diff, negative_slope);
     // Binary added end
     // Binary commented
