@@ -421,6 +421,7 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   // OpenPose: new layer
   optional OPTransformationParameter op_transform_param = 147;
+  optional BinaryActivationParameter binary_activation_param = 148;
   // OpenPose: end new layer
 }
 
@@ -1083,11 +1084,6 @@ message ReLUParameter {
     CUDNN = 2;
   }
   optional Engine engine = 2 [default = DEFAULT];
-
-  // Binary added
-  // Whether to use binary conv layer
-  optional bool binary = 3 [default = false];
-  // Binary added ended
 }
 
 message ReshapeParameter {
@@ -1494,3 +1490,9 @@ message PReLUParameter {
   // Whether or not slope parameters are shared across channels.
   optional bool channel_shared = 2 [default = false];
 }
+
+// Binary added
+// Message that stores parameters used by ReLULayer
+message BinaryActivationParameter {
+}
+// Binary added ended
