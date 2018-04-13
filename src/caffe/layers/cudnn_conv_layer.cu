@@ -199,7 +199,8 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       const auto weightArea = this->blobs_[0]->shape()[2] * this->blobs_[0]->shape()[3];
       const auto countReduced = count/weightArea;
       backwardNormalizeWeightsGpu<<<CAFFE_GET_BLOCKS(countReduced), CAFFE_CUDA_NUM_THREADS>>>(
-        this->blobs_[0]->mutable_gpu_diff(), this->blobs_[0]->gpu_data(), countReduced, weightArea);
+        this->blobs_[0]->mutable_gpu_diff(), this->blobs_[0]->gpu_diff(), this->blobs_[0]->gpu_data(),
+        countReduced, weightArea);
     }
   }
   // // If binary (XNOR-style) - First tried (didn't work)
