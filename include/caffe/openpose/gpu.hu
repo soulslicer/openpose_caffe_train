@@ -1,0 +1,59 @@
+#ifndef CAFFE_OPENPOSE_GPU_HPP
+#define CAFFE_OPENPOSE_GPU_HPP
+
+namespace caffe {
+  // Binary weights = +-n - XNOR-style
+  template <typename Dtype>
+  __global__ void normalizeWeightsGpu(Dtype* weightBinaryData, const Dtype* weightRealData, const int count,
+                                      const int weightArea)
+  {
+    const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (globalIdx < count)
+    {
+      const auto offset = globalIdx * weightArea;
+      // XNOR-style
+      // L1 norm
+      auto l1Norm = Dtype(0);
+      for (auto i = 0 ; i < weightArea ; i++)
+      {
+        // // truncate to +-1
+        // weightRealData[offset+i] = max(-Dtype(1), min(Dtype(1), weightRealData[offset+i]));
+        // l1Norm
+        l1Norm += (weightRealData[offset+i] < 0
+                   ? -weightRealData[offset+i] : weightRealData[offset+i]);
+      }
+      const auto sum = l1Norm / weightArea;
+      for (auto i = 0 ; i < weightArea ; i++)
+        weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -sum : sum);
+    }
+  }
+
+  // Binary weights = +-n - XNOR-style
+  template <typename Dtype>
+  __global__ void backwardNormalizeWeightsGpu(Dtype* weightRealDiff, const Dtype* weightRealData, const int count,
+                                              const int weightArea)
+  {
+    const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (globalIdx < count)
+    {
+      const auto offset = globalIdx * weightArea;
+      // XNOR-style
+      // L1 norm
+      auto l1Norm = Dtype(0);
+      for (auto i = 0 ; i < weightArea ; i++)
+      {
+        // // truncate to +-1
+        // weightRealData[offset+i] = max(-Dtype(1), min(Dtype(1), weightRealData[offset+i]));
+        // l1Norm
+        l1Norm += (weightRealData[offset+i] < 0
+                   ? -weightRealData[offset+i] : weightRealData[offset+i]);
+      }
+      const auto oneOverWeightArea = Dtype(1)/Dtype(weightArea);
+      for (auto i = 0 ; i < weightArea ; i++)
+        weightRealDiff[offset+i] *= oneOverWeightArea
+                                  * (1 + l1Norm * max(-Dtype(1), min(Dtype(1), weightRealData[offset+i])));
+    }
+  }
+}
+
+#endif // CAFFE_OPENPOSE_GPU_HPP

@@ -2,6 +2,9 @@
 #include <vector>
 
 #include "caffe/layers/cudnn_conv_layer.hpp"
+  // Binary added
+#include "caffe/openpose/gpu.hu"
+  // Binary added end
 
 namespace caffe {
 
@@ -9,7 +12,7 @@ __global__ void sync_conv_groups() { }
 
 // // Binary weights = +-1
 // template <typename Dtype>
-// __global__ void normalizeWeightsGpu(Dtype* weightBinaryData, Dtype* weightRealData, const int count)
+// __global__ void normalizeWeightsGpuBinary(Dtype* weightBinaryData, Dtype* weightRealData, const int count)
 // {
 //   const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
 //   if (globalIdx < count)
@@ -19,72 +22,13 @@ __global__ void sync_conv_groups() { }
 //   }
 // }
 
-// Binary weights = +-n - XNOR-style
-template <typename Dtype>
-__global__ void normalizeWeightsGpu(Dtype* weightBinaryData, const Dtype* weightRealData, const int count, const int weightArea)
-{
-  const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (globalIdx < count)
-  {
-    const auto offset = globalIdx * weightArea;
-    // XNOR-style
-    // L1 norm
-    auto l1Norm = Dtype(0);
-    for (auto i = 0 ; i < weightArea ; i++)
-    {
-      // // truncate to +-1
-      // weightRealData[offset+i] = max(-Dtype(1), min(Dtype(1), weightRealData[offset+i]));
-      // l1Norm
-      l1Norm += (weightRealData[offset+i] < 0
-                 ? -weightRealData[offset+i] : weightRealData[offset+i]);
-    }
-    const auto sum = l1Norm / weightArea;
-    for (auto i = 0 ; i < weightArea ; i++)
-      weightBinaryData[offset+i] = (weightRealData[offset+i] < 0 ? -sum : sum);
-  }
-}
-
-// Binary weights = +-n - XNOR-style
-template <typename Dtype>
-__global__ void backwardNormalizeWeightsGpu(Dtype* weightRealDiff, const Dtype* weightRealData, const int count, const int weightArea)
-{
-  const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (globalIdx < count)
-  {
-    const auto offset = globalIdx * weightArea;
-    // XNOR-style
-    // L1 norm
-    auto l1Norm = Dtype(0);
-    for (auto i = 0 ; i < weightArea ; i++)
-    {
-      // // truncate to +-1
-      // weightRealData[offset+i] = max(-Dtype(1), min(Dtype(1), weightRealData[offset+i]));
-      // l1Norm
-      l1Norm += (weightRealData[offset+i] < 0
-                 ? -weightRealData[offset+i] : weightRealData[offset+i]);
-    }
-    const auto oneOverWeightArea = Dtype(1)/Dtype(weightArea);
-    for (auto i = 0 ; i < weightArea ; i++)
-      weightRealDiff[offset+i] *= oneOverWeightArea * (1 + l1Norm * max(-Dtype(1), min(Dtype(1), weightRealData[offset+i])));
-  }
-}
-
 template <typename Dtype>
 void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // Binary added
   if (this->layer_param_.convolution_param().binary())
   {
-    // // TRAIN
-    // if (this->phase_ == TRAIN)
-    // {
-    //     // const auto count = this->blobs_[0]->count();
-    //     // normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-    //     //   weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
-    //   normalizeWeights();
-    // }
     // TEST (only first time)
-    // else if (!weight_initialized_)
     if (!weight_initialized_)
     {
       weight_initialized_ = true;
@@ -97,7 +41,7 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
         // Data to weightReal
         const auto count = this->blobs_[0]->count();
         // // Option a - Weight = +-1
-        // normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count/weightArea), CAFFE_CUDA_NUM_THREADS>>>(
+        // normalizeWeightsGpuBinary<<<CAFFE_GET_BLOCKS(count/weightArea), CAFFE_CUDA_NUM_THREADS>>>(
         //   weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
         // Option b - Weight = +-n
         const auto weightArea = this->blobs_[0]->shape()[2] * this->blobs_[0]->shape()[3];
@@ -106,11 +50,12 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
           weight_binary_->mutable_gpu_data(), this->blobs_[0]->gpu_data(), countReduced, weightArea);
       }
     }
+    // TRAIN (always)
     if (this->phase_ == TRAIN)
     {
       const auto count = this->blobs_[0]->count();
       // // Option a - Weight = +-1
-      // normalizeWeightsGpu<<<CAFFE_GET_BLOCKS(count/weightArea), CAFFE_CUDA_NUM_THREADS>>>(
+      // normalizeWeightsGpuBinary<<<CAFFE_GET_BLOCKS(count/weightArea), CAFFE_CUDA_NUM_THREADS>>>(
       //   weight_binary_->mutable_gpu_data(), this->blobs_[0]->mutable_gpu_data(), count);
       // Option b - Weight = +-n
       const auto weightArea = this->blobs_[0]->shape()[2] * this->blobs_[0]->shape()[3];
