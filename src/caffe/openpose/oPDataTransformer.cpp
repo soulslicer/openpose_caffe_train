@@ -313,6 +313,12 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
 
     // Write metadata
     cv::Mat imageAugCloned = imageAugmented.clone();
+    int i=0;
+    for(cv::Point2f p : metaData.jointsSelf.points){
+        cv::circle(imageAugCloned, p, 3, cv::Scalar(25,255,255),CV_FILLED);
+        cv::putText(imageAugCloned, std::to_string(i), p, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1);
+        i++;
+    }
     for(const Joints& j : metaData.jointsOthers){
         int i=0;
         for(cv::Point2f p : j.points){
@@ -355,7 +361,7 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
                 cv::addWeighted(labelMap, 0.5, imageAugCloned, 0.5, 0.0, labelMap);
             }
             // Write on disk
-            char imagename [100];
+            char imagename [200];
             sprintf(imagename, "%s/%s_augment_%04d_label_part_%02d.jpg", vizDir.c_str(), mModelString.c_str(),
                     metaData.writeNumber, part);
             cv::imwrite(imagename, finalImage);
@@ -863,7 +869,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     }
 
     // Read mask miss (LMDB channel 2)
-    const cv::Mat maskMiss = ((mPoseCategory == PoseCategory::COCO || mPoseCategory == PoseCategory::MPII)
+    const cv::Mat maskMiss = ((mPoseCategory == PoseCategory::COCO || mPoseCategory == PoseCategory::MPII || mPoseCategory == PoseCategory::PT)
                               // COCO & MPII
                               ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
             // DOME & MPII_hands
@@ -922,6 +928,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     timer1.Start();
 
     VLOG(2) << "  ReadMeta+MetaJoints: " << timer1.MicroSeconds()*1e-3 << " ms";
+
+    std::cout << metaData.jointsSelf.points[20] << std::endl;
 
     // Data augmentation
     timer1.Start();
@@ -1061,71 +1069,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // Debugging - Visualize - Write on disk
-    // if (mPoseModel == PoseModel::DOME_59)
-    if (mPoseModel == PoseModel::MPII_21)
-    {
-        // if (metaData.writeNumber < 5)
-        if (metaData.writeNumber == 4)
-            // if (metaData.writeNumber < 100)
-        {
-            // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
-            // 2. Comment the following if statement
-            const auto rezX = (int)imageAugmented.cols;
-            const auto rezY = (int)imageAugmented.rows;
-            const auto gridX = rezX / stride;
-            const auto gridY = rezY / stride;
-            const auto channelOffset = gridY * gridX;
-            const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
-            for (auto part = 0; part < numberTotalChannels; part++)
-            {
-                // Reduce #images saved (ideally mask images should be the same)
-                // if (part < 1)
-                //                 if (part == numberTotalChannels-1)
-                // if (part < 3 || part >= numberTotalChannels - 3)
-                {
-                    cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
-                    for (auto subPart = 0; subPart < 2; subPart++)
-                    {
-                        cv::Mat labelMap = finalImage(cv::Rect{subPart*gridX, 0, gridX, gridY});
-                        for (auto gY = 0; gY < gridY; gY++)
-                        {
-                            const auto yOffset = gY*gridX;
-                            for (auto gX = 0; gX < gridX; gX++)
-                            {
-                                const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-                                labelMap.at<uchar>(gY,gX) = (int)(255*transformedLabel[channelIndex + yOffset + gX]);
-                            }
-                        }
-                    }
-                    cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-                    cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
-                    for (auto subPart = 0; subPart < 2; subPart++)
-                    {
-                        cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
-                        cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
-                    }
-                    // Write on disk
-                    char imagename [100];
-                    sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", mModelString.c_str(),
-                            metaData.writeNumber, part);
-                    cv::imwrite(imagename, finalImage);
-                }
-            }
-            if (depthEnabled)
-            {
-                cv::Mat depthMap;
-                cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-                char imagename [100];
-                sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", mModelString.c_str(),
-                        metaData.writeNumber);
-                cv::imwrite(imagename, depthMap);
-            }
-
-        }else{
-            //exit(-1);
-        }
-    }
+    //vizDebug()
+    //vizDebug()
+//    if (metaData.writeNumber == 0 && mPoseModel == PoseModel::PT_21){
+//        vizDebug(imageAugmented, metaData, transformedLabel, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
+//        exit(-1);
+//    }
 }
 
 template<typename Dtype>

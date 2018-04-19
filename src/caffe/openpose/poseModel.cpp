@@ -247,7 +247,7 @@ namespace caffe {
     // Parameters and functions to change if new PoseModel
     const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19, 19, 21, 21, 21};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17, 17, 16, 15};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17, 17, 16, 21};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -303,7 +303,7 @@ namespace caffe {
         },
 
         std::vector<std::vector<int>>{
-            {13}, {8,9}, {8},{7},{6}, {9},{10},{11}, {2,3}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {12},{14}         // PT_21
+            {0}, {2,5}, {2},{3},{4}, {5},{6},{7}, {9,12}, {9},{10},{11}, {12},{13},{14}, {15},{16},{17},{18}, {19},{20}         // PT_21
         },
     };
 
