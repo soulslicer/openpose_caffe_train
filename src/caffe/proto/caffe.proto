@@ -421,8 +421,8 @@ message LayerParameter {
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
   // OpenPose: new layer
-  optional OPTransformationParameter op_transform_param = 147;
-  optional BinaryActivationParameter binary_activation_param = 148;
+  optional OPTransformationParameter op_transform_param = 148;
+  optional BinaryActivationParameter binary_activation_param = 149;
   // OpenPose: end new layer
 }
 
@@ -697,7 +697,7 @@ message ConvolutionParameter {
 
   // Binary added
   // Whether to use binary conv layer
-  // 0 not binary, 1 binary weights, 2 full binary (weights and input activations)
+  // 0 not binary, 1 binary weights fake XNOR style, 2 binary weights real XNOR style, 3 full binary (weights and input activations)
   optional int32 binary = 19 [default = 0];
   // Binary added ended
 }

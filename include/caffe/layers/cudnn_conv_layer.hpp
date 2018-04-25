@@ -69,6 +69,8 @@ class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
   // Binary net added
   bool weight_initialized_;
   std::unique_ptr<Blob<Dtype>> weight_binary_;
+  std::unique_ptr<Blob<Dtype>> input_binary_;
+  std::unique_ptr<Blob<Dtype>> input_K_;
   void normalizeWeights();
   // Binary net end
 };

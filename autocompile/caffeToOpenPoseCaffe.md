@@ -1,6 +1,6 @@
 # Official Caffe to OpenPose Custom Caffe
 
-Current Caffe version: Last commit of Feb 6nd, 2018
+Current Caffe version: Last commit of Apr 18th, 2018
 https://github.com/BVLC/caffe
 
 
