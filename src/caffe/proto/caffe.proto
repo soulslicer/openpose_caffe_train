@@ -696,7 +696,8 @@ message ConvolutionParameter {
 
   // Binary added
   // Whether to use binary conv layer
-  optional bool binary = 19 [default = false];
+  // 0 not binary, 1 binary weights, 2 full binary (weights and input activations)
+  optional int32 binary = 19 [default = 0];
   // Binary added ended
 }
 
