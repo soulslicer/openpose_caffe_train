@@ -533,9 +533,9 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         int j=0;
         for(Joints& joints : metaData.jointsOthers){
             // Can i just load it in direct
-            joints.points.resize(15);
-            joints.isVisible.resize(15);
-            for(int m=0; m<15; m++){
+            joints.points.resize(21);
+            joints.isVisible.resize(21);
+            for(int m=0; m<21; m++){
                 joints.points[m].x = json["annorect"][j]["keypoints"][m*3 + 0].asFloat();
                 joints.points[m].y = json["annorect"][j]["keypoints"][m*3 + 1].asFloat();
                 joints.isVisible[m] = json["annorect"][j]["keypoints"][m*3 + 2].asFloat();
@@ -641,7 +641,7 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
             cv::cvtColor(bgLabel, bgLabel, cv::COLOR_GRAY2BGR);
             cv::resize(bgLabel, bgLabel, cv::Size(bgLabel.size().width*8,bgLabel.size().height*8));
             testImg = testImg + bgLabel;
-            cv::imwrite("/home/raaj/visualize/"+std::to_string(vid)+"-"+std::to_string(fid)+".png",testImg);
+            cv::imwrite("/home/ryaadhav/visualize/"+std::to_string(vid)+"-"+std::to_string(fid)+".png",testImg);
         }
     }
 
@@ -928,8 +928,6 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     timer1.Start();
 
     VLOG(2) << "  ReadMeta+MetaJoints: " << timer1.MicroSeconds()*1e-3 << " ms";
-
-    std::cout << metaData.jointsSelf.points[20] << std::endl;
 
     // Data augmentation
     timer1.Start();
