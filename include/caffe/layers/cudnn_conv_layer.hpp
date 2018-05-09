@@ -69,9 +69,24 @@ class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
   // Binary net added
   bool weight_initialized_;
   std::unique_ptr<Blob<Dtype>> weight_binary_;
-  std::unique_ptr<Blob<Dtype>> input_binary_;
-  std::unique_ptr<Blob<Dtype>> input_K_;
+  std::unique_ptr<Blob<Dtype>> bottom_binary_;
+  std::unique_ptr<Blob<Dtype>> matrix_A_;
+  std::unique_ptr<Blob<Dtype>> matrix_one_over_chw;
+  std::unique_ptr<Blob<Dtype>> matrix_K_;
+  cudnnHandle_t matrix_K_handle_;
+  cudaStream_t matrix_K_stream_;
+  cudnnTensorDescriptor_t matrix_A_desc_;
+  cudnnFilterDescriptor_t matrix_one_filter_desc_;
+  cudnnTensorDescriptor_t matrix_K_desc_;
+  cudnnConvolutionDescriptor_t matrix_AK_conv_descs_;
+  cudnnConvolutionFwdAlgo_t matrix_AK_fwd_algo_;
+  size_t matrix_AK_workspace_fwd_sizes_;
   void normalizeWeights();
+  void binarizeWeightsAndInputGpu(Blob<Dtype>* weight_binary_, Blob<Dtype>* bottom_binary_, Blob<Dtype>* matrix_A_,
+                                  Blob<Dtype>* matrix_K_, const Blob<Dtype>* const matrix_one_over_chw,
+                                  const boost::shared_ptr<caffe::Blob<Dtype>>& this_blobs_0,
+                                  const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
+                                  const int num, const int binaryOption);
   // Binary net end
 };
 #endif
