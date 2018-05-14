@@ -82,11 +82,10 @@ class CuDNNConvolutionLayer : public ConvolutionLayer<Dtype> {
   cudnnConvolutionFwdAlgo_t matrix_AK_fwd_algo_;
   size_t matrix_AK_workspace_fwd_sizes_;
   void normalizeWeights();
-  void binarizeWeightsAndInputGpu(Blob<Dtype>* weight_binary_, Blob<Dtype>* bottom_binary_, Blob<Dtype>* matrix_A_,
-                                  Blob<Dtype>* matrix_K_, const Blob<Dtype>* const matrix_one_over_chw,
-                                  const boost::shared_ptr<caffe::Blob<Dtype>>& this_blobs_0,
-                                  const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
-                                  const int num, const int binaryOption);
+  void approximateInputGpu(Blob<Dtype>* bottom_binary_, Blob<Dtype>* matrix_A_,
+                           Blob<Dtype>* matrix_K_, const Blob<Dtype>* const matrix_one_over_chw,
+                           const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
+                           const int num, const int binaryOption) const;
   // Binary net end
 };
 #endif
