@@ -929,8 +929,6 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     VLOG(2) << "  ReadMeta+MetaJoints: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    std::cout << metaData.jointsSelf.points[20] << std::endl;
-
     // Data augmentation
     timer1.Start();
     AugmentSelection augmentSelection;
