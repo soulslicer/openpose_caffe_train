@@ -8,7 +8,7 @@ namespace caffe {
 __global__ void sync_conv_groups() { }
 
 // Binary added
-#define SLOW_SECURITY_CHECKS
+// #define SLOW_SECURITY_CHECKS
 
 // Get L1 norm
 template <typename Dtype>
