@@ -593,8 +593,8 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
         generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug);
-        //vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
-        //exit(-1);
+        vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
+        exit(-1);
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];

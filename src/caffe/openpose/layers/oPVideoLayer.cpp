@@ -202,9 +202,9 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // Sample lmdb for video?
     Datum datum;
     Datum datumBackground;
-    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-    const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
     for (int item_id = 0; item_id < batch_size; ++item_id) {
+        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+        const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
 
         // Read from desired DB - DB1, DB2 or BG
         timer.Start();
@@ -250,9 +250,13 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Process image & label
         const auto begin = std::chrono::high_resolution_clock::now();
         if (backgroundDb){
-            oPDataTransformerPtr->TransformVideoJSON(item_id, frame_size, vs, &(this->transformed_data_),
-                                            &(this->transformed_label_),
-                                            datum, &datumBackground);
+            if(desiredDbIs1)
+                oPDataTransformerPtr->TransformVideoJSON(item_id, frame_size, vs, &(this->transformed_data_),
+                                                &(this->transformed_label_),
+                                                datum, &datumBackground);
+            else
+                std::cout << "2" << std::endl;
+
         }else{
             oPDataTransformerPtr->TransformVideoJSON(item_id, frame_size, vs, &(this->transformed_data_),
                                             &(this->transformed_label_),
@@ -270,8 +274,8 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
 
     // Testing Optional
-    //auto oPDataTransformerPtr = this->mOPDataTransformer;
-    //oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
+    auto oPDataTransformerPtr = this->mOPDataTransformer;
+    oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
     //std::cout << "Loaded Data" << std::endl;
 
