@@ -8,7 +8,7 @@ namespace caffe {
 __global__ void sync_conv_groups() { }
 
 // Binary added
-// #define SLOW_SECURITY_CHECKS
+#define SLOW_SECURITY_CHECKS
 
 // Get L1 norm
 template <typename Dtype>
@@ -42,6 +42,31 @@ __global__ void approximateWeightsGpu(Dtype* weightBinaryData, const Dtype* weig
     // Update output
     for (auto i = 0 ; i < weightArea ; i++)
       weightBinaryDataOffset[i] = (weightRealDataOffset[i] < 0 ? -alphaOptimal : alphaOptimal);
+  }
+}
+
+// Binary weights = +-n - XNOR-style
+template <typename Dtype>
+__global__ void backwardNormalizeWeightsGpu(Dtype* bottomDiff, const Dtype* topDiff, const Dtype* bottomData, const int count,
+                                            const int weightArea)
+{
+  const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (globalIdx < count)
+  {
+    // Offset
+    const auto offset = globalIdx * weightArea;
+    const auto* topDiffOffset = &topDiff[offset];
+    const auto* bottomDataOffset = &bottomData[offset];
+    auto* bottomDiffOffset = &bottomDiff[offset];
+    // XNOR-style
+    // L1 norm & optimal alpha
+    const auto alphaOptimal = getL1Norm(bottomDataOffset, weightArea) / weightArea;
+    // Update output
+    const auto oneOverWeightArea = Dtype(1)/Dtype(weightArea);
+    for (auto i = 0 ; i < weightArea ; i++)
+      bottomDiffOffset[i] = topDiffOffset[i]
+                          * (oneOverWeightArea
+                             + alphaOptimal * max(-Dtype(1), min(Dtype(1), bottomDataOffset[i])));
   }
 }
 
@@ -82,7 +107,7 @@ void CuDNNConvolutionLayer<Dtype>::approximateInputGpu(Blob<Dtype>* bottom_binar
   const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top, const int num, const int binaryOption) const
 {
   // Full binary (weights + input)
-  if (binaryOption == 3)
+  if (binaryOption > 1)
   {
     // Get binary input (bottom_binary_)
     const auto count = bottom_binary_->count();
@@ -128,34 +153,6 @@ __global__ void multiplyOverChannelsGpu(Dtype* outputData, const Dtype* multipli
       outputData[globalIdx+i*topWHArea] *= multiplierData[globalIdx];
 }
 
-// Binary weights = +-n - XNOR-style
-template <typename Dtype>
-__global__ void backwardNormalizeWeightsGpu(Dtype* bottomDiff, /*const Dtype* topDiff,*/ const Dtype* bottomData, const int count,
-                                            const int weightArea)
-{
-  const int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (globalIdx < count)
-  {
-    // Offset
-    const auto offset = globalIdx * weightArea;
-    // const auto* topDiffOffset = &topDiff[offset];
-    const auto* bottomDataOffset = &bottomData[offset];
-    auto* bottomDiffOffset = &bottomDiff[offset];
-    // XNOR-style
-    // L1 norm
-    // const auto l1Norm = getL1Norm(topDiffOffset, weightArea);
-    // const auto l1Norm = getL1Norm(bottomDiffOffset, weightArea);
-    const auto l1Norm = getL1Norm(bottomData, weightArea);
-// bottomDiff or bottomData????????????????????????????????????????????
-    // Update output
-    const auto oneOverWeightArea = Dtype(1)/Dtype(weightArea);
-    for (auto i = 0 ; i < weightArea ; i++)
-      // bottomDiffOffset[i] = topDiffOffset[i] * oneOverWeightArea
-      bottomDiffOffset[i] *= oneOverWeightArea
-                          * (1 + l1Norm * max(-Dtype(1), min(Dtype(1), bottomDataOffset[i])));
-  }
-}
-
 // XNOR-style
 template <typename Dtype>
 __global__ void backwardNormalizeInputGpu(Dtype* bottomDiff, /*const Dtype* topDiff,*/ const Dtype* bottomData, const int count,
@@ -188,7 +185,7 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
       CHECK_GT(this->blobs_[0]->shape().size(), 2u);
       weight_binary_.reset(new Blob<Dtype>());
       weight_binary_->Reshape(this->blobs_[0]->shape());
-      if (this->layer_param_.convolution_param().binary() > 2)
+      if (this->layer_param_.convolution_param().binary() > 1)
       {
         // Blob initialization
         bottom_binary_.reset(new Blob<Dtype>());
@@ -215,37 +212,32 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
       // const auto count = this_blobs_0->count();
       // dTypeToBinaryGpu<<<CAFFE_GET_BLOCKS(count/binarizationArea), CAFFE_CUDA_NUM_THREADS>>>(
       //   weight_binary_->mutable_gpu_data(), this_blobs_0->mutable_gpu_data(), count);
-      // Option b - Weight = +-n per w,h
-      if (this->layer_param_.convolution_param().binary() == 1)
-      {
-        const auto count = this_blobs_0->count();
-        const auto binarizationArea = this_blobs_0->count(2);
-        const auto countReduced = count/binarizationArea;
-        approximateWeightsGpu<<<CAFFE_GET_BLOCKS(countReduced), CAFFE_CUDA_NUM_THREADS>>>(
-          weight_binary_->mutable_gpu_data(), this_blobs_0->gpu_data(), countReduced, binarizationArea);
-      }
+      // // Option b - Weight = +-n per w,h
+      // const auto count = this_blobs_0->count();
+      // const auto binarizationArea = this_blobs_0->count(2);
+      // const auto countReduced = count/binarizationArea;
+      // approximateWeightsGpu<<<CAFFE_GET_BLOCKS(countReduced), CAFFE_CUDA_NUM_THREADS>>>(
+      //   weight_binary_->mutable_gpu_data(), this_blobs_0->gpu_data(), countReduced, binarizationArea);
       // Option c - Weight = +-n per c,w,h
-      else if (this->layer_param_.convolution_param().binary() > 1)
-      {
-        const auto binarizationArea = this_blobs_0->count(1);
-        const auto countReduced = this_blobs_0->shape(0);
-        approximateWeightsGpu<<<CAFFE_GET_BLOCKS(countReduced), CAFFE_CUDA_NUM_THREADS>>>(
-          weight_binary_->mutable_gpu_data(), this_blobs_0->gpu_data(), countReduced, binarizationArea);
-        // SECURITY CHECK
-        #ifdef SLOW_SECURITY_CHECKS
-          const auto cpuDataB = weight_binary_->cpu_data();
-          const auto cpuDataW = this_blobs_0->cpu_data();
-          for (auto i = 0 ; i < this_blobs_0->shape(0); i++)
-          {
-            auto counter = Dtype(0);
-            for (auto j = 0 ; j < binarizationArea; j++)
-              counter += std::abs(cpuDataW[j+i*binarizationArea]);
-            counter /= binarizationArea;
-            CHECK_EQ(counter, std::abs(cpuDataB[i*binarizationArea]));
-            // std::cout << counter << " vs. " << cpuDataB[i*binarizationArea]
-            //   << " vs. " << cpuDataB[i*binarizationArea+1] << " vs. " << cpuDataB[i*binarizationArea-1] << std::endl;
-          }
-        #endif
+      const auto binarizationArea = this_blobs_0->count(1);
+      const auto countReduced = this_blobs_0->shape(0);
+      approximateWeightsGpu<<<CAFFE_GET_BLOCKS(countReduced), CAFFE_CUDA_NUM_THREADS>>>(
+        weight_binary_->mutable_gpu_data(), this_blobs_0->gpu_data(), countReduced, binarizationArea);
+      // SECURITY CHECK
+      #ifdef SLOW_SECURITY_CHECKS
+        const auto cpuDataB = weight_binary_->cpu_data();
+        const auto cpuDataW = this_blobs_0->cpu_data();
+        for (auto i = 0 ; i < this_blobs_0->shape(0); i++)
+        {
+          auto counter = Dtype(0);
+          for (auto j = 0 ; j < binarizationArea; j++)
+            counter += std::abs(cpuDataW[j+i*binarizationArea]);
+          counter /= binarizationArea;
+          CHECK_EQ(counter, std::abs(cpuDataB[i*binarizationArea]));
+          // std::cout << counter << " vs. " << cpuDataB[i*binarizationArea]
+          //   << " vs. " << cpuDataB[i*binarizationArea+1] << " vs. " << cpuDataB[i*binarizationArea-1] << std::endl;
+        }
+      #endif
 
 // for (auto asdf = 0 ; asdf < 20; asdf++)
 //   std::cout << this_blobs_0->cpu_data()[asdf] << " ";
@@ -253,7 +245,6 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
 // for (auto asdf = 0 ; asdf < 20; asdf++)
 //   std::cout << weight_binary_->cpu_data()[asdf] << " ";
 // std::cout << "\n\n" << std::endl;
-      }
     }
     // Every frame
     approximateInputGpu(bottom_binary_.get(), matrix_A_.get(), matrix_K_.get(),
@@ -261,18 +252,18 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
                         this->layer_param_.convolution_param().binary());
     // SECURITY CHECK
     #ifdef SLOW_SECURITY_CHECKS
-      if (this->layer_param_.convolution_param().binary() == 3)
+      if (this->layer_param_.convolution_param().binary() > 1)
       {
         const auto bottomData = bottom[0]->cpu_data();
         const auto matrixAData = matrix_A_->cpu_data();
-        // bottom_binary
+        // bottom_binary_ from bottom[0]
         for (auto i = 0 ; i < bottom[0]->count(); i++)
           CHECK(bottomData[i] < 0
             ? bottom_binary_->cpu_data()[i] == -1
             : bottom_binary_->cpu_data()[i] == 1);
         // matrix_A_
-        const auto whArea = bottom[0]->count(2);
         const auto cwhArea = bottom[0]->count(1);
+        const auto whArea = bottom[0]->count(2);
         for (auto num = 0 ; num < bottom[0]->shape(0); num++)
         {
           for (auto xy = 0 ; xy < whArea; xy++)
@@ -282,39 +273,47 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
               counter += std::abs(bottomData[xy+c*whArea+num*cwhArea]);
             CHECK_EQ(counter, std::abs(matrixAData[xy+num*whArea]))
               << "Some values: " << bottomData[xy+num*cwhArea]
-              << " " << bottomData[xy+1*whArea+num*cwhArea] << " " << bottomData[xy+2*whArea+num*cwhArea] << " " << bottomData[xy+3*whArea+num*cwhArea];
+                          << " " << bottomData[xy+num*cwhArea+1*whArea]
+                          << " " << bottomData[xy+num*cwhArea+2*whArea]
+                          << " " << bottomData[xy+num*cwhArea+3*whArea];
           }
         }
-        // // matrix_K_
-        // // No considered the borders to simplify operation
-        // CHECK_EQ(this->blobs_[0]->count(2), 9) << "Slow security check only implemented for 3x3 convolutions.";
-        // CHECK_EQ(matrix_K_->count(3), top[0]->count(3)) << "Slow security check only implemented for pad = 1 sceneario.";
-        // CHECK_EQ(matrix_K_->shape(1), 1);
-        // const auto yOffset = matrix_K_->count(3);
-        // for (auto num = 0 ; num < top[0]->shape(0); num++)
-        // {
-        //   for (auto y = 1 ; y < top[0]->shape(2) - 1; y++)
-        //   {
-        //     for (auto x = 1 ; x < top[0]->shape(3) - 1; x++)
-        //     {
-        //       const auto baseIndex = num * matrix_A_->count(1) + y * yOffset + x;
-        //       const auto counter = (matrixAData[-yOffset+baseIndex-1] + matrixAData[-yOffset+baseIndex] + matrixAData[-yOffset+baseIndex+1]
-        //                             + matrixAData[baseIndex-1] + matrixAData[baseIndex] + matrixAData[baseIndex+1]
-        //                             + matrixAData[yOffset+baseIndex-1] + matrixAData[yOffset+baseIndex] + matrixAData[yOffset+baseIndex+1]) / top[0]->count(1)
-        //       / 2; // HACK TO MAKE IT WORK. WHY?????????!!!!!!!!!!!!
-        //       const auto matrixKValue = matrix_K_->cpu_data()[num * matrix_K_->count(1) + y * matrix_K_->count(3) + x];
-        //       if (y == 1 && x == 1)
-        //       {
-        //         if (num == 0)
-        //           std::cout << "\n";
-        //         std::cout << "n = " << num << "/" << top[0]->shape(0) << ": "
-        //           << (std::abs(counter - matrixKValue)/matrixKValue, 1e-3) << ": " << counter << " vs. " << matrixKValue << std::endl;
-        //       }
-        //       // CHECK_EQ(counter/(2*top[0]->count(1)), matrix_K_->cpu_data()[num * top[0]->count(1) + y * top[0]->count(3) + x]);
-        //       // CHECK_LE(std::abs(counter - matrixKValue)/matrixKValue, 1e-3) << counter << " vs. " << matrixKValue;
-        //     }
-        //   }
-        // }
+        // matrix_K_
+        // No considered the borders to simplify operation
+        CHECK_EQ(this->blobs_[0]->count(2), 9) << "Slow security check only implemented for 3x3 convolutions.";
+        CHECK_EQ(matrix_K_->count(3), top[0]->count(3)) << "Slow security check only implemented for pad = 1 sceneario.";
+        CHECK_EQ(matrix_K_->shape(1), 1);
+        const auto yOffset = matrix_K_->count(3);
+        const auto binarizationArea = bottom[0]->count(1);
+        for (auto num = 0 ; num < top[0]->shape(0); num++)
+        {
+          // CHECK_EQ(matrix_K_->shape(1), 1);
+          for (auto y = 1 ; y < top[0]->shape(2) - 1; y++)
+          {
+            for (auto x = 1 ; x < top[0]->shape(3) - 1; x++)
+            {
+              const auto baseIndex = num * matrix_A_->count(1) + y * yOffset + x;
+              const auto counter = (matrixAData[-yOffset+baseIndex-1] + matrixAData[-yOffset+baseIndex] + matrixAData[-yOffset+baseIndex+1]
+                                    + matrixAData[baseIndex-1] + matrixAData[baseIndex] + matrixAData[baseIndex+1]
+                                    + matrixAData[yOffset+baseIndex-1] + matrixAData[yOffset+baseIndex] + matrixAData[yOffset+baseIndex+1])
+                                 / binarizationArea;
+              const auto matrixKValue = matrix_K_->cpu_data()[num * matrix_K_->count(1) + y * matrix_K_->count(3) + x];
+              // CHECK_EQ(counter, matrixKValue); // Numerical precision issues
+              CHECK_LE(std::abs(counter - matrixKValue), 1e-6) // 1e-9 fails
+                << counter << " vs. " << matrixKValue;
+              // if (y == 15 && x == 19) // Random position
+              // {
+              //   if (num == 0)
+              //     std::cout << "\n" << "n = " << num << "/" << top[0]->shape(0) << ": "
+              //       << counter << " vs. " << matrixKValue << ", R = " << counter/matrixKValue;
+              //   else
+              //     std::cout << ", R = " << counter/matrixKValue;
+              //   if (num == top[0]->shape(0)-1)
+              //     std::cout << std::endl;
+              // }
+            }
+          }
+        }
       }
     #endif
   }
@@ -332,7 +331,7 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
   for (int i = 0; i < bottom.size(); ++i) {
     // const Dtype* bottom_data = bottom[i]->gpu_data(); // Binary commented
     // Binary added
-    const Dtype* bottom_data = (this->layer_param_.convolution_param().binary() > 2
+    const Dtype* bottom_data = (this->layer_param_.convolution_param().binary() > 1
       ? bottom_binary_->gpu_data() : bottom[i]->gpu_data());
     // Binary added ended
     Dtype* top_data = top[i]->mutable_gpu_data();
@@ -349,13 +348,13 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
             cudnn::dataType<Dtype>::zero,
             top_descs_[i], top_data + top_offset_ * g));
 
-//       // Binary added
-//       if (this->layer_param_.convolution_param().binary() > 2)
-//       {
-//         const auto topChannels = top[i]->shape(1);
-//         const auto topWHArea = top[i]->count(2);
-//         multiplyOverChannelsGpu<<<CAFFE_GET_BLOCKS(topWHArea), CAFFE_CUDA_NUM_THREADS>>>(
-//           top_data + top_offset_ * g, matrix_K_->gpu_data(), topChannels, topWHArea);
+      // Binary added
+      if (this->layer_param_.convolution_param().binary() > 1)
+      {
+        const auto topChannels = top[i]->shape(1);
+        const auto topWHArea = top[i]->count(2);
+        multiplyOverChannelsGpu<<<CAFFE_GET_BLOCKS(topWHArea), CAFFE_CUDA_NUM_THREADS>>>(
+          top_data + top_offset_ * g, matrix_K_->gpu_data(), topChannels, topWHArea);
 // // for (auto asdf = 0 ; asdf < top[i]->count(); asdf++)
 // // {
 // // if (asdf % top[i]->count(1) == 0)
@@ -370,8 +369,8 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
 // // for (auto asdf = 0 ; asdf < 20; asdf++)
 // //   std::cout << bottom[i]->cpu_data()[asdf] << " ";
 // // std::cout << "\n\n" << std::endl;
-//       }
-//       // Binary added end
+      }
+      // Binary added end
 
       // Bias.
       if (this->bias_term_) {
@@ -398,14 +397,13 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   Dtype* weight_diff = NULL;
   if (this->param_propagate_down_[0]) {
     // weight = this->blobs_[0]->gpu_data(); // Binary commented
+    // weight_diff = this->blobs_[0]->mutable_gpu_diff(); // Binary commented
     // Binary added
-    // My binary way
-    // weight = this->blobs_[0]->gpu_data();
-    // Plain truncating
     weight = (this->layer_param_.convolution_param().binary() > 0
               ? weight_binary_->gpu_data() : this->blobs_[0]->gpu_data());
+    weight_diff = (this->layer_param_.convolution_param().binary() > 0
+                   ? weight_binary_->mutable_gpu_diff() : this->blobs_[0]->mutable_gpu_diff());
     // Binary added ended
-    weight_diff = this->blobs_[0]->mutable_gpu_diff();
   }
   Dtype* bias_diff = NULL;
   if (this->bias_term_ && this->param_propagate_down_[1]) {
@@ -470,40 +468,53 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   // Binary added
   if (this->layer_param_.convolution_param().binary() > 0)
   {
-    const auto binarizationArea = this->blobs_[0]->shape(2) * this->blobs_[0]->shape(3);
     // Binarized weights (XNOR-style)
     if (this->param_propagate_down_[0])
     {
-      const auto count = this->blobs_[0]->count();
+      // Common parameters
+      const auto countReduced = this->blobs_[0]->shape(0);
+      const auto binarizationArea = this->blobs_[0]->count(1);
+
       // // Option a - Weight = +-1
       // // Do nothing
       // Option b - Weight = +-n
-      const auto countReduced = count/binarizationArea;
       backwardNormalizeWeightsGpu<<<CAFFE_GET_BLOCKS(countReduced), CAFFE_CUDA_NUM_THREADS>>>(
-        this->blobs_[0]->mutable_gpu_diff(), /*this->blobs_[0]->gpu_diff(),*/ this->blobs_[0]->gpu_data(),
+        this->blobs_[0]->mutable_gpu_diff(), weight_binary_->gpu_diff(), this->blobs_[0]->gpu_data(),
         countReduced, binarizationArea);
 
-      // // SECURITY CHECK
-      // #ifdef SLOW_SECURITY_CHECKS
-      //   const auto cpuDataW = this->blobs_[0]->cpu_data();
-      //   const auto cpuDiffW = this->blobs_[0]->cpu_diff();
-      //   const auto oneOverWeightArea = Dtype(1)/Dtype(binarizationArea);
-      //   for (auto i = 0 ; i < this->blobs_[0]->count(); i++)
-      //   {
-      //     auto l1Norm = Dtype(0);
-      //     for (auto j = 0 ; j < binarizationArea; j++)
-      //       l1Norm += std::abs(cpuDataW[j+i*binarizationArea]);
-      //     l1Norm /= binarizationArea;
-      //     const auto diff = cpuDiffW[i] * oneOverWeightArea
-      //                     * (1 + l1Norm * max(-Dtype(1), min(Dtype(1), cpuDataW[i])));
-      //     CHECK_EQ(diff, std::abs(cpuDataW[i]));
-      //     // std::cout << counter << " vs. " << cpuDataB[i*binarizationArea]
-      //     //   << " vs. " << cpuDataB[i*binarizationArea+1] << " vs. " << cpuDataB[i*binarizationArea-1] << std::endl;
-      //   }
-      // #endif
+      // SECURITY CHECK
+      #ifdef SLOW_SECURITY_CHECKS
+        const auto count = this->blobs_[0]->count();
+        const auto cpuDataW = this->blobs_[0]->cpu_data();
+        const auto cpuDiffB = weight_binary_->cpu_diff();
+        const auto cpuDiffW = this->blobs_[0]->cpu_diff();
+        const auto oneOverWeightArea = Dtype(1)/Dtype(binarizationArea);
+        for (auto i = 0 ; i < countReduced; i++)
+        {
+          // Offset
+          const auto offset = i * binarizationArea;
+          const auto* topDiffOffset = &cpuDiffB[offset];
+          const auto* bottomDataOffset = &cpuDataW[offset];
+          const auto* bottomDiffOffset = &cpuDiffW[offset];
+          // L1 norm & optimal alpha
+          auto alphaOptimal = Dtype(0);
+          for (auto j = 0 ; j < binarizationArea; j++)
+            alphaOptimal += std::abs(bottomDataOffset[j]);
+          alphaOptimal /= binarizationArea;
+          for (auto j = 0 ; j < binarizationArea; j++)
+          {
+            const auto diffTemp = topDiffOffset[j]
+                                * (oneOverWeightArea
+                                   + alphaOptimal * max(-Dtype(1), min(Dtype(1), bottomDataOffset[j])));
+            // CHECK_EQ(bottomDiffOffset[j], diffTemp); // Numerical precision issues
+            CHECK_LE(std::abs(bottomDiffOffset[j] - diffTemp), 1e-6) // 1e-9 fails
+              << bottomDiffOffset[j] << " vs. " << diffTemp;
+          }
+        }
+      #endif
     }
     // // Binarized activations (XNOR-style)
-    // if (this->layer_param_.convolution_param().binary() == 3)
+    // if (this->layer_param_.convolution_param().binary() > 1)
     // {
     //   for (int i = 0; i < top.size(); ++i)
     //   {

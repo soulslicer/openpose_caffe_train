@@ -55,7 +55,7 @@ void CuDNNConvolutionLayer<Dtype>::LayerSetUp(
     workspace[g] = NULL;
   }
   // Binary added
-  if (this->layer_param_.convolution_param().binary() > 2)
+  if (this->layer_param_.convolution_param().binary() > 1)
   {
     CUDA_CHECK(cudaStreamCreate(&matrix_K_stream_));
     CUDNN_CHECK(cudnnCreate(&matrix_K_handle_));
@@ -74,7 +74,7 @@ void CuDNNConvolutionLayer<Dtype>::LayerSetUp(
       this->num_output_ / this->group_, this->channels_ / this->group_,
       kernel_h, kernel_w);
   // Binary added
-  if (this->layer_param_.convolution_param().binary() > 2)
+  if (this->layer_param_.convolution_param().binary() > 1)
   {
     cudnn::createFilterDesc<Dtype>(&matrix_one_filter_desc_,
         1, 1, kernel_h, kernel_w);
@@ -94,7 +94,7 @@ void CuDNNConvolutionLayer<Dtype>::LayerSetUp(
     conv_descs_.push_back(conv_desc);
   }
   // Binary added
-  if (this->layer_param_.convolution_param().binary() > 2)
+  if (this->layer_param_.convolution_param().binary() > 1)
   {
     cudnn::createTensor4dDesc<Dtype>(&matrix_A_desc_);
     cudnn::createConvolutionDesc<Dtype>(&matrix_AK_conv_descs_);
@@ -191,7 +191,7 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
           bwd_data_algo_[i], &workspace_bwd_data_sizes_[i]) );
   }
   // Binary added
-  if (this->layer_param_.convolution_param().binary() > 2)
+  if (this->layer_param_.convolution_param().binary() > 1)
   {
     cudnn::setTensor4dDesc<Dtype>(&matrix_A_desc_,
         this->num_,
@@ -332,7 +332,7 @@ CuDNNConvolutionLayer<Dtype>::~CuDNNConvolutionLayer() {
     cudnnDestroy(handle_[g]);
   }
   // Binary added
-  if (this->layer_param_.convolution_param().binary() > 2)
+  if (this->layer_param_.convolution_param().binary() > 1)
   {
     cudaStreamDestroy(matrix_K_stream_);
     cudnnDestroy(matrix_K_handle_);
@@ -344,7 +344,7 @@ CuDNNConvolutionLayer<Dtype>::~CuDNNConvolutionLayer() {
   delete [] stream_;
   delete [] handle_;
   // Binary added
-  // if (this->layer_param_.convolution_param().binary() > 2)
+  // if (this->layer_param_.convolution_param().binary() > 1)
   // {
   //   delete [] matrix_K_stream_; // It is not a ptr
   //   delete [] matrix_K_handle_; // It is not a ptr
