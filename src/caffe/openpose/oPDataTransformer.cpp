@@ -533,9 +533,9 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         int j=0;
         for(Joints& joints : metaData.jointsOthers){
             // Can i just load it in direct
-            joints.points.resize(15);
-            joints.isVisible.resize(15);
-            for(int m=0; m<15; m++){
+            joints.points.resize(21);
+            joints.isVisible.resize(21);
+            for(int m=0; m<21; m++){
                 joints.points[m].x = json["annorect"][j]["keypoints"][m*3 + 0].asFloat();
                 joints.points[m].y = json["annorect"][j]["keypoints"][m*3 + 1].asFloat();
                 joints.isVisible[m] = json["annorect"][j]["keypoints"][m*3 + 2].asFloat();
