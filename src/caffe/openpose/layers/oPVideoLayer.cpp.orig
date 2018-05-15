@@ -255,12 +255,9 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                                                 &(this->transformed_label_),
                                                 datum, &datumBackground);
             else
-                oPDataTransformerPtr->TransformVideoSF(item_id, frame_size, vs, &(this->transformed_data_),
-                                                &(this->transformed_label_),
-                                                datum, &datumBackground);
+                std::cout << "2" << std::endl;
 
         }else{
-            exit(-1);
             oPDataTransformerPtr->TransformVideoJSON(item_id, frame_size, vs, &(this->transformed_data_),
                                             &(this->transformed_label_),
                                             datum);
@@ -277,10 +274,17 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
 
     // Testing Optional
-    //auto oPDataTransformerPtr = this->mOPDataTransformer;
-    //oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
+<<<<<<< HEAD
+    auto oPDataTransformerPtr = this->mOPDataTransformer;
+    oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
     //std::cout << "Loaded Data" << std::endl;
+=======
+//    auto oPDataTransformerPtr = this->mOPDataTransformer;
+//    oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
+//    boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
+//    std::cout << "Loaded Data" << std::endl;
+>>>>>>> 35661c187da4bfc4afa7c52b575c9af1d859a7c1
 
     // Timer (every 20 iterations x batch size)
     mCounter++;

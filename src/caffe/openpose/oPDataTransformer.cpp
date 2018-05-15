@@ -38,6 +38,8 @@ struct AugmentSelection
     std::pair<cv::Mat, cv::Size> RotAndFinalSize;
     cv::Point2i cropCenter;
     float scale = 1.f;
+    float rotation = 0.;
+    cv::Size pointOffset;
 };
 
 void doOcclusions(cv::Mat& imageAugmented, cv::Mat& backgroundImageAugmented, const MetaData& metaData,
@@ -409,6 +411,149 @@ void caffeToMat(cv::Mat& img, const Dtype* caffeImg, cv::Size imageSize){
     }
 }
 
+void maskBetween(const cv::Point2i& a, const cv::Point2i& b, cv::Mat& maskMiss, cv::Mat& img, float sscale){
+    if((a.x >= 0 && a.x < img.size().width && a.y >= 0 && a.y < img.size().height)
+            && (b.x >= 0 && b.x < img.size().width && b.y >= 0 && b.y < img.size().height)){
+        float x1 = a.x; float x2 = b.x;
+        float y1 = a.y; float y2 = b.y;
+        float xc = (x1 + x2)/2  ;  float yc = (y1 + y2)/2  ;    // Center point
+        float xd = (x1 - x2)/2  ;  float yd = (y1 - y2)/2  ;    // Half-diagonal
+        float x3 = xc - yd  ;  float y3 = yc + xd;              // Third corner
+        float x4 = xc + yd  ;  float y4 = yc - xd;              // Fourth corner
+        float dist = sqrt(pow(x2-x1,2)+pow(y2-y1,2));
+        cv::Point2i rp(x3,y3);
+        cv::Point2i lp(x4,y4);
+        cv::Point2i v(rp.x-lp.x, rp.y-lp.y);
+        float iscale = (float)img.size().width/(float)maskMiss.size().width;
+        cv::Point2i rpn(rp.x - v.x*sscale, rp.y - v.y*sscale);
+        cv::Point2i lpn(lp.x + v.x*sscale, lp.y + v.y*sscale);
+        cv::line(maskMiss, cv::Point2i(lpn.x/iscale, lpn.y/iscale), cv::Point2i(rpn.x/iscale, rpn.y/iscale), cv::Scalar(0), dist/2/iscale);
+        cv::line(img, cv::Point2i(lpn.x/1, lpn.y/1), cv::Point2i(rpn.x/1, rpn.y/1), cv::Scalar(255,255,255), dist/2/1);
+    }
+}
+
+void maskFaceMPII(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
+    // Mask Face
+    if(isVisible[20] == 2 || isVisible[19] == 2) return;
+    cv::Point topPoint = points[20];
+    cv::Point neckPoint = points[19];
+    maskBetween(topPoint, neckPoint, maskMiss, img, 0.7);
+    // maybe handle if top missing ?
+
+}
+
+void maskRealNeckCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
+    if(isVisible[0] == 2 || isVisible[1] == 2) return;
+    cv::Point nosePoint = points[0];
+    cv::Point fakeNeckPoint = points[1];
+    maskBetween(nosePoint, fakeNeckPoint, maskMiss, img, 0.5);
+}
+
+float l2(cv::Point& p, cv::Point& q) {
+    cv::Point diff = p - q;
+    return sqrt(diff.x*diff.x + diff.y*diff.y);
+}
+
+void maskFaceCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img)
+{
+    int neckIndex = 1;
+    int noseIndex = 0;
+    int lEarIndex = 18;
+    int rEarIndex = 19;
+    int lEyeIndex = 16;
+    int rEyeIndex = 17;
+    float threshold = 0.25f;
+    bool neckVisible = (isVisible[neckIndex] < 2);
+    bool noseVisible = (isVisible[noseIndex] < 2);
+    bool lEarVisible = (isVisible[lEarIndex] < 2);
+    bool rEarVisible = (isVisible[rEarIndex] < 2);
+    bool lEyeVisible = (isVisible[lEyeIndex] < 2);
+    bool rEyeVisible = (isVisible[rEyeIndex] < 2);
+    cv::Point neckPoint = points[neckIndex];
+    cv::Point nosePoint = points[noseIndex];
+    cv::Point lEarPoint = points[lEarIndex];
+    cv::Point rEarPoint = points[rEarIndex];
+    cv::Point lEyePoint = points[lEyeIndex];
+    cv::Point rEyePoint = points[rEyeIndex];
+
+    cv::Point pointTopLeft(0,0);
+    float faceSize = 0.;
+    int counter = 0;
+
+    // Neck and Nose Visible
+    if(noseVisible && neckVisible){
+        // Only Left Eye and Ear Visible
+        if(lEyeVisible && lEarVisible && !rEyeVisible && !rEarVisible){
+            pointTopLeft.x += (lEyePoint.x + lEarPoint.x + nosePoint.x) / 3.f;
+            pointTopLeft.y += (lEyePoint.y + lEarPoint.y + nosePoint.y) / 3.f;
+            faceSize += 0.85f * l2(nosePoint, lEyePoint) + l2(nosePoint, lEarPoint) + l2(nosePoint, neckPoint);
+        }
+        // Only Right Eye and Ear Visible
+        else if(rEyeVisible && rEarVisible && !lEyeVisible && !lEarVisible){
+            pointTopLeft.x += (rEyePoint.x + rEarPoint.x + nosePoint.x) / 3.f;
+            pointTopLeft.y += (rEyePoint.y + rEarPoint.y + nosePoint.y) / 3.f;
+            faceSize += 0.85f * l2(nosePoint, rEyePoint) + l2(nosePoint, rEarPoint) + l2(nosePoint, neckPoint);
+        }
+        // Neck and Nose only
+        else{
+            pointTopLeft.x += (neckPoint.x + nosePoint.x) / 2.f;
+            pointTopLeft.y += (neckPoint.y + nosePoint.y) / 2.f;
+            faceSize += 2.f * l2(neckPoint, nosePoint);
+        }
+        counter++;
+    }
+    // LEye and REye
+    if(lEyeVisible && rEyeVisible){
+        pointTopLeft.x += (lEyePoint.x + rEyePoint.x) / 2.f;
+        pointTopLeft.y += (lEyePoint.y + rEyePoint.y) / 2.f;
+        faceSize += 3.f * l2(lEyePoint, rEyePoint);
+        counter++;
+    }
+    // LEar and REar
+    if(lEarVisible && rEarVisible){
+        pointTopLeft.x += (lEarPoint.x + rEarPoint.x) / 2.f;
+        pointTopLeft.y += (lEarPoint.y + rEarPoint.y) / 2.f;
+        faceSize += 2.f * l2(lEarPoint, rEarPoint);
+        counter++;
+    }
+    if (counter > 0)
+    {
+        pointTopLeft.x =  pointTopLeft.x / (float)counter;
+        pointTopLeft.y =  pointTopLeft.y / (float)counter;
+        faceSize /= counter;
+    }else{
+        return;
+    }
+
+    cv::Rect bigRect(pointTopLeft.x - faceSize / 2, pointTopLeft.y - faceSize / 2, faceSize, faceSize);
+    float iscale = (float)img.size().width/(float)maskMiss.size().width;
+    cv::Rect smallRect(bigRect.x/iscale,bigRect.y/iscale,bigRect.width/iscale,bigRect.height/iscale);
+
+    float xScale = 0.5;
+    float yScale = 1.0;
+    cv::Point a = cv::Point(bigRect.x,bigRect.y);
+    cv::Point b = cv::Point(bigRect.x+bigRect.width,bigRect.y+bigRect.height);
+    cv::Point centroid = cv::Point((a.x+b.x)/2,(a.y+b.y)/2);
+    cv::Point an = cv::Point(((a.x-centroid.x)*xScale)+centroid.x,((a.y-centroid.y)*yScale)+centroid.y);
+    cv::Rect dropRect(an.x, an.y, bigRect.width*xScale, (bigRect.height*yScale)/4);
+
+    // Eye ear check
+    if(!rEarVisible) rEarPoint.y = std::numeric_limits<int>::max();
+    if(!lEarVisible) lEarPoint.y = std::numeric_limits<int>::max();
+    if(!rEyeVisible) rEyePoint.y = std::numeric_limits<int>::max();
+    if(!lEyeVisible) lEyePoint.y = std::numeric_limits<int>::max();
+    if(lEarVisible || rEarVisible || lEyeVisible || rEyeVisible){
+        int minPixY = std::min(lEarPoint.y, std::min(rEarPoint.y, std::min(lEyePoint.y, rEyePoint.y)));
+        minPixY-=5;
+        if(dropRect.y < minPixY)
+            dropRect.height = minPixY - dropRect.y;
+    }
+
+    cv::Rect dropRectScaled(dropRect.x/iscale,dropRect.y/iscale,dropRect.width/iscale,dropRect.height/iscale);
+    cv::rectangle(img, dropRect, cv::Scalar(255,0,0));
+    cv::rectangle(maskMiss, dropRectScaled, cv::Scalar(0), CV_FILLED);
+}
+
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
@@ -593,8 +738,8 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
         generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug);
-        vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
-        exit(-1);
+        //vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
+        //exit(-1);
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
@@ -648,6 +793,191 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
     exit(-1);
 }
 
+
+// OpenPose: added
+template<typename Dtype>
+void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
+                                                  const Datum& datum, const Datum* datumNegative)
+{
+    // Parameters
+    const std::string& data = datum.data();
+    const int datumHeight = datum.height();
+    const int datumWidth = datum.width();
+    const auto datumArea = (int)(datumHeight * datumWidth);
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel); // numberBodyParts + numberPafChannels + 1
+
+    // Read meta data (LMDB channel 3)
+    MetaData metaData;
+    readMetaData<Dtype>(metaData, mCurrentEpoch, &data[3 * datumArea], datumWidth, mPoseCategory, mPoseModel);
+
+    // Image
+    cv::Mat image;
+    const cv::Mat b(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[0]);
+    const cv::Mat g(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[datumArea]);
+    const cv::Mat r(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[2*datumArea]);
+    cv::merge({b,g,r}, image);
+    const auto initImageWidth = (int)image.cols;
+    const auto initImageHeight = (int)image.rows;
+
+    // BG
+    // Read background image
+    cv::Mat backgroundImage;
+    cv::Mat maskBackgroundImage = (datumNegative != nullptr
+            ? cv::Mat(image.size().height, image.size().width, CV_8UC1, cv::Scalar{0}) : cv::Mat());
+    if (datumNegative != nullptr)
+    {
+        const std::string& data = datumNegative->data();
+        const int datumNegativeWidth = datumNegative->width();
+        const int datumNegativeHeight = datumNegative->height();
+        const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
+        // OpenCV wrapping --> 1.7x speed up naive image.at<cv::Vec3b>, 1.25x speed up with smart speed up
+        const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
+        const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
+        const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
+        cv::merge({b,g,r}, backgroundImage);
+        // // Security checks
+        // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
+        // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
+        // CHECK_EQ(cv::norm(backgroundImage-image2), 0);
+        // Included data augmentation: cropping
+        // Disable data augmentation --> minX = minY = 0
+        // Data augmentation: cropping
+        if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
+        {
+            const auto xDiff = datumNegativeWidth - finalImageWidth;
+            const auto yDiff = datumNegativeHeight - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                                            (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                                            (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+        }
+        // Resize (if smaller than final crop size)
+        // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+        else
+        {
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+        }
+    }
+
+    // Mask
+    cv::Mat maskMiss = ((mPoseCategory == PoseCategory::COCO || mPoseCategory == PoseCategory::MPII || mPoseCategory == PoseCategory::PT)
+                              // COCO & MPII
+                              ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
+            // DOME & MPII_hands
+            : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
+
+    // Start Aug
+    //metaData.objPos = cv::Point(image.size().width/2, image.size().height/2
+    AugmentSelection startAug, endAug;
+    startAug.scale = estimateScale(metaData, param_);
+    startAug.rotation = getRotRand(param_);
+    startAug.pointOffset = estimatePO(metaData, param_);
+
+    endAug.scale = estimateScale(metaData, param_);
+    endAug.rotation = getRotRand(param_);
+    endAug.pointOffset = estimatePO(metaData, param_);
+
+    std::vector<AugmentSelection> augVec(frames);
+
+    for(int i=0; i<frames; i++){
+        float scale = startAug.scale + (((endAug.scale - startAug.scale) / frames))*i;
+        float rotation = startAug.rotation + (((endAug.rotation - startAug.rotation) / frames))*i;
+        cv::Size ci = cv::Size(startAug.pointOffset.width + (((endAug.pointOffset.width - startAug.pointOffset.width) / frames))*i,
+                                     startAug.pointOffset.height + (((endAug.pointOffset.height - startAug.pointOffset.height) / frames))*i);
+
+        MetaData metaDataCopy = metaData;
+
+        // Augment
+        cv::Mat& img = image;
+        const cv::Mat& mask = maskMiss;
+        AugmentSelection augmentSelection;
+        // Augment here
+        cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;
+        augmentSelection.scale = scale;
+        applyScale(metaDataCopy, augmentSelection.scale, mPoseModel);
+        augmentSelection.RotAndFinalSize = estimateRotation(
+                    metaDataCopy,
+                    cv::Size{(int)std::round(metaDataCopy.imageSize.width * startAug.scale),
+                             (int)std::round(metaDataCopy.imageSize.height * startAug.scale)},
+                    rotation);
+        applyRotation(metaDataCopy, augmentSelection.RotAndFinalSize.first, mPoseModel);
+
+        augmentSelection.cropCenter = addPO(metaDataCopy, ci);
+        //augmentSelection.cropCenter = ci;
+        applyCrop(metaDataCopy, augmentSelection.cropCenter, finalCropSize, mPoseModel);
+        //if(i==0) augmentSelection.flip = estimateFlip(metaData, param_);
+        //applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+        applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
+        applyAllAugmentation(maskAug, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, mask, 255);
+        applyAllAugmentation(maskBgAug, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, maskBackgroundImage, 255);
+        const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
+        cv::Mat backgroundImageTemp;
+        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
+        applyFlip(bgImgAug, augmentSelection.flip, backgroundImageTemp);
+        // Resize mask
+        if (!maskAug.empty()){
+            cv::Mat maskAugTemp;
+            cv::resize(maskAug, maskAugTemp, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+            maskAug = maskAugTemp;
+        }
+        // Final background image - elementwise multiplication
+        if (!bgImgAug.empty() && !maskBgAug.empty())
+        {
+            // Apply mask to background image
+            cv::Mat backgroundImageAugmentedTemp;
+            bgImgAug.copyTo(backgroundImageAugmentedTemp, maskBgAug);
+            // Add background image to image augmented
+            cv::Mat imageAugmentedTemp;
+            cv::addWeighted(imgAug, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
+            imgAug = imageAugmentedTemp;
+        }
+
+        // Create Label for frame
+        Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
+        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug);
+        //vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
+        //exit(-1);
+
+        // Convert image to Caffe Format
+        Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
+        matToCaffe(imgaugTemp, imgAug);
+
+        // Get pointers for all
+        int dataOffset = imgAug.channels()*imgAug.size().width*imgAug.size().height;
+        int labelOffset = 2*numberTotalChannels * gridY * gridX;
+        Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
+        Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data(); // Max 6,703,488
+
+        // Copy label
+        int totalVid = transformedLabel->shape()[0]/frames;
+        std::copy(labelmapTemp, labelmapTemp + labelOffset, transformedLabelPtr + (i*totalVid*labelOffset + vid*labelOffset));
+        delete labelmapTemp;
+
+        // Copy data
+        std::copy(imgaugTemp, imgaugTemp + dataOffset, transformedDataPtr + (i*totalVid*dataOffset + vid*dataOffset));
+        delete imgaugTemp;
+    }
+}
+
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
@@ -680,14 +1010,6 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 }
 // OpenPose: end
 
-// OpenPose: commented
-// template <typename Dtype>
-// int OPDataTransformer<Dtype>::Rand(int n) {
-//     CHECK(rng_);
-//     CHECK_GT(n, 0);
-//     caffe::rng_t* rng = static_cast<caffe::rng_t*>(rng_->generator());
-//     return ((*rng)() % n);
-// }
 
 // OpenPose: added
 template<typename Dtype>
@@ -1198,149 +1520,6 @@ void fillMaskChannels(Dtype* transformedLabel, const int gridX, const int gridY,
         // CHECK_LT(std::abs(cv::norm(transformedLabel-maskMissFloat)), 1e-6);
         maskMissFloat.copyTo(transformedLabel);
     }
-}
-
-void maskBetween(const cv::Point2i& a, const cv::Point2i& b, cv::Mat& maskMiss, cv::Mat& img, float sscale){
-    if((a.x >= 0 && a.x < img.size().width && a.y >= 0 && a.y < img.size().height)
-            && (b.x >= 0 && b.x < img.size().width && b.y >= 0 && b.y < img.size().height)){
-        float x1 = a.x; float x2 = b.x;
-        float y1 = a.y; float y2 = b.y;
-        float xc = (x1 + x2)/2  ;  float yc = (y1 + y2)/2  ;    // Center point
-        float xd = (x1 - x2)/2  ;  float yd = (y1 - y2)/2  ;    // Half-diagonal
-        float x3 = xc - yd  ;  float y3 = yc + xd;              // Third corner
-        float x4 = xc + yd  ;  float y4 = yc - xd;              // Fourth corner
-        float dist = sqrt(pow(x2-x1,2)+pow(y2-y1,2));
-        cv::Point2i rp(x3,y3);
-        cv::Point2i lp(x4,y4);
-        cv::Point2i v(rp.x-lp.x, rp.y-lp.y);
-        float iscale = (float)img.size().width/(float)maskMiss.size().width;
-        cv::Point2i rpn(rp.x - v.x*sscale, rp.y - v.y*sscale);
-        cv::Point2i lpn(lp.x + v.x*sscale, lp.y + v.y*sscale);
-        cv::line(maskMiss, cv::Point2i(lpn.x/iscale, lpn.y/iscale), cv::Point2i(rpn.x/iscale, rpn.y/iscale), cv::Scalar(0), dist/2/iscale);
-        cv::line(img, cv::Point2i(lpn.x/1, lpn.y/1), cv::Point2i(rpn.x/1, rpn.y/1), cv::Scalar(255,255,255), dist/2/1);
-    }
-}
-
-void maskFaceMPII(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
-    // Mask Face
-    if(isVisible[20] == 2 || isVisible[19] == 2) return;
-    cv::Point topPoint = points[20];
-    cv::Point neckPoint = points[19];
-    maskBetween(topPoint, neckPoint, maskMiss, img, 0.7);
-    // maybe handle if top missing ?
-
-}
-
-void maskRealNeckCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img){
-    if(isVisible[0] == 2 || isVisible[1] == 2) return;
-    cv::Point nosePoint = points[0];
-    cv::Point fakeNeckPoint = points[1];
-    maskBetween(nosePoint, fakeNeckPoint, maskMiss, img, 0.5);
-}
-
-float l2(cv::Point& p, cv::Point& q) {
-    cv::Point diff = p - q;
-    return sqrt(diff.x*diff.x + diff.y*diff.y);
-}
-
-void maskFaceCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points, cv::Mat& img)
-{
-    int neckIndex = 1;
-    int noseIndex = 0;
-    int lEarIndex = 18;
-    int rEarIndex = 19;
-    int lEyeIndex = 16;
-    int rEyeIndex = 17;
-    float threshold = 0.25f;
-    bool neckVisible = (isVisible[neckIndex] < 2);
-    bool noseVisible = (isVisible[noseIndex] < 2);
-    bool lEarVisible = (isVisible[lEarIndex] < 2);
-    bool rEarVisible = (isVisible[rEarIndex] < 2);
-    bool lEyeVisible = (isVisible[lEyeIndex] < 2);
-    bool rEyeVisible = (isVisible[rEyeIndex] < 2);
-    cv::Point neckPoint = points[neckIndex];
-    cv::Point nosePoint = points[noseIndex];
-    cv::Point lEarPoint = points[lEarIndex];
-    cv::Point rEarPoint = points[rEarIndex];
-    cv::Point lEyePoint = points[lEyeIndex];
-    cv::Point rEyePoint = points[rEyeIndex];
-
-    cv::Point pointTopLeft(0,0);
-    float faceSize = 0.;
-    int counter = 0;
-
-    // Neck and Nose Visible
-    if(noseVisible && neckVisible){
-        // Only Left Eye and Ear Visible
-        if(lEyeVisible && lEarVisible && !rEyeVisible && !rEarVisible){
-            pointTopLeft.x += (lEyePoint.x + lEarPoint.x + nosePoint.x) / 3.f;
-            pointTopLeft.y += (lEyePoint.y + lEarPoint.y + nosePoint.y) / 3.f;
-            faceSize += 0.85f * l2(nosePoint, lEyePoint) + l2(nosePoint, lEarPoint) + l2(nosePoint, neckPoint);
-        }
-        // Only Right Eye and Ear Visible
-        else if(rEyeVisible && rEarVisible && !lEyeVisible && !lEarVisible){
-            pointTopLeft.x += (rEyePoint.x + rEarPoint.x + nosePoint.x) / 3.f;
-            pointTopLeft.y += (rEyePoint.y + rEarPoint.y + nosePoint.y) / 3.f;
-            faceSize += 0.85f * l2(nosePoint, rEyePoint) + l2(nosePoint, rEarPoint) + l2(nosePoint, neckPoint);
-        }
-        // Neck and Nose only
-        else{
-            pointTopLeft.x += (neckPoint.x + nosePoint.x) / 2.f;
-            pointTopLeft.y += (neckPoint.y + nosePoint.y) / 2.f;
-            faceSize += 2.f * l2(neckPoint, nosePoint);
-        }
-        counter++;
-    }
-    // LEye and REye
-    if(lEyeVisible && rEyeVisible){
-        pointTopLeft.x += (lEyePoint.x + rEyePoint.x) / 2.f;
-        pointTopLeft.y += (lEyePoint.y + rEyePoint.y) / 2.f;
-        faceSize += 3.f * l2(lEyePoint, rEyePoint);
-        counter++;
-    }
-    // LEar and REar
-    if(lEarVisible && rEarVisible){
-        pointTopLeft.x += (lEarPoint.x + rEarPoint.x) / 2.f;
-        pointTopLeft.y += (lEarPoint.y + rEarPoint.y) / 2.f;
-        faceSize += 2.f * l2(lEarPoint, rEarPoint);
-        counter++;
-    }
-    if (counter > 0)
-    {
-        pointTopLeft.x =  pointTopLeft.x / (float)counter;
-        pointTopLeft.y =  pointTopLeft.y / (float)counter;
-        faceSize /= counter;
-    }else{
-        return;
-    }
-
-    cv::Rect bigRect(pointTopLeft.x - faceSize / 2, pointTopLeft.y - faceSize / 2, faceSize, faceSize);
-    float iscale = (float)img.size().width/(float)maskMiss.size().width;
-    cv::Rect smallRect(bigRect.x/iscale,bigRect.y/iscale,bigRect.width/iscale,bigRect.height/iscale);
-
-    float xScale = 0.5;
-    float yScale = 1.0;
-    cv::Point a = cv::Point(bigRect.x,bigRect.y);
-    cv::Point b = cv::Point(bigRect.x+bigRect.width,bigRect.y+bigRect.height);
-    cv::Point centroid = cv::Point((a.x+b.x)/2,(a.y+b.y)/2);
-    cv::Point an = cv::Point(((a.x-centroid.x)*xScale)+centroid.x,((a.y-centroid.y)*yScale)+centroid.y);
-    cv::Rect dropRect(an.x, an.y, bigRect.width*xScale, (bigRect.height*yScale)/4);
-
-    // Eye ear check
-    if(!rEarVisible) rEarPoint.y = std::numeric_limits<int>::max();
-    if(!lEarVisible) lEarPoint.y = std::numeric_limits<int>::max();
-    if(!rEyeVisible) rEyePoint.y = std::numeric_limits<int>::max();
-    if(!lEyeVisible) lEyePoint.y = std::numeric_limits<int>::max();
-    if(lEarVisible || rEarVisible || lEyeVisible || rEyeVisible){
-        int minPixY = std::min(lEarPoint.y, std::min(rEarPoint.y, std::min(lEyePoint.y, rEyePoint.y)));
-        minPixY-=5;
-        if(dropRect.y < minPixY)
-            dropRect.height = minPixY - dropRect.y;
-    }
-
-    cv::Rect dropRectScaled(dropRect.x/iscale,dropRect.y/iscale,dropRect.width/iscale,dropRect.height/iscale);
-    cv::rectangle(img, dropRect, cv::Scalar(255,0,0));
-    cv::rectangle(maskMiss, dropRectScaled, cv::Scalar(0), CV_FILLED);
 }
 
 void drawPoints(cv::Mat& clone, const MetaData& metaData){

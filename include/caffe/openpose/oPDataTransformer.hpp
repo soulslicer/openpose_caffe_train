@@ -82,6 +82,8 @@ public:
                    const Datum* datumNegative = nullptr);
     void TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum* datumNegative = nullptr);
+    void TransformVideoSF(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
+                   const Datum* datumNegative = nullptr);
     void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
 protected:

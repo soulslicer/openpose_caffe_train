@@ -9,6 +9,12 @@
 #include "poseModel.hpp"
 
 namespace caffe {
+    cv::Size estimatePO(const MetaData& metaData, const OPTransformationParameter& param_);
+    cv::Point2i addPO(const MetaData& metaData, const cv::Size pointOffset);
+    float getRotRand(const OPTransformationParameter& param_);
+    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
+                                                  const float rotation);
+
     // Swap center point
     void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const PoseModel poseModel);
     // Scale
