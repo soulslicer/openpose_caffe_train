@@ -392,8 +392,11 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         if (desiredDbIs1)
             Next();
         // DB 2
-        else
+        else if (desiredDbIs2)
             NextSecond();
+        // DB 3
+        else if (desiredDbIs3)
+            NextThird();
         trans_time += timer.MicroSeconds();
         // OpenPose: added ended
         // OpenPose: commented
