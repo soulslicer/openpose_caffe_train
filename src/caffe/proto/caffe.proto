@@ -498,11 +498,16 @@ message OPTransformationParameter {
   optional string source_secondary = 25 [default = ""];
   optional string model_secondary = 26 [default = ""];
   optional float prob_secondary = 27 [default = 0.0];
-  optional uint32 normalization = 28 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+
+  optional string source_tertiary = 28 [default = ""];
+  optional string model_tertiary = 29 [default = ""];
+  optional float prob_tertiary = 30 [default = 0.0];
+
+  optional uint32 normalization = 31 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
   // // CLAHE
-  // optional float clahe_tile_size = 26 [default = 8.0];
-  // optional float clahe_clip_limit = 27 [default = 4.0];
-  // optional bool do_clahe = 28 [default = false];
+  // optional float clahe_tile_size = 32 [default = 8.0];
+  // optional float clahe_clip_limit = 33 [default = 4.0];
+  // optional bool do_clahe = 34 [default = false];
 }
 // OpenPose: end new parameter
 

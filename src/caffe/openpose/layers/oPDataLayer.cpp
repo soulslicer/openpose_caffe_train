@@ -26,6 +26,7 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
     offset_(),
     offsetSecond(), // OpenPose: added
+    offsetThird(),
     op_transform_param_(param.op_transform_param()) // OpenPose: added
 {
     db_.reset(db::GetDB(param.data_param().backend()));
@@ -34,6 +35,7 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     // OpenPose: added
     mOnes = 0;
     mTwos = 0;
+    mThrees = 0;
     // Set up secondary DB
     if (!param.op_transform_param().source_secondary().empty())
     {
@@ -49,6 +51,22 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     {
         secondDb = false;
         secondProbability = 0.f;
+    }
+    // Set up tertiary DB
+    if (!param.op_transform_param().source_tertiary().empty())
+    {
+        thirdDb = true;
+        thirdProbability = param.op_transform_param().prob_tertiary();
+        CHECK_GE(thirdProbability, 0.f);
+        CHECK_LE(thirdProbability, 1.f);
+        dbThird.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
+        dbThird->Open(param.op_transform_param().source_tertiary(), db::READ);
+        cursorThird.reset(dbThird->NewCursor());
+    }
+    else
+    {
+        thirdDb = false;
+        thirdProbability = 0.f;
     }
     // Set up negatives DB
     if (!param.op_transform_param().source_background().empty())
@@ -85,6 +103,8 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
     if (secondDb)
         mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
+    if (thirdDb)
+        mOPDataTransformerTertiary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_tertiary()));
     // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
@@ -177,6 +197,19 @@ bool OPDataLayer<Dtype>::SkipSecond()
     return !keep;
 }
 
+// OpenPose: added
+template <typename Dtype>
+bool OPDataLayer<Dtype>::SkipThird()
+{
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetThird % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+
+
 template<typename Dtype>
 void OPDataLayer<Dtype>::NextBackground()
 {
@@ -204,6 +237,19 @@ void OPDataLayer<Dtype>::NextSecond()
     }
     offsetSecond++;
 }
+
+template<typename Dtype>
+void OPDataLayer<Dtype>::NextThird()
+{
+    cursorThird->Next();
+    if (!cursorThird->valid())
+    {
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting third data prefetching from start.";
+        cursorThird->SeekToFirst();
+    }
+    offsetThird++;
+}
 // OpenPose: added ended
 
 // This function is called on prefetch thread
@@ -227,10 +273,33 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     Datum datumBackground;
 
     // OpenPose: added ended
+    std::string debugString = "";
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         // OpenPose: added
         const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-        const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
+        bool desiredDbIs1 = true, desiredDbIs2 = false, desiredDbIs3 = false;
+        if(!thirdDb){
+            float firstProbability = (1-(secondProbability));
+            if(dice <= firstProbability){
+                desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
+            }else{
+                desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
+            }
+        }else{
+            float firstProbability = (1-(secondProbability+thirdProbability));
+            if(dice <= firstProbability){
+                desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
+            }else if(dice <= (firstProbability + secondProbability)){
+                desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
+            }else if(dice <= (firstProbability + secondProbability + thirdProbability)){
+                desiredDbIs1 = false; desiredDbIs2 = false; desiredDbIs3 = true;
+            }
+        }
+
+        // Debug
+        //if(desiredDbIs1) debugString += "1";
+        //if(desiredDbIs2) debugString += "2";
+        //if(desiredDbIs3) debugString += "3";
 
         timer.Start();
         // OpenPose: commended
@@ -250,13 +319,22 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             datum.ParseFromString(cursor_->value());
         }
         // If 2 DBs & 2nd one must go
-        else
+        else if (desiredDbIs2)
         {
             oPDataTransformerPtr = this->mOPDataTransformerSecondary;
             mTwos++;
             while (SkipSecond())
                 NextSecond();
             datum.ParseFromString(cursorSecond->value());
+        }
+        // 3rd DB
+        else if (desiredDbIs3)
+        {
+            oPDataTransformerPtr = this->mOPDataTransformerTertiary;
+            mThrees++;
+            while (SkipThird())
+                NextThird();
+            datum.ParseFromString(cursorThird->value());
         }
         if (backgroundDb)
         {
@@ -329,6 +407,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Next();
         // OpenPose: commented ended
     }
+    if(debugString.size()) std::cout << debugString << std::endl;
     // Timer (every 20 iterations x batch size)
     mCounter++;
     const auto repeatEveryXVisualizations = 2;

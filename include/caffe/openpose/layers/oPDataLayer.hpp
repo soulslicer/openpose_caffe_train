@@ -42,8 +42,10 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
 
   // OpenPose: added
   bool SkipSecond();
+  bool SkipThird();
   void NextBackground();
   void NextSecond();
+  void NextThird();
   // Secondary lmdb
   uint64_t offsetSecond;
   bool secondDb;
@@ -51,6 +53,13 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   shared_ptr<db::DB> dbSecond;
   shared_ptr<db::Cursor> cursorSecond;
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerSecondary;
+  // Tertiary lmdb
+  uint64_t offsetThird;
+  bool thirdDb;
+  float thirdProbability;
+  shared_ptr<db::DB> dbThird;
+  shared_ptr<db::Cursor> cursorThird;
+  shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerTertiary;
   // Background lmdb
   bool backgroundDb;
   shared_ptr<db::DB> dbBackground;
@@ -64,6 +73,7 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   // Timer
   unsigned long long mOnes;
   unsigned long long mTwos;
+  unsigned long long mThrees;
   int mCounter;
   double mDuration;
   // OpenPose: added end
