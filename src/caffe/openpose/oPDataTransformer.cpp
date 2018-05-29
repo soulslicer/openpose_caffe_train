@@ -569,6 +569,9 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
     // [31 x 20000 x 1]
     //cout << datum.channels() << " " << datum.height() << " " << datum.width() << " " << labelNum << endl;
 
+    // Skip Vector
+    std::vector<int> skip;
+
     // Load json data
     std::vector<Json::Value> jsonVideoData;
     const std::string& data = datum.data();
@@ -588,6 +591,15 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
             throw;
         }
         jsonVideoData.emplace_back(root);
+
+        if(i==0 && root["skip"].size())
+        {
+            for(int f=0; f<root["skip"].size(); f++){
+                skip.push_back(root["skip"][f].asInt());
+                std::cout << skip.back() << " ";
+            }
+            std::cout << std::endl;
+        }
     }
 
     // Sample the start frame (We can timestep too) NOT DONE!!! Try to do cache also
