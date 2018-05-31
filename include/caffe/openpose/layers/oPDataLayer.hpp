@@ -15,6 +15,8 @@
 #include "caffe/util/db.hpp"
 // OpenPose: added
 #include "caffe/openpose/oPDataTransformer.hpp"
+#include <boost/algorithm/string.hpp>
+#include <opencv2/opencv.hpp>
 // OpenPose: added end
 
 namespace caffe {
@@ -29,7 +31,7 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual inline const char* type() const { return "OPData"; }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int MinTopBlobs() const { return 1; }
-  virtual inline int MaxTopBlobs() const { return 3; }
+  virtual inline int MaxTopBlobs() const { return 5; }
 
  protected:
   void Next();
@@ -66,6 +68,11 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   shared_ptr<db::Cursor> cursorBackground;
   // New label
   Blob<Dtype> transformed_label_;
+  // Extra labels
+  int extra_labels_count_;
+  Blob<Dtype> extra_transformed_labels_[Batch<float>::extra_labels_count];
+  std::vector<int> extra_strides_;
+  std::vector<std::vector<int>> extra_labels_shapes_;
   // Data augmentation parameters
   OPTransformationParameter op_transform_param_;
   // Data augmentation class

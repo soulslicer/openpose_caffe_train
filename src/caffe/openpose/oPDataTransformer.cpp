@@ -592,13 +592,15 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         }
         jsonVideoData.emplace_back(root);
 
-        if(i==0 && root["skip"].size())
-        {
-            for(int f=0; f<root["skip"].size(); f++){
-                skip.push_back(root["skip"][f].asInt());
-                std::cout << skip.back() << " ";
+        if(root.isMember("skip")){
+            if(i==0 && root["skip"].size())
+            {
+                for(int f=0; f<root["skip"].size(); f++){
+                    skip.push_back(root["skip"][f].asInt());
+                    std::cout << skip.back() << " ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
         }
     }
 
@@ -749,7 +751,7 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
 
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
-        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug);
+        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
         //vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
         //exit(-1);
 
@@ -965,7 +967,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
 
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
-        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug);
+        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
         //vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
         //exit(-1);
 
@@ -993,7 +995,10 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
-                                         const Datum& datum, const Datum* datumNegative)
+                                         const Datum& datum, const Datum* datumNegative,
+                                         Blob<Dtype> extra_transformed_labels[],
+                                         std::vector<int> extra_strides,
+                                         int extra_labels_count)
 {
     // Secuirty checks
     const int datumChannels = datum.channels();
@@ -1009,7 +1014,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative);
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative, extra_transformed_labels, extra_strides, extra_labels_count);
     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
 
@@ -1026,7 +1031,10 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
-                                                    const Datum& datum, const Datum* datumNegative)
+                                                    const Datum& datum, const Datum* datumNegative,
+                                                    Blob<Dtype> extra_transformed_labels[],
+                                                    std::vector<int> extra_strides,
+                                                    int extra_labels_count)
 {
     // Parameters
     const std::string& data = datum.data();
@@ -1272,6 +1280,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     cv::Mat imageAugmented;
     cv::Mat backgroundImageAugmented;
     cv::Mat maskMissAugmented;
+    cv::Mat maskMissAugmentedOrig;
     cv::Mat depthAugmented;
     VLOG(2) << "   input size (" << initImageWidth << ", " << initImageHeight << ")";
     // We only do random transform augmentSelection augmentation when training.
@@ -1320,8 +1329,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
                      mPoseModel);
         // Resize mask
-        if (!maskMissAugmented.empty())
+        if (!maskMissAugmented.empty()){
+            maskMissAugmentedOrig = maskMissAugmented.clone();
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+        }
         // Final background image - elementwise multiplication
         if (!backgroundImageAugmented.empty() && !maskBackgroundImageAugmented.empty())
         {
@@ -1339,6 +1350,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Test
     else
     {
+        exit(-1);
         imageAugmented = image;
         maskMissAugmented = maskMiss;
         depthAugmented = depth;
@@ -1396,10 +1408,31 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
     // Generate and copy label
-    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented);
+    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented, stride);
     if (depthEnabled)
         generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
+
+    // Multilabel case
+    if(extra_labels_count){
+        for(int i=0; i<extra_labels_count; i++){
+            auto gridX_extra = finalImageWidth / extra_strides[i];
+            auto gridY_extra = finalImageHeight / extra_strides[i];
+            cv::Mat maskMissAugmented_extra;
+            cv::resize(maskMissAugmentedOrig, maskMissAugmented_extra, cv::Size{gridX_extra, gridY_extra}, 0, 0, cv::INTER_AREA);
+            generateLabelMap(extra_transformed_labels[i].mutable_cpu_data(), imageAugmented.size(), maskMissAugmented_extra, metaData, imageAugmented, extra_strides[i]);
+
+//            if (metaData.writeNumber == 0 && mPoseModel == PoseModel::COCO_21){
+//                std::cout << finalImageWidth << " " << finalImageHeight << " " << imageAugmented.size() << " " << gridX_extra << " " << gridY_extra << " " << extra_strides[i] << std::endl;
+//                vizDebug(imageAugmented, metaData, extra_transformed_labels[i].mutable_cpu_data(), finalImageWidth, finalImageHeight, gridX_extra, gridY_extra, extra_strides[i], mPoseModel, mModelString);
+//                exit(-1);
+//            }
+        }
+    }
+
+//        Blob<Dtype> extra_transformed_labels[],
+//        std::vector<int> extra_strides,
+//        int extra_labels_count
 
     //vizDebug()
     //vizDebug()
@@ -1559,12 +1592,11 @@ void drawPoints(cv::Mat& clone, const MetaData& metaData){
 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                                                const MetaData& metaData, const cv::Mat& img) const
+                                                const MetaData& metaData, const cv::Mat& img, const int stride) const
 {
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
     const auto rezY = (int)imageSize.height;
-    const auto stride = (int)param_.stride();
     const auto gridX = rezX / stride;
     const auto gridY = rezY / stride;
     const auto channelOffset = gridY * gridX;
@@ -1782,7 +1814,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                        param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                        stride, gridX, gridY, param_.sigma(), threshold,
                         diagonal, diagonalProportion);
             }
         }
@@ -1801,7 +1833,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                        param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                        stride, gridX, gridY, param_.sigma(), threshold,
                         diagonal, diagonalProportion);
             }
         }
@@ -1826,7 +1858,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 const auto& centerPoint = metaData.jointsSelf.points[part];
                 putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                                centerPoint, stride, gridX, gridY, param_.sigma());
             }
         }
         // For every other person
@@ -1836,7 +1868,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
                 putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                                centerPoint, stride, gridX, gridY, param_.sigma());
             }
         }
     }

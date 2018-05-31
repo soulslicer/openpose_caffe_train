@@ -109,6 +109,9 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
             this->prefetch_[i]->label_.Reshape(labelShape);
+        for (int i = 0; i < this->prefetch_.size(); ++i)
+            for (int j = 0; j < Batch<float>::extra_labels_count; ++j)
+                this->prefetch_[i]->extra_labels_[j].Reshape(labelShape);
         this->transformed_label_.Reshape(labelShape[0], labelShape[1], labelShape[2], labelShape[3]);
         LOG(INFO) << "Label shape: " << labelShape[0] << ", " << labelShape[1] << ", " << labelShape[2] << ", " << labelShape[3];
     }
@@ -198,6 +201,8 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     // Get Label pointer [Label shape: 20, 132, 46, 46]
     auto* topLabel = batch->label_.mutable_cpu_data();
+    for(int i=0; i<Batch<float>::extra_labels_count; i++)
+        batch->extra_labels_[i].mutable_cpu_data();
 
     // Sample lmdb for video?
     Datum datum;

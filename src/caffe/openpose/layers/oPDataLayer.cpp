@@ -94,6 +94,15 @@ template <typename Dtype>
 void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
 {
+    // Load extra strides amounts
+    extra_labels_count_ = top.size() - 2;
+    const std::string extra_strides_string = op_transform_param_.extra_strides();
+    for(int i=0; i<extra_strides_string.size(); i++){
+        extra_strides_.push_back(extra_strides_string[i] - '0');
+        std::cout << extra_strides_.back() << std::endl;
+    }
+    if(extra_strides_.size() != extra_labels_count_) throw std::runtime_error("Invalid extra_strides");
+
     const int batch_size = this->layer_param_.data_param().batch_size();
     // Read a data point, and use it to initialize the top blob.
     Datum datum;
@@ -129,6 +138,25 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
             this->prefetch_[i]->label_.Reshape(labelShape);
+
+        // Generate extra label shapes
+        for(int j=0; j<extra_labels_count_; j++){
+            extra_labels_shapes_.push_back({batch_size, numberChannels, height/extra_strides_[j], width/extra_strides_[j]});
+        }
+        for(int j=0; j<extra_labels_count_; j++){
+            top[j+2]->Reshape(extra_labels_shapes_[j]);
+            std::cout << extra_labels_shapes_.back()[0] << " " << extra_labels_shapes_.back()[1] << " " << extra_labels_shapes_.back()[2] << " " << extra_labels_shapes_.back()[3] << std::endl;
+        }
+        for (int i = 0; i < this->prefetch_.size(); ++i)
+            for (int j = 0; j < Batch<float>::extra_labels_count; ++j)
+                this->prefetch_[i]->extra_labels_[j].Reshape(labelShape);
+        for (int i = 0; i < this->prefetch_.size(); ++i)
+            for (int j = 0; j < extra_labels_count_; ++j)
+                this->prefetch_[i]->extra_labels_[j].Reshape(extra_labels_shapes_[j]);
+        for (int j=0; j<extra_labels_count_; j++){
+            extra_transformed_labels_[j].Reshape(1,extra_labels_shapes_[j][1],extra_labels_shapes_[j][2],extra_labels_shapes_[j][3]);
+        }
+
         this->transformed_label_.Reshape(1, labelShape[1], labelShape[2], labelShape[3]);
         LOG(INFO) << "Label shape: " << labelShape[0] << ", " << labelShape[1] << ", " << labelShape[2] << ", " << labelShape[3];
     }
@@ -267,6 +295,8 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     // OpenPose: added
     auto* topLabel = batch->label_.mutable_cpu_data();
+    for(int i=0; i<Batch<float>::extra_labels_count; i++)
+        batch->extra_labels_[i].mutable_cpu_data();
     // OpenPose: added ended
 
     Datum datum;
@@ -374,17 +404,34 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Label
         const int offsetLabel = batch->label_.offset(item_id);
         this->transformed_label_.set_cpu_data(topLabel + offsetLabel);
+        // Extra Labels
+        if(extra_labels_count_){
+            for(int j=0; j<extra_labels_count_; j++){
+                extra_transformed_labels_[j].set_cpu_data(batch->extra_labels_[j].mutable_cpu_data() + batch->extra_labels_[j].offset(item_id));
+            }
+        }
         // Process image & label
         const auto begin = std::chrono::high_resolution_clock::now();
-        if (backgroundDb)
-            oPDataTransformerPtr->Transform(&(this->transformed_data_),
-                                            &(this->transformed_label_),
-                                            datum,
-                                            &datumBackground);
-        else
+        if (backgroundDb){
+            if(!extra_labels_count_)
+                oPDataTransformerPtr->Transform(&(this->transformed_data_),
+                                                &(this->transformed_label_),
+                                                datum,
+                                                &datumBackground);
+            else
+                oPDataTransformerPtr->Transform(&(this->transformed_data_),
+                                                &(this->transformed_label_),
+                                                datum,
+                                                &datumBackground,
+                                                extra_transformed_labels_,
+                                                extra_strides_,
+                                                extra_labels_count_);
+        }else{
+            if(extra_labels_count_) throw std::runtime_error("This case is not handled");
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
                                             datum);
+        }
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 

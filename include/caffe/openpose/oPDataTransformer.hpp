@@ -79,7 +79,11 @@ protected:
     // Image and label
 public:
     void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
-                   const Datum* datumNegative = nullptr);
+                   const Datum* datumNegative = nullptr,
+                   // Extra labels addition
+                   Blob<Dtype> extra_transformed_labels[] = nullptr,
+                   std::vector<int> extra_strides = std::vector<int>(0),
+                   int extra_labels_count = 0);
     void TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum* datumNegative = nullptr);
     void TransformVideoSF(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
@@ -106,10 +110,14 @@ protected:
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
-                              const Datum* datumNegative);
+                              const Datum* datumNegative,
+                              // Extra labels addition
+                              Blob<Dtype> extra_transformed_labels[] = nullptr,
+                              std::vector<int> extra_strides = std::vector<int>(0),
+                              int extra_labels_count = 0);
     void generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                          const MetaData& metaData, const cv::Mat& img) const;
+                          const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;
     void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY, cv::Mat& count,
