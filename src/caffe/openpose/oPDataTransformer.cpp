@@ -608,9 +608,9 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
             {
                 for(int f=0; f<root["skip"].size(); f++){
                     skip.push_back(root["skip"][f].asInt());
-                    std::cout << skip.back() << " ";
+                    //std::cout << skip.back() << " ";
                 }
-                std::cout << std::endl;
+                //std::cout << std::endl;
             }
         }
     }
