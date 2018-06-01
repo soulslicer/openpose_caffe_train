@@ -554,6 +554,17 @@ void maskFaceCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const 
     cv::rectangle(maskMiss, dropRectScaled, cv::Scalar(0), CV_FILLED);
 }
 
+template<typename T>
+bool contains(vector<T> v, T x)
+{
+      if (v.empty())
+           return false;
+      if (find(v.begin(), v.end(), x) != v.end())
+           return true;
+      else
+           return false;
+}
+
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
@@ -604,18 +615,52 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         }
     }
 
+    // Sample for flip
+    bool rev = 1;
+    rev = getRand(0,1);
+
+    // Sample for step frames
+    int step = 1;
+    if(!skip.size()) step = getRand(1,2);
+
     // Sample the start frame (We can timestep too) NOT DONE!!! Try to do cache also
-    int startIndex = getRand(0,datum.channels()-frames-1);
+    int startIndex = getRand(0,datum.channels()-(frames*step)-1);
+
+    // Dont train on Skip frames
+    int skipCounter = 0;
+    if(skip.size()){
+        while(true){
+            bool mustSkip = false;
+            for(int i=startIndex; i<startIndex+(frames*step); i+=step){
+                if(contains(skip, i)) mustSkip = true;
+            }
+            if(mustSkip){
+                startIndex = getRand(0,datum.channels()-(frames*step)-1);
+            }else break;
+            skipCounter++;
+            if(skipCounter > 500){
+                std::cout << "BAD" << std::endl;
+                break;
+            }
+        }
+    }
+
     vs.images.clear();
     vs.masks.clear();
     vs.jsons.clear();
-    for(int i=startIndex; i<startIndex+frames; i++){
+    for(int i=startIndex; i<startIndex+(frames*step); i+=step){
         //cout << "Looking at frame: " << i << endl;
         vs.images.emplace_back(cv::imread(jsonVideoData[i]["image_path_full"].asString()));
         vs.masks.emplace_back(cv::imread(jsonVideoData[i]["mask_path_full"].asString(),0));
         vs.jsons.emplace_back(jsonVideoData[i]);
     }
     //cout << "Loaded Images" << endl;
+
+    if(rev){
+        std::reverse(vs.images.begin(), vs.images.end());
+        std::reverse(vs.masks.begin(), vs.masks.end());
+        std::reverse(vs.jsons.begin(), vs.jsons.end());
+    }
 
     // Params
     //const auto rezX = (int)metaData.imageSize.width;
@@ -752,8 +797,10 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
         generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+        //if(vid == 1){
         //vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
         //exit(-1);
+        //}
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
