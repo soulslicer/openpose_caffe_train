@@ -712,11 +712,13 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         const auto gridY = rezY / stride;
     //         const auto channelOffset = gridY * gridX;
     //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+    //         const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
     //         for (auto part = 0; part < numberTotalChannels; part++)
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
     //             // if (part < 1)
     //             if (part == numberTotalChannels-1)
+    //             // if (part < numberPafChannels || part == numberTotalChannels-1)
     //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
     //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
