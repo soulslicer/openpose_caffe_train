@@ -928,7 +928,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
         }
         // If foot
-        if (numberBodyParts == 23)
+        if (numberBodyParts == 23 || (numberBodyParts == 25 && mPoseModel != PoseModel::COCO_25))
         {
             maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
             for (const auto& jointsOther : metaData.jointsOthers)
@@ -937,8 +937,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 
 // TODO: Remove, temporary hack to get foot data, do nicely for 6-keypoint foot
-    // Remove if required RBigToe, RSmallToe, LBigToe, LSmallToe, and Background
-    if (mPoseModel == PoseModel::COCO_23 || mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
+    // Mask foot region over person whose feet are not anotated with a square
+    if (mPoseModel == PoseModel::COCO_23)
     {
         std::vector<int> indexesToRemove;
         // PAFs
@@ -954,96 +954,57 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             const auto indexBase = numberPafChannels + index;
             indexesToRemove.emplace_back(indexBase);
         }
-        // Included in code 10-30 lines above...
-        // // Dome data: Exclude (unlabeled) foot keypoints
-        // if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
-        // {
-        //     // Remove those channels
-        //     for (const auto& index : indexesToRemove)
-        //     {
-        //         std::fill(&transformedLabel[index*channelOffset],
-        //                   &transformedLabel[index*channelOffset + channelOffset], 0);
-        //     }
-        // }
-        // // Background
-        // if (mPoseModel == PoseModel::DOME_23_19 || mPoseModel == PoseModel::COCO_23_17)
-        // {
-        //     const auto backgroundIndex = numberPafChannels + numberBodyParts;
-        //     int type;
-        //     const auto type = getType(Dtype(0));
-        //     cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
-        //     maskFeet(maskMiss, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
-        //     for (const auto& jointsOther : metaData.jointsOthers)
-        //         maskFeet(maskMiss, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
-        // }
-        // Mask foot region over person whose feet are not anotated with a square
-        if (mPoseModel == PoseModel::COCO_23)
+        // auto visualize = false;
+        // From side annotations
+        for (const auto& jointsOther : metaData.jointsOthers)
         {
-            // auto visualize = false;
-            // // From current annotation
-            // const auto& selfPoints = metaData.jointsSelf.points;
-            // const auto& selfVisible = metaData.jointsSelf.isVisible;
-            // if (selfVisible.at(11) == 2.f && selfVisible.at(12) == 2.f
-            //     && selfVisible.at(16) == 2.f && selfVisible.at(17) == 2.f)
-            // {
-            //     // If knees and ankles visible
-            //     if (selfVisible.at(9) != 2 && selfVisible.at(10) != 2
-            //         && selfVisible.at(14) != 2 && selfVisible.at(15) != 2)
-            //     {
-            //         maskFeet(maskMiss, selfVisible, selfPoints, 0.75f);
-            //     }
-            // }
-            // From side annotations
-            for (const auto& jointsOther : metaData.jointsOthers)
+            const auto& otherPoints = jointsOther.points;
+            const auto& otherVisible = jointsOther.isVisible;
+            // If no points visible
+            if (otherVisible.at(11) == 2.f && otherVisible.at(12) == 2.f
+                && otherVisible.at(16) == 2.f && otherVisible.at(17) == 2.f)
             {
-                const auto& otherPoints = jointsOther.points;
-                const auto& otherVisible = jointsOther.isVisible;
-                // If no points visible
-                if (otherVisible.at(11) == 2.f && otherVisible.at(12) == 2.f
-                    && otherVisible.at(16) == 2.f && otherVisible.at(17) == 2.f)
+                // If knees and ankles visible
+                if (otherVisible.at(9) != 2 && otherVisible.at(10) != 2
+                    && otherVisible.at(14) != 2 && otherVisible.at(15) != 2)
                 {
-                    // If knees and ankles visible
-                    if (otherVisible.at(9) != 2 && otherVisible.at(10) != 2
-                        && otherVisible.at(14) != 2 && otherVisible.at(15) != 2)
+                    for (auto index : indexesToRemove)
                     {
-                        for (auto index : indexesToRemove)
-                        {
-                            const auto type = getType(Dtype(0));
-                            cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[index*channelOffset]);
-                            maskFeet(maskMiss, otherVisible, otherPoints, stride, 0.6f);
-                        }
-                        // visualize = true;
+                        const auto type = getType(Dtype(0));
+                        cv::Mat maskMiss(gridY, gridX, type, &transformedLabel[index*channelOffset]);
+                        maskFeet(maskMiss, otherVisible, otherPoints, stride, 0.6f);
                     }
+                    // visualize = true;
                 }
             }
-            // if (visualize)
-            // {
-            //     // Visualizing
-            //     for (auto part = 0; part < 2*numberTotalChannels; part++)
-            //     {
-            //         // Reduce #images saved (ideally images from 0 to numberTotalChannels should be the same)
-            //         // if (part >= 11*2)
-            //         if (part >= 22 && part <= numberTotalChannels)
-            //         // if (part < 3 || part >= numberTotalChannels - 3)
-            //         {
-            //             cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-            //             for (auto gY = 0; gY < gridY; gY++)
-            //             {
-            //                 const auto yOffset = gY*gridX;
-            //                 for (auto gX = 0; gX < gridX; gX++)
-            //                     labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
-            //             }
-            //             cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-            //             cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
-            //             cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
-            //             // Write on disk
-            //             char imagename [100];
-            //             sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
-            //             cv::imwrite(imagename, labelMap);
-            //         }
-            //     }
-            // }
         }
+        // if (visualize)
+        // {
+        //     // Visualizing
+        //     for (auto part = 0; part < 2*numberTotalChannels; part++)
+        //     {
+        //         // Reduce #images saved (ideally images from 0 to numberTotalChannels should be the same)
+        //         // if (part >= 11*2)
+        //         if (part >= 22 && part <= numberTotalChannels)
+        //         // if (part < 3 || part >= numberTotalChannels - 3)
+        //         {
+        //             cv::Mat labelMap = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        //             for (auto gY = 0; gY < gridY; gY++)
+        //             {
+        //                 const auto yOffset = gY*gridX;
+        //                 for (auto gX = 0; gX < gridX; gX++)
+        //                     labelMap.at<uchar>(gY,gX) = (int)(transformedLabel[part*channelOffset + yOffset + gX]*255);
+        //             }
+        //             cv::resize(labelMap, labelMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+        //             cv::applyColorMap(labelMap, labelMap, cv::COLORMAP_JET);
+        //             cv::addWeighted(labelMap, 0.5, image, 0.5, 0.0, labelMap);
+        //             // Write on disk
+        //             char imagename [100];
+        //             sprintf(imagename, "visualize/augment_%04d_label_part_%02d.jpg", metaData.writeNumber, part);
+        //             cv::imwrite(imagename, labelMap);
+        //         }
+        //     }
+        // }
     }
 
     // PAFs
