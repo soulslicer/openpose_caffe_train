@@ -731,7 +731,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //                         for (auto gX = 0; gX < gridX; gX++)
     //                         {
     //                             const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-    //                             labelMap.at<uchar>(gY,gX) = (int)(255*transformedLabel[channelIndex + yOffset + gX]);
+    //                             labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(transformedLabel[channelIndex + yOffset + gX]));
     //                         }
     //                     }
     //                 }
