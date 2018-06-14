@@ -506,10 +506,12 @@ message OPTransformationParameter {
   optional string extra_strides = 31 [default = ""];
 
   optional uint32 normalization = 32 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+
+  optional uint32 tpaf = 33 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
   // // CLAHE
-  // optional float clahe_tile_size = 33 [default = 8.0];
-  // optional float clahe_clip_limit = 34 [default = 4.0];
-  // optional bool do_clahe = 35 [default = false];
+  // optional float clahe_tile_size = 34 [default = 8.0];
+  // optional float clahe_clip_limit = 35 [default = 4.0];
+  // optional bool do_clahe = 36 [default = false];
 }
 // OpenPose: end new parameter
 

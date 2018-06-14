@@ -66,6 +66,7 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   unsigned long long mOnes;
   unsigned long long mTwos;
   int mCounter;
+  int vCounter = 0;
   double mDuration;
 
   int frame_size = 6;

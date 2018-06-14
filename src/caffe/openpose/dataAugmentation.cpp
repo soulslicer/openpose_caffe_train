@@ -37,6 +37,7 @@ namespace caffe {
 
     void flipKeypoints(Joints& joints, const int widthMinusOne, const PoseModel poseModel)
     {
+        if(!joints.points.size()) return;
         for (auto& point : joints.points)
             point.x = widthMinusOne - point.x;
         swapLeftRightKeypoints(joints, poseModel);
@@ -114,6 +115,10 @@ namespace caffe {
             if(metaData.scaleOthers.size()) metaData.scaleOthers[person] *= scale;
             for (auto& point : metaData.jointsOthers[person].points)
                 point *= scale;
+            if(metaData.jointsOthersPrev.size()){
+                for (auto& point : metaData.jointsOthersPrev[person].points)
+                    point *= scale;
+            }
         }
     }
 
@@ -174,6 +179,10 @@ namespace caffe {
             if(metaData.objPosOthers.size()) rotatePoint(metaData.objPosOthers[person], Rot);
             for (auto& point : metaData.jointsOthers[person].points)
                 rotatePoint(point, Rot);
+            if(metaData.jointsOthersPrev.size()){
+                for (auto& point : metaData.jointsOthersPrev[person].points)
+                    rotatePoint(point, Rot);
+            }
         }
     }
 
@@ -332,6 +341,10 @@ namespace caffe {
             if(metaData.objPosOthers.size()) metaData.objPosOthers[person] += offsetPoint;
             for (auto& point : metaData.jointsOthers[person].points)
                 point += offsetPoint;
+            if(metaData.jointsOthersPrev.size()){
+                for (auto& point : metaData.jointsOthersPrev[person].points)
+                    point += offsetPoint;
+            }
         }
     }
 
@@ -363,8 +376,15 @@ namespace caffe {
             flipKeypoints(metaData.jointsSelf, metaData.objPos, widthMinusOne, poseModel);
             // Other keypoints
             for (auto p = 0 ; p < metaData.numberOtherPeople ; p++){
-                if(metaData.objPosOthers.size()) flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
-                else flipKeypoints(metaData.jointsOthers[p], widthMinusOne, poseModel);
+                if(metaData.objPosOthers.size()){
+                    flipKeypoints(metaData.jointsOthers[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
+                    if(metaData.jointsOthersPrev.size())
+                    flipKeypoints(metaData.jointsOthersPrev[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
+                }else {
+                    flipKeypoints(metaData.jointsOthers[p], widthMinusOne, poseModel);
+                    if(metaData.jointsOthersPrev.size())
+                    flipKeypoints(metaData.jointsOthersPrev[p], widthMinusOne, poseModel);
+                }
             }
         }
     }

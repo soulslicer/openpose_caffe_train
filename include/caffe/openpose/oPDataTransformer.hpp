@@ -40,7 +40,7 @@ class OPDataTransformer {
 public:
     explicit OPDataTransformer(const std::string& modelString);
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
-        const std::string& modelString); // OpenPose: Added std::string
+        const std::string& modelString, bool tpaf = false); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
 
     /**
@@ -107,6 +107,7 @@ protected:
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
     std::string mModelString;
+    bool mTpaf;
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
@@ -123,7 +124,7 @@ protected:
     void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY, cv::Mat& count,
                        const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride,
                        const int gridX, const int gridY, const float sigma, const int threshold,
-                       const int diagonal, const float diagonalProportion) const;
+                       const int diagonal, const float diagonalProportion, const bool normalize = true, const bool demask = false) const;
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,

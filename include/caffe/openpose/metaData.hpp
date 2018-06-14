@@ -12,6 +12,12 @@ namespace caffe {
     {
         std::vector<cv::Point2f> points;
         std::vector<float> isVisible;
+        Joints clone(){
+            Joints newJoints;
+            newJoints.points = this->points;
+            newJoints.isVisible = this->isVisible;
+            return newJoints;
+        }
     };
 
     struct MetaData
@@ -25,9 +31,11 @@ namespace caffe {
         cv::Point2f objPos; //objPos_x(float), objPos_y (float)
         float scaleSelf;
         Joints jointsSelf; //(3*16)
+        Joints jointsSelfPrev;
         std::vector<cv::Point2f> objPosOthers; //length is numberOtherPeople
         std::vector<float> scaleOthers; //length is numberOtherPeople
         std::vector<Joints> jointsOthers; //length is numberOtherPeople
+        std::vector<Joints> jointsOthersPrev; //length must match above
         // Only for DomeDB
         std::string imageSource;
         bool depthEnabled = false;

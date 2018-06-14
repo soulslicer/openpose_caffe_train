@@ -84,9 +84,9 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     datum.ParseFromString(cursor_->value());
 
     // OpenPose Module
-    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
+    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model(), op_transform_param_.tpaf()));
     if (secondDb)
-        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
+        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary(), op_transform_param_.tpaf()));
 
     // Multi Image shape (Data layer is ([frame*batch * 3 * 368 * 38])) - Set Data size
     const int width = this->phase_ != TRAIN ? datum.width() : this->layer_param_.op_transform_param().crop_size_x();
@@ -282,13 +282,16 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
 
     // Testing Optional
-    //auto oPDataTransformerPtr = this->mOPDataTransformer;
-    //oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
+//    if(vCounter == 2){
+//    auto oPDataTransformerPtr = this->mOPDataTransformer;
+//    oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
+//    }
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
     //std::cout << "Loaded Data" << std::endl;
 
     // Timer (every 20 iterations x batch size)
     mCounter++;
+    vCounter++;
     const auto repeatEveryXVisualizations = 2;
     if (mCounter == 20*repeatEveryXVisualizations)
     {
