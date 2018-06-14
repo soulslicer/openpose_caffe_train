@@ -222,11 +222,11 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     Datum datum;
     Datum datumBackground;
+    // OpenPose: added
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
+    // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
-        // OpenPose: added
-        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-        const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
-        // OpenPose: added ended
         timer.Start();
         // OpenPose: commended
         // while (Skip()) {
