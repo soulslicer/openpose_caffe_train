@@ -302,30 +302,30 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     Datum datum;
     Datum datumBackground;
 
+    // OpenPose: added
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    bool desiredDbIs1 = true, desiredDbIs2 = false, desiredDbIs3 = false;
+    if(!thirdDb){
+        float firstProbability = (1-(secondProbability));
+        if(dice <= firstProbability){
+            desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
+        }else{
+            desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
+        }
+    }else{
+        float firstProbability = (1-(secondProbability+thirdProbability));
+        if(dice <= firstProbability){
+            desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
+        }else if(dice <= (firstProbability + secondProbability)){
+            desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
+        }else if(dice <= (firstProbability + secondProbability + thirdProbability)){
+            desiredDbIs1 = false; desiredDbIs2 = false; desiredDbIs3 = true;
+        }
+    }
+
     // OpenPose: added ended
     std::string debugString = "";
     for (int item_id = 0; item_id < batch_size; ++item_id) {
-        // OpenPose: added
-        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-        bool desiredDbIs1 = true, desiredDbIs2 = false, desiredDbIs3 = false;
-        if(!thirdDb){
-            float firstProbability = (1-(secondProbability));
-            if(dice <= firstProbability){
-                desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
-            }else{
-                desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
-            }
-        }else{
-            float firstProbability = (1-(secondProbability+thirdProbability));
-            if(dice <= firstProbability){
-                desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
-            }else if(dice <= (firstProbability + secondProbability)){
-                desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
-            }else if(dice <= (firstProbability + secondProbability + thirdProbability)){
-                desiredDbIs1 = false; desiredDbIs2 = false; desiredDbIs3 = true;
-            }
-        }
-
         // Debug
         //if(desiredDbIs1) debugString += "1";
         //if(desiredDbIs2) debugString += "2";
