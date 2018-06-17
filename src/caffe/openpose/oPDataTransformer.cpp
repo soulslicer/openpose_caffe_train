@@ -601,9 +601,15 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyAllAugmentation(maskBackgroundImageAugmented, augmentSelection.RotAndFinalSize.first,
                              augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
                              finalCropSize, maskBackgroundImage, 255);
-        applyAllAugmentation(maskMissAugmented, augmentSelection.RotAndFinalSize.first,
-                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
-                             finalCropSize, maskMiss, 255);
+        if (mPoseModel != PoseModel::MPII_65_42)
+        {
+            applyAllAugmentation(maskMissAugmented, augmentSelection.RotAndFinalSize.first,
+                                 augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                                 finalCropSize, maskMiss, 255);
+        }
+        // MPII hands special cases (1/4)
+        else
+            maskMissAugmented = maskBackgroundImageAugmented.clone();
         applyAllAugmentation(depthAugmented, augmentSelection.RotAndFinalSize.first,
                              augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
                              finalCropSize, depth, 0);
@@ -712,12 +718,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         const auto gridY = rezY / stride;
     //         const auto channelOffset = gridY * gridX;
     //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
-    //         const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
     //         for (auto part = 0; part < numberTotalChannels; part++)
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
     //             // if (part < 1)
     //             if (part == numberTotalChannels-1)
+    //             // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
     //             // if (part < numberPafChannels || part == numberTotalChannels-1)
     //             // if (part < 3 || part >= numberTotalChannels - 3)
     //             {
@@ -912,14 +918,27 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
     {
         // Remove BP/PAF non-labeled channels
-        const auto missingChannels = getMissingChannels(mPoseModel, (mPoseModel == PoseModel::MPII_59
-                                                                        ? metaData.jointsSelf.isVisible
-                                                                        : std::vector<float>{}));
+        // MPII hands special cases (2/4)
+        //     - If left or right hand not labeled --> mask out training of those channels
+        const auto missingChannels = getMissingChannels(
+            mPoseModel,
+            (mPoseModel == PoseModel::MPII_59 || mPoseModel == PoseModel::MPII_65_42
+                ? metaData.jointsSelf.isVisible
+                : std::vector<float>{}));
         for (const auto& index : missingChannels)
             std::fill(&transformedLabel[index*channelOffset],
                       &transformedLabel[index*channelOffset + channelOffset], 0);
-        // Background
         const auto type = getType(Dtype(0));
+        // MPII hands special cases (3/4)
+        if (mPoseModel == PoseModel::MPII_65_42)
+        {
+            // MPII hands without body --> Remove wrists masked out to avoid overfitting
+            const auto numberPafChannels = getNumberPafChannels(mPoseModel);
+            for (const auto& index : {4+numberPafChannels, 7+numberPafChannels})
+                std::fill(&transformedLabel[index*channelOffset],
+                          &transformedLabel[index*channelOffset + channelOffset], 0);
+        }
+        // Background
         const auto backgroundIndex = numberPafChannels + numberBodyParts;
         cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
         // If hands
@@ -1030,7 +1049,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                           // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                           // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                           count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                          param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                          param_.stride(), gridX, gridY, threshold,
                           diagonal, diagonalProportion);
         }
 
@@ -1048,7 +1067,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                              param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                              param_.stride(), gridX, gridY, threshold,
                               diagonal, diagonalProportion);
             }
         }
@@ -1088,6 +1107,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
     // Background channel
     // Naive implementation
+    const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -1095,13 +1115,53 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             const auto xyOffset = yOffset + gX;
             Dtype maximum = 0.;
-            const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
             for (auto part = numberTotalChannels+numberPafChannels ; part < backgroundIndex ; part++)
             {
                 const auto index = part * channelOffset + xyOffset;
                 maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
             }
             transformedLabel[backgroundIndex*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
+        }
+    }
+
+    // MPII hands special cases (4/4)
+    // Make background channel as non-masked out region for visible labels (for cases with no all people labeled)
+    if (mPoseModel == PoseModel::MPII_65_42)
+    {
+        // MPII - If left or right hand not labeled --> mask out training of those channels
+        for (auto part = 0 ; part < 2 ; part++)
+        {
+            const auto wristIndex = (part == 0 ? 7:4);
+            // jointsOther not used --> assuming 1 person / image
+            if (metaData.jointsSelf.isVisible[wristIndex] <= 1)
+            {
+                std::vector<int> handIndexes;
+                // PAFs
+                for (auto i = 26 ; i < 46 ; i++)
+                {
+                    handIndexes.emplace_back(2*(i+20*part));
+                    handIndexes.emplace_back(handIndexes.back()+1);
+                }
+                // Body parts
+                for (auto i = 25 ; i < 45 ; i++)
+                    handIndexes.emplace_back(i+20*part + numberPafChannels);
+                // Fill those channels
+                for (const auto& handIndex : handIndexes)
+                {
+                    for (auto gY = 0; gY < gridY; gY++)
+                    {
+                        const auto yOffset = gY*gridX;
+                        for (auto gX = 0; gX < gridX; gX++)
+                        {
+                            const auto xyOffset = yOffset + gX;
+                            // transformedLabel[handIndex*channelOffset + xyOffset] = 1.0;
+                            transformedLabel[handIndex*channelOffset + xyOffset] = (
+                                transformedLabel[backgroundIndex*channelOffset + xyOffset] < 1-1e-6
+                                    ? 1 : transformedLabel[handIndex*channelOffset + xyOffset]);
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1142,12 +1202,12 @@ template<typename Dtype>
 void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
                                              cv::Mat& count, const cv::Point2f& centerA,
                                              const cv::Point2f& centerB, const int stride, const int gridX,
-                                             const int gridY, const float sigma, const int threshold,
+                                             const int gridY, const int threshold,
                                              const int diagonal, const float diagonalProportion) const
 // void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
 //                                              cv::Mat& count, const cv::Point2f& centerA,
 //                                              const cv::Point2f& centerB, const int stride, const int gridX,
-//                                              const int gridY, const float sigma, const int threshold) const
+//                                              const int gridY, const int threshold) const
 {
     const auto scaleLabel = Dtype(1)/Dtype(stride);
     const auto centerALabelScale = scaleLabel * centerA;
