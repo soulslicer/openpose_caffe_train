@@ -124,7 +124,7 @@ protected:
     void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY, cv::Mat& count,
                        const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride,
                        const int gridX, const int gridY, const float sigma, const int threshold,
-                       const int diagonal, const float diagonalProportion, const bool normalize = true, const bool demask = false) const;
+                       const int diagonal, const float diagonalProportion, const bool normalize = true, const bool demask = false, const float tanval = 0) const;
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,

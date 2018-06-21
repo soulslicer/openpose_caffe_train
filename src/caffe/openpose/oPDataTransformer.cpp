@@ -2043,7 +2043,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                   tpafMaskStartPointer + 2*j*channelOffset,
                                   tpafMaskStartPointer + ((2*j)+1)*channelOffset,
                                   count, metaData.jointsSelf.points[j], metaData.jointsSelfPrev.points[j],
-                                  stride, gridX, gridY, param_.sigma(), threshold, 0, 0);
+                                  stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
                 }
             }
 
@@ -2057,7 +2057,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               tpafMaskStartPointer + 2*j*channelOffset,
                               tpafMaskStartPointer + ((2*j)+1)*channelOffset,
                               count, metaData.jointsOthers[i].points[j], metaData.jointsOthersPrev[i].points[j],
-                              stride, gridX, gridY, param_.sigma(), threshold, 0, 0);
+                              stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
             }
 
         }
@@ -2217,7 +2217,8 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
                                              cv::Mat& count, const cv::Point2f& centerA,
                                              const cv::Point2f& centerB, const int stride, const int gridX,
                                              const int gridY, const float sigma, const int threshold,
-                                             const int diagonal, const float diagonalProportion, const bool normalize, const bool demask) const
+                                             const int diagonal, const float diagonalProportion,
+                                             const bool normalize, const bool demask, const float tanval) const
 // void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
 //                                              cv::Mat& count, const cv::Point2f& centerA,
 //                                              const cv::Point2f& centerB, const int stride, const int gridX,
@@ -2229,6 +2230,12 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
     cv::Point2f directionAB = centerBLabelScale - centerALabelScale;
     const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y);
     if(normalize) directionAB *= (Dtype(1) / distanceAB);
+
+    if(tanval){
+        cv::Point2f directionABOrig = centerB - centerA;
+        const auto distanceABOrig = std::sqrt(directionABOrig.x*directionABOrig.x + directionABOrig.y*directionABOrig.y);
+        directionAB *= tanh(tanval * distanceABOrig);
+    }
 
     // // For Distance
     // const auto dMin = Dtype(0);

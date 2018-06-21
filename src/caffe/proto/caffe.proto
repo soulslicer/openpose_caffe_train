@@ -387,6 +387,7 @@ message LayerParameter {
   optional DummyDataParameter dummy_data_param = 109;
   optional EltwiseParameter eltwise_param = 110;
   optional ELUParameter elu_param = 140;
+  optional EltwiseAffineParameter eltwise_affine_param = 211;
   optional EmbedParameter embed_param = 137;
   optional ExpParameter exp_param = 111;
   optional FlattenParameter flatten_param = 135;
@@ -422,6 +423,17 @@ message LayerParameter {
   // OpenPose: new layer
   optional OPTransformationParameter op_transform_param = 147;
   // OpenPose: end new layer
+}
+
+message EltwiseAffineParameter {
+
+  // Initial value of a_i. Default is a_i=1.0 for all i.
+  optional FillerParameter slope_filler = 1;
+
+  optional FillerParameter bias_filler = 2;
+
+  // Whether or not slope paramters are shared across channels.
+  optional bool channel_shared = 3 [default = false];
 }
 
 // Message that stores parameters used to apply transformation
