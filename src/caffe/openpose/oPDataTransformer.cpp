@@ -227,6 +227,117 @@ int getType(Dtype dtype)
         return CV_32F;
     }
 }
+
+template<typename Dtype>
+void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int stride,
+                     const int gridX, const int gridY, const float sigma)
+{
+    //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
+    const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
+    const auto multiplier = 2.0 * sigma * sigma;
+    for (auto gY = 0; gY < gridY; gY++)
+    {
+        const auto yOffset = gY*gridX;
+        const Dtype y = start + gY * stride;
+        const auto yMenosCenterPointSquared = (y-centerPoint.y)*(y-centerPoint.y);
+        for (auto gX = 0; gX < gridX; gX++)
+        {
+            const Dtype x = start + gX * stride;
+            const Dtype d2 = (x-centerPoint.x)*(x-centerPoint.x) + yMenosCenterPointSquared;
+            const Dtype exponent = d2 / multiplier;
+            //ln(100) = -ln(1%)
+            if (exponent <= 4.6052)
+            {
+                const auto xyOffset = yOffset + gX;
+                // Option a) Max
+                entry[xyOffset] = std::min(Dtype(1), std::max(entry[xyOffset], std::exp(-exponent)));
+                // // Option b) Average
+                // entry[xyOffset] += std::exp(-exponent);
+                // if (entry[xyOffset] > 1)
+                //     entry[xyOffset] = 1;
+            }
+        }
+    }
+}
+
+template<typename Dtype>
+void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
+                   cv::Mat& count, const cv::Point2f& centerA,
+                   const cv::Point2f& centerB, const int stride, const int gridX,
+                   const int gridY, const int threshold,
+                   const int diagonal, const float diagonalProportion, Dtype* backgroundMask)
+// void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
+//                    cv::Mat& count, const cv::Point2f& centerA,
+//                    const cv::Point2f& centerB, const int stride, const int gridX,
+//                    const int gridY, const int threshold)
+{
+    const auto scaleLabel = Dtype(1)/Dtype(stride);
+    const auto centerALabelScale = scaleLabel * centerA;
+    const auto centerBLabelScale = scaleLabel * centerB;
+    cv::Point2f directionAB = centerBLabelScale - centerALabelScale;
+    const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y);
+    directionAB *= (Dtype(1) / distanceAB);
+
+    // // For Distance
+    // const auto dMin = Dtype(0);
+    // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
+    // const auto dRange = dMax - dMin;
+    // const auto entryDValue = 2*(distanceAB - dMin)/dRange - 1; // Main range: [-1, 1], -1 is 0px-distance, 1 is 368 / stride x sqrt(2) px of distance
+
+    // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
+    if (!isnan(directionAB.x) && !isnan(directionAB.y))
+    {
+        const int minX = std::max(0,
+                                  int(std::round(std::min(centerALabelScale.x, centerBLabelScale.x) - threshold)));
+        const int maxX = std::min(gridX,
+                                  int(std::round(std::max(centerALabelScale.x, centerBLabelScale.x) + threshold)));
+        const int minY = std::max(0,
+                                  int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
+        const int maxY = std::min(gridY,
+                                  int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
+(void)diagonalProportion;
+(void)diagonal;
+(void)entryX;
+(void)entryY;
+        // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
+        for (auto gY = minY; gY < maxY; gY++)
+        {
+            const auto yOffset = gY*gridX;
+            const auto gYMenosCenterALabelScale = gY - centerALabelScale.y;
+            for (auto gX = minX; gX < maxX; gX++)
+            {
+                const auto xyOffset = yOffset + gX;
+                const cv::Point2f ba{gX - centerALabelScale.x, gYMenosCenterALabelScale};
+                const float distance = std::abs(ba.x*directionAB.y - ba.y*directionAB.x);
+                if (distance <= threshold)
+                {
+                    auto& counter = count.at<uchar>(gY, gX);
+                    if (counter == 0)
+                    {
+                        entryX[xyOffset] = directionAB.x;
+                        entryY[xyOffset] = directionAB.y;
+                        // Weight makes small PAFs as important as big PAFs
+                        // maskX[xyOffset] *= weight;
+                        // maskY[xyOffset] *= weight;
+                        // // For Distance
+                        // entryD[xyOffset] = entryDValue;
+                        // entryDMask[xyOffset] = Dtype(1);
+                        if (backgroundMask != nullptr)
+                            backgroundMask[xyOffset] = Dtype(1);
+                    }
+                    else
+                    {
+                        entryX[xyOffset] = (entryX[xyOffset]*counter + directionAB.x) / (counter + 1);
+                        entryY[xyOffset] = (entryY[xyOffset]*counter + directionAB.y) / (counter + 1);
+                        // // For Distance
+                        // entryD[xyOffset] = (entryD[xyOffset]*counter + entryDValue) / (counter + 1);
+                    }
+                    counter++;
+                }
+            }
+        }
+    }
+}
 // OpenPose: added ended
 
 template<typename Dtype>
@@ -601,15 +712,16 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyAllAugmentation(maskBackgroundImageAugmented, augmentSelection.RotAndFinalSize.first,
                              augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
                              finalCropSize, maskBackgroundImage, 255);
-        if (mPoseModel != PoseModel::MPII_65_42)
+        // MPII hands special cases (1/4)
+        // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+        if (mPoseModel == PoseModel::MPII_65_42 || mPoseModel == PoseModel::CAR_12)
+            maskMissAugmented = maskBackgroundImageAugmented.clone();
+        else
         {
             applyAllAugmentation(maskMissAugmented, augmentSelection.RotAndFinalSize.first,
                                  augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
                                  finalCropSize, maskMiss, 255);
         }
-        // MPII hands special cases (1/4)
-        else
-            maskMissAugmented = maskBackgroundImageAugmented.clone();
         applyAllAugmentation(depthAugmented, augmentSelection.RotAndFinalSize.first,
                              augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
                              finalCropSize, depth, 0);
@@ -1047,60 +1159,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // }
     }
 
-    // PAFs
-    const auto& labelMapA = getPafIndexA(mPoseModel);
-    const auto& labelMapB = getPafIndexB(mPoseModel);
-    const auto threshold = 1;
-    const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
-    const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
-    for (auto i = 0 ; i < labelMapA.size() ; i++)
-    {
-        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-        // Self
-        const auto& joints = metaData.jointsSelf;
-        if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
-        {
-            putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
-                          transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
-                          transformedLabel + 2*i*channelOffset,
-                          transformedLabel + (2*i + 1)*channelOffset,
-                          // // For Distance
-                          // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
-                          // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
-                          count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                          param_.stride(), gridX, gridY, threshold,
-                          diagonal, diagonalProportion);
-        }
-
-        // For every other person
-        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
-        {
-            const auto& joints = metaData.jointsOthers[otherPerson];
-            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
-            {
-                putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
-                              transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
-                              transformedLabel + 2*i*channelOffset,
-                              transformedLabel + (2*i + 1)*channelOffset,
-                              // // For Distance
-                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
-                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
-                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                              param_.stride(), gridX, gridY, threshold,
-                              diagonal, diagonalProportion);
-            }
-        }
-    }
-    // // Re-normalize masks (otherwise PAF explodes)
-    // const auto finalImageArea = gridX*gridY;
-    // for (auto i = 0 ; i < labelMapA.size() ; i++)
-    // {
-    //     auto* initPoint = &transformedLabel[2*i*channelOffset];
-    //     const auto accumulation = std::accumulate(initPoint, initPoint+channelOffset, 0);
-    //     const auto ratio = finalImageArea / (float)accumulation;
-    //     if (ratio > 1.01 || ratio < 0.99)
-    //         std::transform(initPoint, initPoint + 2*channelOffset, initPoint, std::bind1st(std::multiplies<Dtype>(), ratio)) ;
-    // }
+    // Background channel
+    const auto backgroundMaskIndex = numberPafChannels+numberBodyParts;
+    auto* transformedLabelBkgMask = &transformedLabel[backgroundMaskIndex*channelOffset];
 
     // Body parts
     for (auto part = 0; part < numberBodyParts; part++)
@@ -1127,6 +1188,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Background channel
     // Naive implementation
     const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
+    auto* transformedLabelBkg = &transformedLabel[backgroundIndex*channelOffset];
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -1139,9 +1201,72 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 const auto index = part * channelOffset + xyOffset;
                 maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
             }
-            transformedLabel[backgroundIndex*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
+            transformedLabelBkg[xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
+            // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+            if (mPoseModel == PoseModel::CAR_12 && transformedLabelBkg[xyOffset] < 1 - 1e-9)
+                transformedLabelBkgMask[xyOffset] = Dtype(1);
         }
     }
+
+    // PAFs
+    const auto& labelMapA = getPafIndexA(mPoseModel);
+    const auto& labelMapB = getPafIndexB(mPoseModel);
+    const auto threshold = 1;
+    const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
+    const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
+    for (auto i = 0 ; i < labelMapA.size() ; i++)
+    {
+        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        // Self
+        const auto& joints = metaData.jointsSelf;
+        if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+        {
+            putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
+                          transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                          transformedLabel + 2*i*channelOffset,
+                          transformedLabel + (2*i + 1)*channelOffset,
+                          // // For Distance
+                          // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                          // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                          count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                          param_.stride(), gridX, gridY, threshold,
+                          diagonal, diagonalProportion,
+                          // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+                          (mPoseModel == PoseModel::CAR_12 ? transformedLabelBkgMask : nullptr));
+        }
+
+        // For every other person
+        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+        {
+            const auto& joints = metaData.jointsOthers[otherPerson];
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
+                              transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                              transformedLabel + 2*i*channelOffset,
+                              transformedLabel + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                              param_.stride(), gridX, gridY, threshold,
+                              diagonal, diagonalProportion,
+                              // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+                              (mPoseModel == PoseModel::CAR_12 ? transformedLabelBkgMask : nullptr));
+            }
+        }
+    }
+    // // Re-normalize masks (otherwise PAF explodes)
+    // const auto finalImageArea = gridX*gridY;
+    // for (auto i = 0 ; i < labelMapA.size() ; i++)
+    // {
+    //     auto* initPoint = &transformedLabel[2*i*channelOffset];
+    //     const auto accumulation = std::accumulate(initPoint, initPoint+channelOffset, 0);
+    //     const auto ratio = finalImageArea / (float)accumulation;
+    //     if (ratio > 1.01 || ratio < 0.99)
+    //         std::transform(initPoint, initPoint + 2*channelOffset, initPoint,
+    //                        std::bind1st(std::multiplies<Dtype>(), ratio)) ;
+    // }
 
     // MPII hands special cases (4/4)
     // Make background channel as non-masked out region for visible labels (for cases with no all people labeled)
@@ -1183,115 +1308,11 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             }
         }
     }
-}
-
-template<typename Dtype>
-void OPDataTransformer<Dtype>::putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int stride,
-                                               const int gridX, const int gridY, const float sigma) const
-{
-    //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
-    const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
-    const auto multiplier = 2.0 * sigma * sigma;
-    for (auto gY = 0; gY < gridY; gY++)
-    {
-        const auto yOffset = gY*gridX;
-        const Dtype y = start + gY * stride;
-        const auto yMenosCenterPointSquared = (y-centerPoint.y)*(y-centerPoint.y);
-        for (auto gX = 0; gX < gridX; gX++)
-        {
-            const Dtype x = start + gX * stride;
-            const Dtype d2 = (x-centerPoint.x)*(x-centerPoint.x) + yMenosCenterPointSquared;
-            const Dtype exponent = d2 / multiplier;
-            //ln(100) = -ln(1%)
-            if (exponent <= 4.6052)
-            {
-                const auto xyOffset = yOffset + gX;
-                // Option a) Max
-                entry[xyOffset] = std::min(Dtype(1), std::max(entry[xyOffset], std::exp(-exponent)));
-                // // Option b) Average
-                // entry[xyOffset] += std::exp(-exponent);
-                // if (entry[xyOffset] > 1)
-                //     entry[xyOffset] = 1;
-            }
-        }
-    }
-}
-
-template<typename Dtype>
-void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
-                                             cv::Mat& count, const cv::Point2f& centerA,
-                                             const cv::Point2f& centerB, const int stride, const int gridX,
-                                             const int gridY, const int threshold,
-                                             const int diagonal, const float diagonalProportion) const
-// void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
-//                                              cv::Mat& count, const cv::Point2f& centerA,
-//                                              const cv::Point2f& centerB, const int stride, const int gridX,
-//                                              const int gridY, const int threshold) const
-{
-    const auto scaleLabel = Dtype(1)/Dtype(stride);
-    const auto centerALabelScale = scaleLabel * centerA;
-    const auto centerBLabelScale = scaleLabel * centerB;
-    cv::Point2f directionAB = centerBLabelScale - centerALabelScale;
-    const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y);
-    directionAB *= (Dtype(1) / distanceAB);
-
-    // // For Distance
-    // const auto dMin = Dtype(0);
-    // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-    // const auto dRange = dMax - dMin;
-    // const auto entryDValue = 2*(distanceAB - dMin)/dRange - 1; // Main range: [-1, 1], -1 is 0px-distance, 1 is 368 / stride x sqrt(2) px of distance
-
-    // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
-    if (!isnan(directionAB.x) && !isnan(directionAB.y))
-    {
-        const int minX = std::max(0,
-                                  int(std::round(std::min(centerALabelScale.x, centerBLabelScale.x) - threshold)));
-        const int maxX = std::min(gridX,
-                                  int(std::round(std::max(centerALabelScale.x, centerBLabelScale.x) + threshold)));
-        const int minY = std::max(0,
-                                  int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
-        const int maxY = std::min(gridY,
-                                  int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
-(void)diagonalProportion;
-(void)diagonal;
-(void)entryX;
-(void)entryY;
-        // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
-        for (auto gY = minY; gY < maxY; gY++)
-        {
-            const auto yOffset = gY*gridX;
-            const auto gYMenosCenterALabelScale = gY - centerALabelScale.y;
-            for (auto gX = minX; gX < maxX; gX++)
-            {
-                const auto xyOffset = yOffset + gX;
-                const cv::Point2f ba{gX - centerALabelScale.x, gYMenosCenterALabelScale};
-                const float distance = std::abs(ba.x*directionAB.y - ba.y*directionAB.x);
-                if (distance <= threshold)
-                {
-                    auto& counter = count.at<uchar>(gY, gX);
-                    if (counter == 0)
-                    {
-                        entryX[xyOffset] = directionAB.x;
-                        entryY[xyOffset] = directionAB.y;
-                        // Weight makes small PAFs as important as big PAFs
-                        // maskX[xyOffset] *= weight;
-                        // maskY[xyOffset] *= weight;
-                        // // For Distance
-                        // entryD[xyOffset] = entryDValue;
-                        // entryDMask[xyOffset] = Dtype(1);
-                    }
-                    else
-                    {
-                        entryX[xyOffset] = (entryX[xyOffset]*counter + directionAB.x) / (counter + 1);
-                        entryY[xyOffset] = (entryY[xyOffset]*counter + directionAB.y) / (counter + 1);
-                        // // For Distance
-                        // entryD[xyOffset] = (entryD[xyOffset]*counter + entryDValue) / (counter + 1);
-                    }
-                    counter++;
-                }
-            }
-        }
-    }
+    // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+    if (mPoseModel == PoseModel::CAR_12)
+        for (auto i = 0 ; i < backgroundMaskIndex ; i++)
+            std::copy(transformedLabelBkgMask, transformedLabelBkgMask+channelOffset,
+                      &transformedLabel[i*channelOffset]);
 }
 // OpenPose: added end
 

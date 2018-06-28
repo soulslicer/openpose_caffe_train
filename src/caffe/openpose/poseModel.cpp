@@ -228,6 +228,21 @@ namespace caffe {
 //     // Background
 //     {65, "Background"},
 // };
+// CAR_12_PARTS {
+//     {0,  "FRWheel"},
+//     {1,  "FLWheel"},
+//     {2,  "BRWheel"},
+//     {3,  "BLWheel"},
+//     {4,  "FRLight"},
+//     {5,  "FLLight"},
+//     {6,  "BRLight"},
+//     {7,  "BLLight"},
+//     {8,  "FRTop"},
+//     {9,  "FLTop"},
+//     {10, "BRTop"},
+//     {11, "BLTop"},
+//     {12, "Background"},
+// };
 // // Hand legend:
 // //     - Thumb:
 // //         - Carpometacarpal Joints (CMC)
@@ -252,6 +267,8 @@ namespace caffe {
             return 4;
         else if (poseModel == PoseModel::COCO_19_V2)
             return 5;
+        else if (poseModel == PoseModel::CAR_12)
+            return 8;
         else if (numberBodyParts == 18)
             return 0;
         else if (numberBodyParts == 19)
@@ -275,9 +292,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19, 19, 25, 25, 65};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19, 19, 25, 25, 65, 12};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17, 23, 17, 42};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17, 23, 17, 42, 14};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -337,6 +354,9 @@ namespace caffe {
             {1},{2},{3},{4}, {5},{6},{7},{8}, {9},{10},{11},{12}, {13},{14},{15},{16}, {17},{18},{19},{20},         // Left hand
             {22},{23},{24},{25}, {26},{27},{28},{29}, {30},{31},{32},{33}, {34},{35},{36},{37}, {38},{39},{40},{41} // Right hand
         },
+        std::vector<std::vector<int>>{                                                                              // CAR_12
+            {0},{1},{2},{3},{4},{5},{6},{7},{9},{10},{11},{12}                                                      // 8 and 13 are always empty
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -376,6 +396,8 @@ namespace caffe {
             return std::make_pair(PoseModel::MPII_59, PoseCategory::MPII);
         else if (poseModeString == "MPII_65_42")
             return std::make_pair(PoseModel::MPII_65_42, PoseCategory::MPII);
+        else if (poseModeString == "CAR_12")
+            return std::make_pair(PoseModel::CAR_12, PoseCategory::CAR);
         // Unknown
         throw std::runtime_error{"String (" + poseModeString
                                  + ") does not correspond to any model (COCO_18, DOME_18, ...)"
@@ -403,6 +425,7 @@ namespace caffe {
                                        {25,45},{26,46},{27,47},{28,48},{29,49},{30,50},{31,51},{32,52},     // 2 fingers
                                        {33,53},{34,54},{35,55},{36,56},{37,57},{38,58},{39,59},{40,60},     // 2 fingers
                                        {41,61},{42,62},{43,63},{44,64}},                                    // 1 finger
+        std::vector<std::array<int,2>>{{0,1},{2,3},{4,5},{6,7},{8,9},{10,11}},                                      // CAR_12
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
@@ -418,21 +441,8 @@ namespace caffe {
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16, 14,19,14, 11,22,11,    // 65 (MPII_65_42)
                          7,25,26,27, 7,29,30,31, 7,33,34,35, 7,37,38,39, 7,41,42,43, // Left hand
                          4,45,46,47, 4,49,50,51, 4,53,54,55, 4,57,58,59, 4,61,62,63},// Right hand
+        std::vector<int>{4, 4,4,0,4,8, 5,5,1,5,9},                                                                  // CAR_12
     };
-//     // Left hand
-//     {25, "LThumb1CMC"},         {26, "LThumb2Knuckles"},{27, "LThumb3IP"},  {28, "LThumb4FingerTip"},
-//     {29, "LIndex1Knuckles"},    {30, "LIndex2PIP"},     {31, "LIndex3DIP"}, {32, "LIndex4FingerTip"},
-//     {33, "LMiddle1Knuckles"},   {34, "LMiddle2PIP"},    {35, "LMiddle3DIP"},{36, "LMiddle4FingerTip"},
-//     {37, "LRing1Knuckles"},     {38, "LRing2PIP"},      {39, "LRing3DIP"},  {40, "LRing4FingerTip"},
-//     {41, "LPinky1Knuckles"},    {42, "LPinky2PIP"},     {43, "LPinky3DIP"}, {44, "LPinky4FingerTip"},
-//     // Right hand
-//     {45, "RThumb1CMC"},         {46, "RThumb2Knuckles"},{47, "RThumb3IP"},  {48, "RThumb4FingerTip"},
-//     {49, "RIndex1Knuckles"},    {50, "RIndex2PIP"},     {51, "RIndex3DIP"}, {52, "RIndex4FingerTip"},
-//     {53, "RMiddle1Knuckles"},   {54, "RMiddle2PIP"},    {55, "RMiddle3DIP"},{56, "RMiddle4FingerTip"},
-//     {57, "RRing1Knuckles"},     {58, "RRing2PIP"},      {59, "RRing3DIP"},  {60, "RRing4FingerTip"},
-//     {61, "RPinky1Knuckles"},    {62, "RPinky2PIP"},     {63, "RPinky3DIP"}, {64, "RPinky4FingerTip"},
-//     // Background
-//     {65, "Background"},
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
         std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                       // 18 (COCO_18, DOME_18)
@@ -447,6 +457,7 @@ namespace caffe {
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 19,20,21, 22,23,24,    // 65 (MPII_65_42)
                          25,26,27,28, 29,30,31,32, 33,34,35,36, 37,38,39,40, 41,42,43,44, // Left hand
                          45,46,47,48, 49,50,51,52, 53,54,55,56, 57,58,59,60, 61,62,63,64},// Right hand
+        std::vector<int>{5, 6,0,2,8,10, 7,1,3,9,11},                                                                // CAR_12
     };
 
 

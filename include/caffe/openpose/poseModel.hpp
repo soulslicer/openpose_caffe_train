@@ -25,13 +25,15 @@ enum class PoseModel : unsigned short
     COCO_25,
     COCO_25_17,
     MPII_65_42,
+    CAR_12,
     Size,
 };
 enum class PoseCategory : unsigned short
 {
     COCO,
     DOME,
-    MPII
+    MPII,
+    CAR
 };
 
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString);
