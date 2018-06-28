@@ -659,7 +659,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Copy imageAugmented into transformedData + mean-subtraction
     const int imageAugmentedArea = imageAugmented.rows * imageAugmented.cols;
     auto* uCharPtrCvMat = (unsigned char*)(imageAugmented.data);
-    // x/256 - 0.5
+    // VGG: x/256 - 0.5
     if (param_.normalization() == 0)
     {
         for (auto y = 0; y < imageAugmented.rows; y++)
@@ -676,7 +676,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             }
         }
     }
-    // x - channel average
+    // ResNet: x - channel average
     else if (param_.normalization() == 1)
     {
         for (auto y = 0; y < imageAugmented.rows ; y++)
@@ -690,6 +690,25 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                 transformedData[xyOffset] = bgr[0] - 102.9801;
                 transformedData[xyOffset + imageAugmentedArea] = bgr[1] - 115.9465;
                 transformedData[xyOffset + 2*imageAugmentedArea] = bgr[2] - 122.7717;
+            }
+        }
+    }
+    // DenseNet: [x - channel average] * 0.017
+    // https://github.com/shicai/DenseNet-Caffe#notes
+    else if (param_.normalization() == 2)
+    {
+        const auto scaleDenseNet = 0.017;
+        for (auto y = 0; y < imageAugmented.rows ; y++)
+        {
+            const auto yOffset = y*imageAugmented.cols;
+            for (auto x = 0; x < imageAugmented.cols ; x++)
+            {
+                const auto xyOffset = yOffset + x;
+                // const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+                auto* bgr = &uCharPtrCvMat[3*xyOffset];
+                transformedData[xyOffset] = (bgr[0] - 103.94)*scaleDenseNet;
+                transformedData[xyOffset + imageAugmentedArea] = (bgr[1] - 116.78)*scaleDenseNet;
+                transformedData[xyOffset + 2*imageAugmentedArea] = (bgr[2] - 123.68)*scaleDenseNet;
             }
         }
     }
