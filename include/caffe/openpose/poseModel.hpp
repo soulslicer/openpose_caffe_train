@@ -14,12 +14,12 @@ enum class PoseModel : unsigned short
     COCO_19,
     DOME_19,
     DOME_59,
-    COCO_59_17,
+    COCO_59_17, // 5
     MPII_59,
     COCO_19b,
     COCO_19_V2,
     COCO_25,
-    COCO_25_17 = 10,
+    COCO_25_17, // 10
     MPII_65_42,
     CAR_12,
     COCO_25E,
@@ -54,7 +54,10 @@ const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
-const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {});
+std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
+                                    const std::vector<float>& isVisible = {});
+
+std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {});
 
 }  // namespace caffe
 

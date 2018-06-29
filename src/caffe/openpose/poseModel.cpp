@@ -479,24 +479,20 @@ namespace caffe {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
     }
 
-    const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible)
+    std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
+                                        const std::vector<float>& isVisible)
     {
-        std::vector<int> missingChannels;
-        // Missing body parts
-        std::vector<int> missingBodyParts;
-        const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(poseModel);
-        for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
-            if (lmdbToOpenPoseKeypoints[i].empty())
-                missingBodyParts.emplace_back(i);
+        auto missingBodyParts = missingBodyPartsBase;
         // If masking also non visible points
         if (!isVisible.empty())
         {
             for (auto i = 0u ; i < isVisible.size() ; i++)
-                if (isVisible[i] == 2.f)
+                if (isVisible[i] >= 2.f)
                     missingBodyParts.emplace_back(i);
             std::sort(missingBodyParts.begin(), missingBodyParts.end());
         }
         // Missing PAF channels
+        std::vector<int> missingChannels;
         if (!missingBodyParts.empty())
         {
             const auto& pafIndexA = getPafIndexA(poseModel);
@@ -524,5 +520,16 @@ namespace caffe {
         }
         // Return result
         return missingChannels;
+    }
+
+    std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible)
+    {
+        // Missing body parts
+        std::vector<int> missingBodyParts;
+        const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(poseModel);
+        for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
+            if (lmdbToOpenPoseKeypoints[i].empty())
+                missingBodyParts.emplace_back(i);
+        return getIndexesForParts(poseModel, missingBodyParts, isVisible);
     }
 }  // namespace caffe

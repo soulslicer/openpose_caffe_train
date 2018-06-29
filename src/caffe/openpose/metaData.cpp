@@ -53,13 +53,19 @@ namespace caffe {
                 //     v=0: labeled but not visible
                 //     v=1: labeled and visible
                 //     v=2: out of image / unlabeled
+                //     v=3: on of it's parents is v=2
                 joints.isVisible[i] = 1;
                 for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
                 {
                     // If any of them is 2 --> 2 (not in the image or unlabeled)
                     if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
                     {
-                        joints.isVisible[i] = 2;
+                        // Keypoint to keypoint correspondence
+                        if (lmdbToOurModel[i].size() < 2)
+                            joints.isVisible[i] = 2;
+                        // Fake neck, midhip: When interpolated from >=2 keypoints, and at least 1 of them is missing
+                        else
+                            joints.isVisible[i] = 3;
                         break;
                     }
                     // If no 2 but 0 -> 0 (ocluded but located)

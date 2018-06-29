@@ -338,6 +338,47 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
         }
     }
 }
+
+template <typename Dtype>
+void maskOutIsVisible3(Dtype* transformedLabel, const std::vector<float>& isVisible,
+                       const Dtype objPosX, const Dtype objPosY, const Dtype scaleX, const Dtype scaleY,
+                       const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
+{
+    // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
+    const auto type = getType(Dtype(0));
+    std::vector<int> missingBodyPartsBase;
+    for (auto part = 0; part < isVisible.size(); part++)
+        if (isVisible[part] == 3)
+            missingBodyPartsBase.emplace_back(part);
+    const auto missingIndexes = getIndexesForParts(poseModel, missingBodyPartsBase);
+    if (!missingIndexes.empty())
+    {
+        // const auto objPosX = metaData.objPos.x * Dtype(1)/stride;
+        // const auto objPosY = metaData.objPos.y * Dtype(1)/stride;
+        // const auto scaleX = metaData.scaleSelf * gridX;
+        // const auto scaleY = metaData.scaleSelf * gridY;
+        cv::Rect roi{
+            int(std::round(objPosX - scaleX/2 - 0.1*scaleX)),
+            int(std::round(objPosY - scaleY/2 - 0.2*scaleY)),
+            int(std::round(scaleX*1.2)),
+            int(std::round(scaleY*1.4))
+        };
+        // Apply ROI
+        keepRoiInside(roi, cv::Size{gridX, gridY});
+        const auto channelOffset = gridX * gridY;
+        if (roi.area() > 0)
+        {
+            for (const auto& missingIndex : missingIndexes)
+            {
+                cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[missingIndex*channelOffset]);
+                maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+            }
+            // Bkg
+            cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundMaskIndex*channelOffset]);
+            maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+        }
+    }
+}
 // OpenPose: added ended
 
 template<typename Dtype>
@@ -1040,7 +1081,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2); // numberBodyParts + numberPafChannels + 1
 
     // Labels to 0
-    std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * gridY * gridX, 0.f);
+    std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
 
     // Initialize labels to [0, 1] (depending on maskMiss)
     fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
@@ -1196,6 +1237,25 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     //         std::transform(initPoint, initPoint + 2*channelOffset, initPoint,
     //                        std::bind1st(std::multiplies<Dtype>(), ratio)) ;
     // }
+
+    // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
+    // Self
+    const auto objPosX = Dtype(metaData.objPos.x * Dtype(1)/stride);
+    const auto objPosY = Dtype(metaData.objPos.y * Dtype(1)/stride);
+    const auto scaleX = Dtype(metaData.scaleSelf * gridX);
+    const auto scaleY = Dtype(metaData.scaleSelf * gridY);
+    maskOutIsVisible3(transformedLabel, metaData.jointsSelf.isVisible,
+                      objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
+    // For every other person
+    for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+    {
+        const auto objPosX = Dtype(metaData.objPosOthers[otherPerson].x * Dtype(1)/stride);
+        const auto objPosY = Dtype(metaData.objPosOthers[otherPerson].y * Dtype(1)/stride);
+        const auto scaleX = Dtype(metaData.scaleOthers[otherPerson] * gridX);
+        const auto scaleY = Dtype(metaData.scaleOthers[otherPerson] * gridY);
+        maskOutIsVisible3(transformedLabel, metaData.jointsOthers[otherPerson].isVisible,
+                          objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
+    }
 
     // MPII hands special cases (4/4)
     // Make background channel as non-masked out region for visible labels (for cases with no all people labeled)
