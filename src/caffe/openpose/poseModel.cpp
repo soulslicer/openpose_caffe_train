@@ -1,4 +1,5 @@
 #include <algorithm>    // std::sort, std::unique, std::distance
+#include <iostream>
 #include <caffe/openpose/poseModel.hpp>
 #include <caffe/openpose/getLine.hpp>
 
@@ -124,32 +125,6 @@ namespace caffe {
 //     {24, "RHeel"},
 //     {19/25, "Background"},
 // };
-// OPENPOSE_BODY_PARTS_23 {
-//     {0,  "Neck"},
-//     {1,  "RShoulder"},
-//     {2,  "RElbow"},
-//     {3,  "RWrist"},
-//     {4,  "LShoulder"},
-//     {5,  "LElbow"},
-//     {6,  "LWrist"},
-//     {7,  "LowerAbs"},
-//     {8,  "RHip"},
-//     {9,  "RKnee"},
-//     {10, "RAnkle"},
-//     {11, "RBigToe"},
-//     {12, "RSmallToe"},
-//     {13, "LHip"},
-//     {14, "LKnee"},
-//     {15, "LAnkle"},
-//     {16, "LBigToe"},
-//     {17, "LSmallToe"},
-//     {18, "Nose"},
-//     {19, "REye"},
-//     {20, "REar"},
-//     {21, "LEye"},
-//     {22, "LEar"},
-//     {23, "Background"}
-// };
 // OPENPOSE_BODY_PARTS_59 {
 //     // Body
 //     {0,  "Nose"},
@@ -264,23 +239,23 @@ namespace caffe {
     {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
         if (poseModel == PoseModel::COCO_19b)
-            return 4;
+            return 3;
         else if (poseModel == PoseModel::COCO_19_V2)
-            return 5;
+            return 4;
         else if (poseModel == PoseModel::CAR_12)
+            return 7;
+        else if (poseModel == PoseModel::COCO_25E || poseModel == PoseModel::COCO_25_17E)
             return 8;
         else if (numberBodyParts == 18)
             return 0;
         else if (numberBodyParts == 19)
             return 1;
-        else if (numberBodyParts == 23)
-            return 2;
         else if (numberBodyParts == 25)
-            return 6;
+            return 5;
         else if (numberBodyParts == 59)
-            return 3;
+            return 2;
         else if (numberBodyParts == 65)
-            return 7;
+            return 6;
         // else
         throw std::runtime_error{"PoseModel does not have corresponding index yet."
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -292,9 +267,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 23, 23, 23, 23, 59, 59, 59, 19, 19, 25, 25, 65, 12};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 21, 19, 17, 23, 59, 17, 59, 17, 17, 23, 17, 42, 14};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -308,18 +283,6 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{
             {0},{1}, {2},{3},{4},  {5},{6},{7},  {8},  {9},{10},{11},  {12},{13},{14},  {15},{16},{17},{18}         // DOME_19
-        },
-        std::vector<std::vector<int>>{
-            {5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16},{19},{20}, {11},{13},{15},{17},{18}, {0},{2},{4},{1},{3}  // COCO_23
-        },
-        std::vector<std::vector<int>>{
-            {1}, {2},{3},{4}, {5},{6},{7}, {8}, {9},{10},{11},{},{}, {12},{13},{14},{},{}, {0},{15},{17},{16},{18}  // DOME_23_19
-        },
-        std::vector<std::vector<int>>{
-            {5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16},{},{}, {11},{13},{15},{},{}, {0},{2},{4},{1},{3}  // COCO_23_17
-        },
-        std::vector<std::vector<int>>{
-            {1}, {2},{3},{4}, {5},{6},{7}, {8}, {9},{10},{11},{19},{20}, {12},{13},{14},{21},{22}, {0},{15},{17},{16},{18} // DOME_23
         },
         std::vector<std::vector<int>>{                                                                              // DOME_59
             {0},{1}, {2},{3},{4},  {5},{6},{7},  {8},  {9},{10},{11},  {12},{13},{14},  {15},{16},{17},{18},        // Body
@@ -357,6 +320,13 @@ namespace caffe {
         std::vector<std::vector<int>>{                                                                              // CAR_12
             {0},{1},{2},{3},{4},{5},{6},{7},{9},{10},{11},{12}                                                      // 8 and 13 are always empty
         },
+        std::vector<std::vector<int>>{
+            // {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25E
+            {},{5,6}, {},{},{}, {},{},{}, {}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22} // COCO_25E
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{} // COCO_25_17E
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -370,14 +340,14 @@ namespace caffe {
             return std::make_pair(PoseModel::COCO_19b, PoseCategory::COCO);
         else if (poseModeString == "COCO_19_V2")
             return std::make_pair(PoseModel::COCO_19_V2, PoseCategory::COCO);
-        else if (poseModeString == "COCO_23")
-            return std::make_pair(PoseModel::COCO_23, PoseCategory::COCO);
-        else if (poseModeString == "COCO_23_17")
-            return std::make_pair(PoseModel::COCO_23_17, PoseCategory::COCO);
         else if (poseModeString == "COCO_25")
             return std::make_pair(PoseModel::COCO_25, PoseCategory::COCO);
         else if (poseModeString == "COCO_25_17")
             return std::make_pair(PoseModel::COCO_25_17, PoseCategory::COCO);
+        else if (poseModeString == "COCO_25E")
+            return std::make_pair(PoseModel::COCO_25E, PoseCategory::COCO);
+        else if (poseModeString == "COCO_25_17E")
+            return std::make_pair(PoseModel::COCO_25_17E, PoseCategory::COCO);
         else if (poseModeString == "COCO_59_17")
             return std::make_pair(PoseModel::COCO_59_17, PoseCategory::COCO);
         // Dome
@@ -385,10 +355,6 @@ namespace caffe {
             return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
         else if (poseModeString == "DOME_19")
             return std::make_pair(PoseModel::DOME_19, PoseCategory::DOME);
-        else if (poseModeString == "DOME_23")
-            return std::make_pair(PoseModel::DOME_23, PoseCategory::DOME);
-        else if (poseModeString == "DOME_23_19")
-            return std::make_pair(PoseModel::DOME_23_19, PoseCategory::DOME);
         else if (poseModeString == "DOME_59")
             return std::make_pair(PoseModel::DOME_59, PoseCategory::DOME);
         // MPII
@@ -413,7 +379,6 @@ namespace caffe {
     const std::array<std::vector<std::array<int,2>>, (int)PoseModel::Size> SWAP_LEFT_RIGHT_KEYPOINTS{
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{11,8},{12,9},{13,10},{15,14},{17,16}},                    // 18 (COCO_18, DOME_18)
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // 19 (COCO_19(b), DOME_19)
-        std::vector<std::array<int,2>>{{1,4},{2,5},{3,6},{8,13},{9,14},{10,15},{11,16},{12,17}, {19,21},{20,22}},   // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},                    // 59 (DOME_59), COCO_59_17, MPII_59
                                        {19,39},{20,40},{21,41},{22,42},{23,43},{24,44},{25,45},{26,46},     // 2 fingers
                                        {27,47},{28,48},{29,49},{30,50},{31,51},{32,52},{33,53},{34,54},     // 2 fingers
@@ -426,12 +391,12 @@ namespace caffe {
                                        {33,53},{34,54},{35,55},{36,56},{37,57},{38,58},{39,59},{40,60},     // 2 fingers
                                        {41,61},{42,62},{43,63},{44,64}},                                    // 1 finger
         std::vector<std::array<int,2>>{{0,1},{2,3},{4,5},{6,7},{8,9},{10,11}},                                      // CAR_12
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},{19,22},{20,23},{21,24}}, // 25E (COCO_25E, COCO_25_17E)
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
         std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                       // 18 (COCO_18, DOME_18)
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},                       // 19 (COCO_19, DOME_19)
-        std::vector<int>{0,0, 1,2, 4,5,  0,7,7,  8,9,10,10, 13,14,15,15,  0,18,18, 19,21,  1,4},                    // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16,                        // 59 (DOME_59), COCO_59_17, MPII_59
                          7,19,20,21, 7,23,24,25, 7,27,28,29, 7,31,32,33, 7,35,36,37, // Left hand
                          4,39,40,41, 4,43,44,45, 4,47,48,49, 4,51,52,53, 4,55,56,57},// Right hand
@@ -442,12 +407,13 @@ namespace caffe {
                          7,25,26,27, 7,29,30,31, 7,33,34,35, 7,37,38,39, 7,41,42,43, // Left hand
                          4,45,46,47, 4,49,50,51, 4,53,54,55, 4,57,58,59, 4,61,62,63},// Right hand
         std::vector<int>{4, 4,4,0,4,8, 5,5,1,5,9},                                                                  // CAR_12
+        std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,     1, 5, 6,     1, 0,  0,  15, 16, 14,19,14, 11,22,11,    // 25 (COCO_25E, COCO_25_17E)
+                         1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1},
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
         std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                       // 18 (COCO_18, DOME_18)
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},                       // 19 (COCO_19, DOME_19)
-        std::vector<int>{1,4, 2,3, 5,6, 7,8,13, 9,10,11,12, 14,15,16,17, 18,19,21, 20,22, 20,22},                   // 23 (COCO_23, DOME_23_19, COCO_23_17, DOME_23)
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18,                        // 59 (DOME_59), COCO_59_17, MPII_59
                          19,20,21,22, 23,24,25,26, 27,28,29,30, 31,32,33,34, 35,36,37,38, // Left hand
                          39,40,41,42, 43,44,45,46, 47,48,49,50, 51,52,53,54, 55,56,57,58},// Right hand
@@ -458,6 +424,8 @@ namespace caffe {
                          25,26,27,28, 29,30,31,32, 33,34,35,36, 37,38,39,40, 41,42,43,44, // Left hand
                          45,46,47,48, 49,50,51,52, 53,54,55,56, 57,58,59,60, 61,62,63,64},// Right hand
         std::vector<int>{5, 6,0,2,8,10, 7,1,3,9,11},                                                                // CAR_12
+        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4,     5, 6, 7,     0, 15, 16, 17, 18, 19,20,21, 22,23,24,    // 25 (COCO_25E, COCO_25_17E)
+                         3,4,6,7,9, 10,11,12,13,14, 15,16,17,18,19, 20,21,22,23,24}, // 0, 2, 5, 8 already done, 1 not required
     };
 
 
