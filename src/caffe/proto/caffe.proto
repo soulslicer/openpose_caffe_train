@@ -411,9 +411,11 @@ message LayerParameter {
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
+  optional ROIPoolingParameter roi_pooling_param = 8266711;
   optional ScaleParameter scale_param = 142;
   optional SigmoidParameter sigmoid_param = 124;
   optional SoftmaxParameter softmax_param = 125;
+  optional SmoothL1LossParameter smooth_l1_loss_param = 8266712;
   optional SPPParameter spp_param = 132;
   optional SliceParameter slice_param = 126;
   optional TanHParameter tanh_param = 127;
@@ -422,6 +424,7 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   // OpenPose: new layer
   optional OPTransformationParameter op_transform_param = 147;
+  optional TripletLossParameter triplet_loss_param = 148;
   // OpenPose: end new layer
 }
 
@@ -662,6 +665,14 @@ message ContrastiveLossParameter {
   // legacy_version = true uses (margin - d^2). This is kept to support /
   // reproduce existing models and results
   optional bool legacy_version = 2 [default = false];
+}
+
+message TripletLossParameter {
+  //margin for negative triplet
+  optional float margin = 1 [default = 1.0];
+  optional uint32 losstype = 2 [default = 1];
+  optional uint32 num_negatives = 3 [default = 3];
+  optional uint32 use_pair = 4 [default = 0];
 }
 
 message ConvolutionParameter {
@@ -1172,6 +1183,17 @@ message ReshapeParameter {
   optional int32 num_axes = 3 [default = -1];
 }
 
+// Message that stores parameters used by ROIPoolingLayer
+message ROIPoolingParameter {
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
+  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
+  // Multiplicative spatial scale factor to translate ROI coords from their
+  // input scale to the scale used when pooling
+  optional float spatial_scale = 3 [default = 1];
+}
+
 message ScaleParameter {
   // The first axis of bottom[0] (the first input Blob) along which to apply
   // bottom[1] (the second input Blob).  May be negative to index from the end
@@ -1216,6 +1238,13 @@ message SigmoidParameter {
     CUDNN = 2;
   }
   optional Engine engine = 1 [default = DEFAULT];
+}
+
+message SmoothL1LossParameter {
+  // SmoothL1Loss(x) =
+  //   0.5 * (sigma * x) ** 2    -- if x < 1.0 / sigma / sigma
+  //   |x| - 0.5 / sigma / sigma -- otherwise
+  optional float sigma = 1 [default = 1];
 }
 
 message SliceParameter {
@@ -1407,6 +1436,7 @@ message V1LayerParameter {
   optional TransformationParameter transform_param = 36;
   optional LossParameter loss_param = 42;
   optional V0LayerParameter layer = 1;
+  optional TripletLossParameter triplet_loss_param = 43;
 }
 
 // DEPRECATED: V0LayerParameter is the old way of specifying layer parameters
