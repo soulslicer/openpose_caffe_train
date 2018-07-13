@@ -58,11 +58,11 @@ void ROIPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
   // For each ROI R = [batch_index x1 y1 x2 y2]: max pool over R
   for (int n = 0; n < num_rois; ++n) {
-    int roi_batch_ind = bottom_rois[0];
-    int roi_start_w = round(bottom_rois[1] * spatial_scale_);
-    int roi_start_h = round(bottom_rois[2] * spatial_scale_);
-    int roi_end_w = round(bottom_rois[3] * spatial_scale_);
-    int roi_end_h = round(bottom_rois[4] * spatial_scale_);
+    int roi_batch_ind = bottom_rois[0]; // Which batch this roi belongs to
+    int roi_start_w = round(bottom_rois[1] * spatial_scale_); // x1 scaled
+    int roi_start_h = round(bottom_rois[2] * spatial_scale_); // y1 scaled
+    int roi_end_w = round(bottom_rois[3] * spatial_scale_); // x2 scaled
+    int roi_end_h = round(bottom_rois[4] * spatial_scale_); // y2 scaled
     CHECK_GE(roi_batch_ind, 0);
     CHECK_LT(roi_batch_ind, batch_size);
 
@@ -81,13 +81,13 @@ void ROIPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
           // Compute pooling region for this output unit:
           //  start (included) = floor(ph * roi_height / pooled_height_)
           //  end (excluded) = ceil((ph + 1) * roi_height / pooled_height_)
-          int hstart = static_cast<int>(floor(static_cast<Dtype>(ph)
+          int hstart = static_cast<int>(floor(static_cast<Dtype>(ph) // If 1, this is 0
                                               * bin_size_h));
-          int wstart = static_cast<int>(floor(static_cast<Dtype>(pw)
+          int wstart = static_cast<int>(floor(static_cast<Dtype>(pw) // If 1, this is 0
                                               * bin_size_w));
-          int hend = static_cast<int>(ceil(static_cast<Dtype>(ph + 1)
+          int hend = static_cast<int>(ceil(static_cast<Dtype>(ph + 1) // If 1, this is ROI height
                                            * bin_size_h));
-          int wend = static_cast<int>(ceil(static_cast<Dtype>(pw + 1)
+          int wend = static_cast<int>(ceil(static_cast<Dtype>(pw + 1) // If 1, this is ROI width
                                            * bin_size_w));
 
           hstart = min(max(hstart + roi_start_h, 0), height_);

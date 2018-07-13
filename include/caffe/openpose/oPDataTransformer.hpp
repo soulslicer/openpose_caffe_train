@@ -40,7 +40,7 @@ class OPDataTransformer {
 public:
     explicit OPDataTransformer(const std::string& modelString);
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
-        const std::string& modelString, bool tpaf = false); // OpenPose: Added std::string
+                               const std::string& modelString, bool tpaf = false, bool staf = false, std::vector<int> stafIDS = {}); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
 
     /**
@@ -90,6 +90,7 @@ public:
                    const Datum* datumNegative = nullptr);
     void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
+
 protected:
     // OpenPose: added end
     // Tranformation parameters
@@ -107,7 +108,8 @@ protected:
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
     std::string mModelString;
-    bool mTpaf;
+    bool mTpaf, mStaf;
+    std::vector<int> mStafIDS;
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
@@ -118,6 +120,8 @@ protected:
                               int extra_labels_count = 0);
     void generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                          const MetaData& metaData, const cv::Mat& img, const int stride) const;
+    void generateLabelMapStaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;

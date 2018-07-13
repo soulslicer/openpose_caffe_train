@@ -90,6 +90,8 @@ OPDataLayer<Dtype>::~OPDataLayer()
     this->StopInternalThread();
 }
 
+#include <boost/algorithm/string.hpp>
+
 template <typename Dtype>
 void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
@@ -103,17 +105,28 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     }
     if(extra_strides_.size() != extra_labels_count_) throw std::runtime_error("Invalid extra_strides");
 
+    // If Staf
+    std::vector<int> staf_ids;
+    if(op_transform_param_.staf()){
+        const std::string staf_ids_string = op_transform_param_.staf_ids();
+        std::vector<std::string> strs;
+        boost::split(strs,staf_ids_string,boost::is_any_of(" "));
+        for(int i=0; i<strs.size(); i++){
+            staf_ids.emplace_back(std::stoi(strs[i]));
+        }
+    }
+
     const int batch_size = this->layer_param_.data_param().batch_size();
     // Read a data point, and use it to initialize the top blob.
     Datum datum;
     datum.ParseFromString(cursor_->value());
 
     // OpenPose: added
-    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
+    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model(), false, op_transform_param_.staf(), staf_ids));
     if (secondDb)
-        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
+        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary(), false, op_transform_param_.staf(), staf_ids));
     if (thirdDb)
-        mOPDataTransformerTertiary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_tertiary()));
+        mOPDataTransformerTertiary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_tertiary(), false, op_transform_param_.staf(), staf_ids));
     // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
