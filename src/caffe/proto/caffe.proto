@@ -527,6 +527,8 @@ message OPTransformationParameter {
   optional uint32 staf = 34 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
 
   optional string staf_ids = 35 [default = ""];
+
+  optional uint32 num_people_image = 36 [default = 3];
   // // CLAHE
   // optional float clahe_tile_size = 34 [default = 8.0];
   // optional float clahe_clip_limit = 35 [default = 4.0];

@@ -16,9 +16,9 @@ void TripletLossLayer<Dtype>::LayerSetUp(
   CHECK_EQ(bottom[0]->channels(), dim);
   CHECK_EQ(bottom[0]->height(), 1);
   CHECK_EQ(bottom[0]->width(), 1);
-  CHECK_EQ(bottom[1]->channels(), 1);
-  CHECK_EQ(bottom[1]->height(), 1);
-  CHECK_EQ(bottom[1]->width(), 1);
+//  CHECK_EQ(bottom[1]->channels(), 1);
+//  CHECK_EQ(bottom[1]->height(), 1);
+//  CHECK_EQ(bottom[1]->width(), 1);
   // In each set, we have:
   // the descriptor of reference sample, closest sample, and negative samples
   // number of sets in the whole batch

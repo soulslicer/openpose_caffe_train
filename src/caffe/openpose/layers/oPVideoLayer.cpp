@@ -72,10 +72,22 @@ OPVideoLayer<Dtype>::~OPVideoLayer()
     this->StopInternalThread();
 }
 
+
 template <typename Dtype>
 void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
 {
+    // If Staf
+    std::vector<int> staf_ids;
+    if(op_transform_param_.staf()){
+        const std::string staf_ids_string = op_transform_param_.staf_ids();
+        std::vector<std::string> strs;
+        boost::split(strs,staf_ids_string,boost::is_any_of(" "));
+        for(int i=0; i<strs.size(); i++){
+            staf_ids.emplace_back(std::stoi(strs[i]));
+        }
+    }
+
     frame_size = this->layer_param_.op_transform_param().frame_size();
 
     const int batch_size = this->layer_param_.data_param().batch_size();
@@ -84,9 +96,9 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     datum.ParseFromString(cursor_->value());
 
     // OpenPose Module
-    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model(), op_transform_param_.tpaf()));
+    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
     if (secondDb)
-        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary(), op_transform_param_.tpaf()));
+        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
 
     // Multi Image shape (Data layer is ([frame*batch * 3 * 368 * 38])) - Set Data size
     const int width = this->phase_ != TRAIN ? datum.width() : this->layer_param_.op_transform_param().crop_size_x();

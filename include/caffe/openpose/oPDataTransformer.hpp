@@ -24,6 +24,25 @@
 
 namespace caffe {
 
+#include  <random>
+#include  <iterator>
+
+template<typename Iter, typename RandomGenerator>
+Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
+    std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
+    std::advance(start, dis(g));
+    return start;
+}
+
+template<typename Iter>
+Iter select_randomly(Iter start, Iter end) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    return select_randomly(start, end, gen);
+}
+
+int getRand(int min, int max);
+
 struct VSeq{
     std::vector<cv::Mat> images;
     std::vector<cv::Mat> imagesAug;
@@ -39,6 +58,7 @@ template <typename Dtype>
 class OPDataTransformer {
 public:
     explicit OPDataTransformer(const std::string& modelString);
+    explicit OPDataTransformer(const OPTransformationParameter& param);
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
                                const std::string& modelString, bool tpaf = false, bool staf = false, std::vector<int> stafIDS = {}); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
@@ -91,6 +111,9 @@ public:
     void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
 
+    cv::Mat parseBackground(const Datum* background);
+
+
 protected:
     // OpenPose: added end
     // Tranformation parameters
@@ -129,6 +152,7 @@ protected:
                        const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride,
                        const int gridX, const int gridY, const float sigma, const int threshold,
                        const int diagonal, const float diagonalProportion, const bool normalize = true, const bool demask = false, const float tanval = 0) const;
+
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,

@@ -242,6 +242,19 @@ OPDataTransformer<Dtype>::OPDataTransformer(const std::string& modelString){
 }
 
 template<typename Dtype>
+OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param) // OpenPose: Added std::string
+// : param_(param), phase_(phase) {
+    : param_(param), mCurrentEpoch{-1} {
+
+    LOG(INFO) << "OPDataTransformer constructor done.";
+    // PoseModel
+    std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(param_.model());
+    mModelString = param_.model();
+    srand(time(NULL));
+    // OpenPose: added end
+}
+
+template<typename Dtype>
 OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param,
                                             Phase phase, const std::string& modelString, bool tpaf, bool staf, std::vector<int> stafIDS) // OpenPose: Added std::string
 // : param_(param), phase_(phase) {
@@ -308,9 +321,9 @@ std::string getCurrDir(){
 }
 
 template<typename Dtype>
-void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dtype* transformedLabel, const int rezX, const int rezY, const int gridX, const int gridY, const int stride, const PoseModel mPoseModel, const std::string mModelString, const int numberTotalChannels, bool basic=false){
+void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dtype* transformedLabel, const int rezX, const int rezY, const int gridX, const int gridY, const int stride, const PoseModel mPoseModel, const std::string mModelString, const int numberTotalChannels, bool basic=false, std::string fname="visualize"){
 
-    std::string vizDir = getCurrDir() + "/visualize";
+    std::string vizDir = getCurrDir() + "/" + fname;
     std::string rmCommand = "rm -rf " + vizDir;
     std::string mkdirCommand = "mkdir " + vizDir;
     system(rmCommand.c_str());
@@ -325,6 +338,18 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
         cv::putText(imageAugCloned, std::to_string(i), p, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1);
         }
         i++;
+
+        i=0;
+        if(metaData.jointsSelfPrev.points.size()){
+            for(cv::Point2f p : metaData.jointsSelfPrev.points){
+                cv::circle(imageAugCloned, p, 3, cv::Scalar(25,25,255),CV_FILLED);
+                if(metaData.jointsSelf.points.size()){
+                    if(metaData.jointsSelf.isVisible[i] <= 1 && metaData.jointsSelfPrev.isVisible[i] <= 1)
+                        cv::line(imageAugCloned, p, metaData.jointsSelf.points[i], cv::Scalar(25,25,255));
+                }
+                i++;
+            }
+        }
     }
     int pid=0;
     for(const Joints& j : metaData.jointsOthers){
@@ -342,7 +367,7 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
             for(cv::Point2f p : metaData.jointsOthersPrev[pid].points){
                 cv::circle(imageAugCloned, p, 3, cv::Scalar(25,25,255),CV_FILLED);
                 if(metaData.jointsOthers[pid].points.size()){
-                    if(metaData.jointsOthers[pid].isVisible[i] == 1 && metaData.jointsOthersPrev[pid].isVisible[i] == 1)
+                    if(metaData.jointsOthers[pid].isVisible[i] <= 1 && metaData.jointsOthersPrev[pid].isVisible[i] <= 1)
                         cv::line(imageAugCloned, p, metaData.jointsOthers[pid].points[i], cv::Scalar(25,25,255));
                 }
                 i++;
@@ -901,11 +926,14 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
 
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
-        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
-        //if(i == 3 && vid == 3){
-        //vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, true);
-        //exit(-1);
-        //}
+        if(mStaf)
+            generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+        else
+            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+//        if(i == 3 && vid == 3){
+//        vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
+//        exit(-1);
+//        }
         //imgAugPrev = imgAug.clone();
 
         // Convert image to Caffe Format
@@ -1008,6 +1036,60 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
     exit(-1);
 }
 
+
+// OpenPose: added
+template<typename Dtype>
+cv::Mat  OPDataTransformer<Dtype>::parseBackground(const Datum *datumNegative){
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+
+    cv::Mat backgroundImage;
+    if (datumNegative != nullptr)
+    {
+        const std::string& data = datumNegative->data();
+        const int datumNegativeWidth = datumNegative->width();
+        const int datumNegativeHeight = datumNegative->height();
+        const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
+        // OpenCV wrapping --> 1.7x speed up naive image.at<cv::Vec3b>, 1.25x speed up with smart speed up
+        const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
+        const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
+        const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
+        cv::merge({b,g,r}, backgroundImage);
+        // // Security checks
+        // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
+        // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
+        // CHECK_EQ(cv::norm(backgroundImage-image2), 0);
+        // Included data augmentation: cropping
+        // Disable data augmentation --> minX = minY = 0
+        // Data augmentation: cropping
+        if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
+        {
+            const auto xDiff = datumNegativeWidth - finalImageWidth;
+            const auto yDiff = datumNegativeHeight - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                                            (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                                            (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+        }
+        // Resize (if smaller than final crop size)
+        // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+        else
+        {
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+        }
+    }
+
+    return backgroundImage;
+}
 
 // OpenPose: added
 template<typename Dtype>
@@ -1174,9 +1256,14 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
 
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
-        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
-        //vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
-        //exit(-1);
+        if(mStaf)
+            generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+        else
+            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+//        if(i == 3 &&  metaData.writeNumber == 1){
+//        vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
+//        exit(-1);
+//        }
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
@@ -1904,7 +1991,7 @@ void OPDataTransformer<Dtype>::generateLabelMapStaf(Dtype* transformedLabel, con
                                   count, metaData.jointsSelf.points[j], metaData.jointsSelf.points[mStafID],
                                   stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
                 }
-            }else{
+            }else if(metaData.jointsSelf.points.size()){
                 if(metaData.jointsSelf.isVisible[j] <= 1 && metaData.jointsSelf.isVisible[mStafID] <= 1){
                     putVectorMaps(stafPtrID + 2*j*channelOffset,
                                   stafPtrID + ((2*j)+1)*channelOffset,

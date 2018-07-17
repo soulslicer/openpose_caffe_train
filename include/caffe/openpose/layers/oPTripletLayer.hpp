@@ -1,8 +1,8 @@
 // File based in `data_layer.hpp`, extracted from Caffe GitHub on Sep 7th, 2017
 // https://github.com/BVLC/caffe/
 
-#ifndef CAFFE_OPENPOSE_OP_VIDEO_LAYER_HPP
-#define CAFFE_OPENPOSE_OP_VIDEO_LAYER_HPP
+#ifndef CAFFE_OPENPOSE_OP_TRIPLET_LAYER_HPP
+#define CAFFE_OPENPOSE_OP_TRIPLET_LAYER_HPP
 
 #include <vector>
 
@@ -23,13 +23,13 @@
 namespace caffe {
 
 template <typename Dtype>
-class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
+class OPTripletLayer : public BasePrefetchingDataLayer<Dtype> {
  public:
-  explicit OPVideoLayer(const LayerParameter& param);
-  virtual ~OPVideoLayer();
+  explicit OPTripletLayer(const LayerParameter& param);
+  virtual ~OPTripletLayer();
   virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
-  virtual inline const char* type() const { return "OPVideo"; }
+  virtual inline const char* type() const { return "OPTriplet"; }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int MinTopBlobs() const { return 1; }
   virtual inline int MaxTopBlobs() const { return 2; }
@@ -71,10 +71,12 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   int vCounter = 0;
   double mDuration;
 
-  int frame_size = 6;
+  const int triplet_size = 3;
+  std::vector<int> reidKeys;
+  std::map<int, std::vector<std::string>> reidData;
   // OpenPose: added end
 };
 
 }  // namespace caffe
 
-#endif  // CAFFE_OPENPOSE_OP_DATA_LAYER_HPP
+#endif  // CAFFE_OPENPOSE_OP_TRIPLET_LAYER_HPP
