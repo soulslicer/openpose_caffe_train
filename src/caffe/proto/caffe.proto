@@ -499,6 +499,8 @@ message OPTransformationParameter {
   optional float prob_secondary = 27 [default = 0.0];
   // 0 for x/256 - 0.5 (VGG); 1 for x-channel average (ResNet); 2 for 1-channel * scale (DenseNet)
   optional uint32 normalization = 28 [default = 0];
+  // Force the decoded image to have 1 color channels.
+  optional bool add_distance = 29 [default = false];
   // // CLAHE
   // optional float clahe_tile_size = 26 [default = 8.0];
   // optional float clahe_clip_limit = 27 [default = 4.0];
@@ -1003,6 +1005,8 @@ message PoolingParameter {
   // If global_pooling then it will pool over the size of the bottom by doing
   // kernel_h = bottom->height and kernel_w = bottom->width
   optional bool global_pooling = 12 [default = false];
+  // Specify floor/ceil mode
+  optional bool ceil_mode = 13 [default = true];
 }
 
 message PowerParameter {

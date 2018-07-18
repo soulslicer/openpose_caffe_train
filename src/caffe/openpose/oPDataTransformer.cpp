@@ -265,7 +265,8 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
                    cv::Mat& count, const cv::Point2f& centerA,
                    const cv::Point2f& centerB, const int stride, const int gridX,
                    const int gridY, const int threshold,
-                   const int diagonal, const float diagonalProportion, Dtype* backgroundMask)
+                   // const int diagonal, const float diagonalProportion,
+                   Dtype* backgroundMask)
 // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
 //                    cv::Mat& count, const cv::Point2f& centerA,
 //                    const cv::Point2f& centerB, const int stride, const int gridX,
@@ -295,10 +296,6 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
                                   int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
         const int maxY = std::min(gridY,
                                   int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
-(void)diagonalProportion;
-(void)diagonal;
-(void)entryX;
-(void)entryY;
         // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
         for (auto gY = minY; gY < maxY; gY++)
         {
@@ -456,9 +453,13 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
 template <typename Dtype>
 int OPDataTransformer<Dtype>::getNumberChannels() const
 {
-    return 2 * getNumberBodyBkgAndPAF(mPoseModel);
-    // // For Distance
-    // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberPafChannels(mPoseModel)/2);
+    // If distance
+    if (param_.add_distance())
+        return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberBodyParts(mPoseModel)-1);
+        // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberPafChannels(mPoseModel)/2);
+    // If no distance
+    else
+        return 2 * getNumberBodyBkgAndPAF(mPoseModel);
 }
 // OpenPose: end
 
@@ -1182,8 +1183,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto& labelMapA = getPafIndexA(mPoseModel);
     const auto& labelMapB = getPafIndexB(mPoseModel);
     const auto threshold = 1;
-    const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
-    const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
+    // const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
+    // const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
     for (auto i = 0 ; i < labelMapA.size() ; i++)
     {
         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
@@ -1200,7 +1201,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                           // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                           count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                           param_.stride(), gridX, gridY, threshold,
-                          diagonal, diagonalProportion,
+                          // diagonal, diagonalProportion,
                           // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
                           (mPoseModel == PoseModel::CAR_12 ? transformedLabelBkgMask : nullptr));
         }
@@ -1220,7 +1221,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
                               param_.stride(), gridX, gridY, threshold,
-                              diagonal, diagonalProportion,
+                              // diagonal, diagonalProportion,
                               // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
                               (mPoseModel == PoseModel::CAR_12 ? transformedLabelBkgMask : nullptr));
             }
