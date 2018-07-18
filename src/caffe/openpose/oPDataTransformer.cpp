@@ -230,7 +230,8 @@ int getType(Dtype dtype)
 
 template<typename Dtype>
 void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int stride,
-                     const int gridX, const int gridY, const float sigma)
+                     const int gridX, const int gridY, const float sigma,
+                     Dtype* entryDistX, Dtype* entryDistY)
 {
     //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
@@ -890,7 +891,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     //         const auto gridX = rezX / stride;
     //         const auto gridY = rezY / stride;
     //         const auto channelOffset = gridY * gridX;
-    //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
+    //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + param_.add_distance() * 2 * (numberBodyParts-1);
     //         for (auto part = 0; part < numberTotalChannels; part++)
     //         {
     //             // Reduce #images saved (ideally mask images should be the same)
@@ -1077,9 +1078,11 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto channelOffset = gridY * gridX;
     const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
     const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
-    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel); // numberBodyParts + numberPafChannels + 1
-    // // For Distance
-    // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2); // numberBodyParts + numberPafChannels + 1
+    // numberBodyParts + numberPafChannels + 1
+    const auto addDistance = param_.add_distance();
+    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + addDistance * 2 * (numberBodyParts-1);
+    // // For old distance
+    // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2);
 
     // Labels to 0
     std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
@@ -1135,16 +1138,25 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     auto* transformedLabelBkgMask = &transformedLabel[backgroundMaskIndex*channelOffset];
 
     // Body parts
+    const auto rootIndex = getRootIndex(mPoseModel);
     for (auto part = 0; part < numberBodyParts; part++)
     {
         // Self
         if (metaData.jointsSelf.isVisible[part] <= 1)
         {
             const auto& centerPoint = metaData.jointsSelf.points[part];
-            putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                            centerPoint, param_.stride(), gridX, gridY, param_.sigma()//,
-                            //ASDFDDDDDDDDDDDDDD
-                            );
+            putGaussianMaps(
+                transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
+                centerPoint, param_.stride(), gridX, gridY, param_.sigma(),
+                (addDistance && rootIndex != part ?
+                    transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
+                        (part > rootIndex ? -2 : 0))*channelOffset
+                    : nullptr),
+                (addDistance && rootIndex != part ?
+                    transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
+                        (part > rootIndex ? -1 : 1))*channelOffset
+                    : nullptr)
+            );
         }
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1152,10 +1164,18 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
-                putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                                centerPoint, param_.stride(), gridX, gridY, param_.sigma()//,
-                                //ASDFDDDDDDDDDDDDDD
-                                );
+                putGaussianMaps(
+                    transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
+                    centerPoint, param_.stride(), gridX, gridY, param_.sigma(),
+                    (addDistance && rootIndex != part ?
+                        transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
+                            (part > rootIndex ? -2 : 0))*channelOffset
+                        : nullptr),
+                    (addDistance && rootIndex != part ?
+                        transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
+                            (part > rootIndex ? -1 : 1))*channelOffset
+                        : nullptr)
+                );
             }
         }
     }

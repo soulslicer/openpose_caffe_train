@@ -54,6 +54,8 @@ const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
+unsigned int getRootIndex(const PoseModel poseModel);
+
 std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
                                     const std::vector<float>& isVisible = {});
 

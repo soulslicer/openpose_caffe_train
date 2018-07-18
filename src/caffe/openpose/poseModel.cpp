@@ -428,6 +428,18 @@ namespace caffe {
                          3,4,6,7,9, 10,11,12,13,14, 15,16,17,18,19, 20,21,22,23,24}, // 0, 2, 5, 8 already done, 1 not required
     };
 
+    const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
+        1u,     // 18 (COCO_18, DOME_18)
+        1u,     // 19 (COCO_19, DOME_19)
+        1u,     // 59 (DOME_59), COCO_59_17, MPII_59
+        1u,     // COCO_19b
+        1u,     // COCO_19_V2
+        1u,     // 25 (COCO_25, COCO_25_17)
+        1u,     // 65 (MPII_65_42)
+        1u,     // CAR_12
+        1u,     // 25 (COCO_25E, COCO_25_17E)
+    };
+
 
 
 
@@ -477,6 +489,11 @@ namespace caffe {
     const std::vector<int>& getPafIndexB(const PoseModel poseModel)
     {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
+    }
+
+    unsigned int getRootIndex(const PoseModel poseModel)
+    {
+        return ROOT_INDEXES.at(poseModelToIndex(poseModel));
     }
 
     std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
