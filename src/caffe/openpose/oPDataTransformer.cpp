@@ -455,7 +455,7 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 {
     // If distance
     if (param_.add_distance())
-        return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberBodyParts(mPoseModel)-1);
+        return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + 2*(getNumberBodyParts(mPoseModel)-1));
         // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberPafChannels(mPoseModel)/2);
     // If no distance
     else
@@ -562,7 +562,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const cv::Mat b(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[0]);
         const cv::Mat g(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[datumArea]);
         const cv::Mat r(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[2*datumArea]);
-        cv::merge({b,g,r}, image);
+        cv::merge(std::vector<cv::Mat>{b,g,r}, image);
         // // Security checks
         // const auto initImageArea = (int)(image.rows * image.cols);
         // CHECK_EQ(initImageArea, datumArea);
@@ -618,7 +618,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
         const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
         const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
-        cv::merge({b,g,r}, backgroundImage);
+        cv::merge(std::vector<cv::Mat>{b,g,r}, backgroundImage);
         // // Security checks
         // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
         // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
@@ -1142,7 +1142,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         {
             const auto& centerPoint = metaData.jointsSelf.points[part];
             putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                            centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                            centerPoint, param_.stride(), gridX, gridY, param_.sigma()//,
+                            //ASDFDDDDDDDDDDDDDD
+                            );
         }
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1151,7 +1153,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
                 putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                                centerPoint, param_.stride(), gridX, gridY, param_.sigma()//,
+                                //ASDFDDDDDDDDDDDDDD
+                                );
             }
         }
     }
