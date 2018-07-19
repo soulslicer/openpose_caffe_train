@@ -1238,6 +1238,7 @@ std::cout << 2*part*channelOffset << "\t";
                     if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
                     {
                         const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+                        const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
                         putDistanceMaps(
                             channelDistance + 2*part*channelOffset,
                             channelDistance + 2*(part+1)*channelOffset,
