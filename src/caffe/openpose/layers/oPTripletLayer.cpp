@@ -237,7 +237,7 @@ float intersectionPercentage(cv::Rect a, cv::Rect b){
 //    # perform the actual rotation and return the image
 //    return cv2.warpAffine(image, M, (nW, nH))
 
-cv::Size rotateBoundSize(cv::Size currSize, float angle){
+std::pair<cv::Mat, cv::Size> rotateBoundSize(cv::Size currSize, float angle){
     int h = currSize.height;
     int w = currSize.width;
     int cx = w/2;
@@ -245,33 +245,27 @@ cv::Size rotateBoundSize(cv::Size currSize, float angle){
 
     cv::Mat M = cv::getRotationMatrix2D(cv::Point(cx,cy), -angle, 1.0);
     float cos = M.at<double>(0,0);
-    float sin = M.at<double>(1,0);
+    float sin;
+    if(angle < 0)
+        sin = -M.at<double>(1,0);
+    else
+        sin = M.at<double>(1,0);
     int nW = int((h * sin) + (w * cos));
     int nH = int((h * cos) + (w * sin));
 
     M.at<double>(0,2) += (nW / 2) - cx;
     M.at<double>(1,2) += (nH / 2) - cy;
 
-    return cv::Size(nW, nH);
+    return std::pair<cv::Mat, cv::Size>(M, cv::Size(nW, nH));
 }
 
 cv::Mat rotateBound(const cv::Mat& image, float angle){
-    int h = image.size().height;
-    int w = image.size().width;
-    int cx = w/2;
-    int cy = h/2;
+    //angle = 10;
 
-    cv::Mat M = cv::getRotationMatrix2D(cv::Point(cx,cy), -angle, 1.0);
-    float cos = M.at<double>(0,0);
-    float sin = M.at<double>(1,0);
-    int nW = int((h * sin) + (w * cos));
-    int nH = int((h * cos) + (w * sin));
-
-    M.at<double>(0,2) += (nW / 2) - cx;
-    M.at<double>(1,2) += (nH / 2) - cy;
+    std::pair<cv::Mat, cv::Size> data = rotateBoundSize(image.size(), angle);
 
     cv::Mat finalImage;
-    cv::warpAffine(image, finalImage, M, cv::Size(nW, nH), cv::INTER_CUBIC, // CUBIC to consider rotations
+    cv::warpAffine(image, finalImage, data.first, data.second, cv::INTER_CUBIC, // CUBIC to consider rotations
                    cv::BORDER_CONSTANT, cv::Scalar{0,0,0});
     return finalImage;
 }
@@ -284,7 +278,8 @@ void generateImage(const cv::Mat& backgroundImage, const std::vector<cv::Mat>& p
  * 2nd one do the same, keep sampling until no overlap
  * 3rd one do the same for both
  */
-    float size_scale = 0.7;
+    fag:
+    float size_scale = 0.33;
     float intersect_ratio = 0.2;
     float image_size_ratio = 1.1;
     float rotate_angle = 10;
@@ -296,31 +291,44 @@ void generateImage(const cv::Mat& backgroundImage, const std::vector<cv::Mat>& p
         const cv::Mat& personImage = personImages[i];
 
         // Do the crop or rotation here!!
+        // Warning, this is set to maxdim but set against width
+        int maxDim = max(personImage.size().width, personImage.size().height);
 
 
         int counter = 0;
         int x, y, w, h;
         float rot;
+        float curr_size_scale = size_scale;
+        bool brokeLoop = false;
         while(1){
             // NEED A BETTER WAY TO HANDLE SCALE
-            if(counter > 500){
-                size_scale = 0.5;
-                std::cout << "warning: reducing scale" << std::endl;
-            }else if(counter > 1000){
-                size_scale = 0.4;
-                std::cout << "warning: reducing scale" << std::endl;
+            if(counter > 1000){
+                //std::cout << "warning: reset try again" << std::endl;
+                size_scale *= 0.9;
+                rectangles.clear();
+                hold_rectangles.clear();
+                finalImage = backgroundImage.clone();
+                i = -1;
+                brokeLoop = true;
+                break;
             }
 
             counter++;
-            w = getRand(personImage.size().width*size_scale, personImage.size().width*(1./size_scale));
-            h = w*(personImage.size().height/personImage.size().width);
+
+            // size needs to be fixed
+            w = getRand(maxDim*curr_size_scale, maxDim);
+            h = w*((float)personImage.size().height/(float)personImage.size().width);
             x = getRand(0, fabs(finalImage.size().width - w));
             y = getRand(0, fabs(finalImage.size().height - h));
             cv::Rect hold_rect(x,y,w,h);
 
             // Rot
             rot = getRand(-rotate_angle,rotate_angle);
-            cv::Size newPossibleSize = rotateBoundSize(cv::Size(w,h), rot);
+            cv::Size newPossibleSize;
+            if(rot == 0)
+                newPossibleSize = cv::Size(w,h);
+            else
+                newPossibleSize = rotateBoundSize(cv::Size(w,h), rot).second;
             x += (newPossibleSize.width - w) / 2;
             y += (newPossibleSize.height - h) / 2;
             w = newPossibleSize.width;
@@ -345,12 +353,15 @@ void generateImage(const cv::Mat& backgroundImage, const std::vector<cv::Mat>& p
             break;
         }
 
+        if(brokeLoop){
+            continue;
+        }
         cv::Mat newPersonImage;
         cv::Rect rect = rectangles.back();
         cv::Rect hold_rect = hold_rectangles.back();
         cv::resize(personImage, newPersonImage,cv::Size(hold_rect.width, hold_rect.height));
 
-        cv::rectangle(finalImage, rect, cv::Scalar(255,0,0));
+        //cv::rectangle(finalImage, rect, cv::Scalar(255,0,0));
 
         cv::Mat mask = cv::Mat(newPersonImage.size(), CV_8UC3,cv::Scalar(255,255,255));
         mask = rotateBound(mask, rot);
@@ -360,8 +371,48 @@ void generateImage(const cv::Mat& backgroundImage, const std::vector<cv::Mat>& p
         newPersonImage.copyTo(finalImage(rect), mask);
     }
 
-    cv::imshow("win", finalImage);
-    cv::waitKey(1000);
+    //cv::imshow("win", finalImage);
+    //cv::waitKey(1000);
+}
+
+template<typename Dtype>
+void matToCaffeInt(Dtype* caffeImg, const cv::Mat& imgAug){
+    const int imageAugmentedArea = imgAug.rows * imgAug.cols;
+    auto* uCharPtrCvMat = (unsigned char*)(imgAug.data);
+    //caffeImg = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
+    for (auto y = 0; y < imgAug.rows; y++)
+    {
+        const auto yOffset = y*imgAug.cols;
+        for (auto x = 0; x < imgAug.cols; x++)
+        {
+            const auto xyOffset = yOffset + x;
+            // const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+            auto* bgr = &uCharPtrCvMat[3*xyOffset];
+            caffeImg[xyOffset] = (bgr[0] - 128) / 256.0;
+            caffeImg[xyOffset + imageAugmentedArea] = (bgr[1] - 128) / 256.0;
+            caffeImg[xyOffset + 2*imageAugmentedArea] = (bgr[2] - 128) / 256.0;
+        }
+    }
+}
+
+template<typename Dtype>
+void caffeToMatInt(cv::Mat& img, const Dtype* caffeImg, cv::Size imageSize){
+    // Need a function to convert back
+    img = cv::Mat(imageSize, CV_8UC3);
+    const int imageAugmentedArea = img.rows * img.cols;
+    auto* imgPtr = (unsigned char*)(img.data);
+    for (auto y = 0; y < img.rows; y++)
+    {
+        const auto yOffset = y*img.cols;
+        for (auto x = 0; x < img.cols; x++)
+        {
+            const auto xyOffset = yOffset + x;
+            auto* bgr = &imgPtr[3*xyOffset];
+            bgr[0] = (caffeImg[xyOffset]*256.) + 128;
+            bgr[1] = (caffeImg[xyOffset + imageAugmentedArea]*256.) + 128;
+            bgr[2] = (caffeImg[xyOffset + 2*imageAugmentedArea]*256.) + 128;
+        }
+    }
 }
 
 // This function is called on prefetch thread
@@ -387,8 +438,8 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     auto* topData = batch->data_.mutable_cpu_data();
     auto* labelData = batch->label_.mutable_cpu_data();
 
-    std::cout << batch->data_.shape_string() << std::endl; // 9, 3, 368, 368
-    std::cout << batch->label_.shape_string() << std::endl; // 27, 5
+    //std::cout << batch->data_.shape_string() << std::endl; // 9, 3, 368, 368
+    //std::cout << batch->label_.shape_string() << std::endl; // 27, 5
 
     /*
      * 0. Store Path of Train Folder
@@ -420,6 +471,8 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // Load Unique People IDS
     for(int i=0; i<batch_size; i++){
 
+        auto* batchLabelPtr = labelData + batch->label_.offset(i * num_people_image * triplet_size);
+
         std::vector< std::pair<int, std::vector<std::string>>> positive_ids, negative_ids; // 3 each
         for(int j=0; j<num_people_image; j++){
             positive_ids.emplace_back(*select_randomly(reidData.begin(), reidData.end()));
@@ -438,12 +491,14 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                     personImages.emplace_back(pos_id_image);
                 }
             }
+            // J=1 Is for +
             else if(j==1){
                 for(auto& pos_id : positive_ids){
                     cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
                     personImages.emplace_back(pos_id_image);
                 }
             }
+            // J=2 Is for -
             else if(j==2){
                 for(auto& neg_id : negative_ids){
                     cv::Mat neg_id_image = cv::imread(neg_id.second[getRand(0, neg_id.second.size()-1)]);
@@ -451,21 +506,48 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 }
             }
 
+            // Generate Image
             cv::Mat finalImage; std::vector<cv::Rect> rects;
             generateImage(backgroundImage, personImages, finalImage, rects);
+
+            // Convert image to Caffe
+            matToCaffeInt(topData + batch->data_.offset(image_id), finalImage);
+
+            // Write rects
+            for(int k=0; k<rects.size(); k++){
+                cv::Rect& rect = rects[k];
+                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[0] = image_id;
+                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[1] = rect.x;
+                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[2] = rect.y;
+                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[3] = rect.x + rect.width;
+                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[4] = rect.y + rect.height;
+            }
+
+
+            //memcpy()
+
+//            // Visualize
 //            int xx = 0;
-//            for(cv::Mat& personImage : personImages){
-//                cv::imwrite("visualize/"+std::to_string(image_id)+"_"+std::to_string(xx)+".jpg", personImage);
-//                xx++;
+//            if(personImages.size() != 3) throw std::runtime_error("Error");
+//            for(int k=0; k<rects.size(); k++){
+//                cv::Rect& rect = rects[k];
+//                cv::putText(finalImage, std::to_string(j) + " " + std::to_string(image_id) + " " + std::to_string(rect.x + rect.width) + " " + std::to_string(rect.y + rect.height),  rect.tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
 //            }
-            std::cout << image_id << std::endl;
+//            cv::imwrite("visualize2/"+std::to_string(image_id)+".jpg", finalImage);
+//            std::cout << image_id << std::endl;
 
         }
 
     }
-    exit(-1);
 
-    std::cout << "---" << std::endl;
+//    for(int i=0; i<batch->label_.shape()[0]; i++){
+//        std::cout << (labelData + batch->label_.offset(i))[0] << " " << (labelData + batch->label_.offset(i))[1] << " " << (labelData + batch->label_.offset(i))[2] << " " << (labelData + batch->label_.offset(i))[3] << " " << (labelData + batch->label_.offset(i))[4] << std::endl;
+//    }
+
+//    std::cout << "---" << std::endl;
+//    exit(-1);
+
+
 
 
 
