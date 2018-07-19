@@ -230,9 +230,7 @@ int getType(Dtype dtype)
 
 template<typename Dtype>
 void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int stride,
-                     const int gridX, const int gridY, const float sigma,
-                     const cv::Point2f& rootPoint,
-                     Dtype* entryDistX, Dtype* entryDistY, const cv::Point2f& dMax)
+                     const int gridX, const int gridY, const float sigma)
 {
     // No distance
     // LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
@@ -258,14 +256,42 @@ void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int str
                 // entry[xyOffset] += std::exp(-exponent);
                 // if (entry[xyOffset] > 1)
                 //     entry[xyOffset] = 1;
-                // For Distance
-                if (entryDistX != nullptr)
-                {
-                    const cv::Point2f directionAB = cv::Point2f{(float)gX, (float)gY} - rootPoint;
-                    const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
-                    entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
-                    entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
-                }
+            }
+        }
+    }
+}
+
+template<typename Dtype>
+void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY,
+                     Dtype* maskDistX, Dtype* maskDistY,
+                     const cv::Point2f& rootPoint, const cv::Point2f& pointTarget, const int stride,
+                     const int gridX, const int gridY, const float sigma,
+                     const cv::Point2f& dMax)
+{
+    // No distance
+    // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
+    const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
+    const auto multiplier = 2.0 * sigma * sigma;
+    for (auto gY = 0; gY < gridY; gY++)
+    {
+        const auto yOffset = gY*gridX;
+        const Dtype y = start + gY * stride;
+        const auto yMenosCenterPointSquared = (y-rootPoint.y)*(y-rootPoint.y);
+        for (auto gX = 0; gX < gridX; gX++)
+        {
+            const Dtype x = start + gX * stride;
+            const Dtype d2 = (x-rootPoint.x)*(x-rootPoint.x) + yMenosCenterPointSquared;
+            const Dtype exponent = d2 / multiplier;
+            //ln(100) = -ln(1%)
+            if (exponent <= 4.6052)
+            {
+                const auto xyOffset = yOffset + gX;
+                const cv::Point2f directionAB = pointTarget - cv::Point2f{(float)gX, (float)gY};
+                const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
+                entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
+                entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
+                maskDistX[xyOffset] = Dtype(1);
+                maskDistY[xyOffset] = Dtype(1);
             }
         }
     }
@@ -1148,11 +1174,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     auto* transformedLabelBkgMask = &transformedLabel[backgroundMaskIndex*channelOffset];
 
     // Body parts
-    const auto rootIndex = getRootIndex(mPoseModel);
-    const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
-    // For Distance
-    // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-    const cv::Point2f dMax{(float)gridX, (float)gridY};
     for (auto part = 0; part < numberBodyParts; part++)
     {
         // Self
@@ -1161,17 +1182,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             const auto& centerPoint = metaData.jointsSelf.points[part];
             putGaussianMaps(
                 transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
-                centerPoint, param_.stride(), gridX, gridY, param_.sigma(),
-                rootPoint,
-                (addDistance && rootIndex != part ?
-                    transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
-                        (part > rootIndex ? -2 : 0))*channelOffset
-                    : nullptr),
-                (addDistance && rootIndex != part ?
-                    transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
-                        (part > rootIndex ? -1 : 1))*channelOffset
-                    : nullptr), dMax
-            );
+                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
         }
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1181,17 +1192,57 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
                 putGaussianMaps(
                     transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
-                    centerPoint, param_.stride(), gridX, gridY, param_.sigma(),
-                    rootPoint,
-                    (addDistance && rootIndex != part ?
-                        transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
-                            (part > rootIndex ? -2 : 0))*channelOffset
-                        : nullptr),
-                    (addDistance && rootIndex != part ?
-                        transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
-                            (part > rootIndex ? -1 : 1))*channelOffset
-                        : nullptr), dMax
-                );
+                    centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+            }
+        }
+    }
+
+    // Neck-part distance
+    // Mask labels to 0
+    auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
+    std::fill(maskDistance,
+              maskDistance + 2*(numberBodyParts-1) * channelOffset,
+              0.f);
+    if (addDistance)
+    {
+        auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
+                              * channelOffset;
+        const auto rootIndex = getRootIndex(mPoseModel);
+        const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
+        // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
+        const cv::Point2f dMax{(float)gridX/(float)stride, (float)gridY/(float)stride};
+        for (auto partT = 0; partT < numberBodyParts; partT++)
+        {
+            if (rootIndex != partT)
+            {
+                const auto part = (partT > rootIndex ? partT-1 : partT);
+                // Self
+                if (metaData.jointsSelf.isVisible[part] <= 1)
+                {
+                    const auto& centerPoint = metaData.jointsSelf.points[part];
+                    putDistanceMaps(
+                        channelDistance + 2*part*channelOffset,
+                        channelDistance + 2*(part-1)*channelOffset,
+                        maskDistance + 2*part*channelOffset,
+                        maskDistance + 2*(part-1)*channelOffset,
+                        rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+                    );
+                }
+                // For every other person
+                for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+                {
+                    if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
+                    {
+                        const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+                        putDistanceMaps(
+                            channelDistance + 2*part*channelOffset,
+                            channelDistance + 2*(part-1)*channelOffset,
+                            maskDistance + 2*part*channelOffset,
+                            maskDistance + 2*(part-1)*channelOffset,
+                            rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+                        );
+                    }
+                }
             }
         }
     }
