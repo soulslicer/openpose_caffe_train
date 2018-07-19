@@ -231,9 +231,11 @@ int getType(Dtype dtype)
 template<typename Dtype>
 void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int stride,
                      const int gridX, const int gridY, const float sigma,
-                     Dtype* entryDistX, Dtype* entryDistY)
+                     const cv::Point2f& rootPoint,
+                     Dtype* entryDistX, Dtype* entryDistY, const cv::Point2f& dMax)
 {
-    //LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
+    // No distance
+    // LOG(INFO) << "putGaussianMaps here we start for " << centerPoint.x << " " << centerPoint.y;
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     const auto multiplier = 2.0 * sigma * sigma;
     for (auto gY = 0; gY < gridY; gY++)
@@ -256,6 +258,14 @@ void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int str
                 // entry[xyOffset] += std::exp(-exponent);
                 // if (entry[xyOffset] > 1)
                 //     entry[xyOffset] = 1;
+                // For Distance
+                if (entryDistX != nullptr)
+                {
+                    const cv::Point2f directionAB = cv::Point2f{(float)gX, (float)gY} - rootPoint;
+                    const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
+                    entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
+                    entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
+                }
             }
         }
     }
@@ -1139,6 +1149,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
     // Body parts
     const auto rootIndex = getRootIndex(mPoseModel);
+    const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
+    // For Distance
+    // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
+    const cv::Point2f dMax{(float)gridX, (float)gridY};
     for (auto part = 0; part < numberBodyParts; part++)
     {
         // Self
@@ -1148,6 +1162,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             putGaussianMaps(
                 transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
                 centerPoint, param_.stride(), gridX, gridY, param_.sigma(),
+                rootPoint,
                 (addDistance && rootIndex != part ?
                     transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
                         (part > rootIndex ? -2 : 0))*channelOffset
@@ -1155,7 +1170,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 (addDistance && rootIndex != part ?
                     transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
                         (part > rootIndex ? -1 : 1))*channelOffset
-                    : nullptr)
+                    : nullptr), dMax
             );
         }
         // For every other person
@@ -1167,6 +1182,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 putGaussianMaps(
                     transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
                     centerPoint, param_.stride(), gridX, gridY, param_.sigma(),
+                    rootPoint,
                     (addDistance && rootIndex != part ?
                         transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
                             (part > rootIndex ? -2 : 0))*channelOffset
@@ -1174,7 +1190,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     (addDistance && rootIndex != part ?
                         transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1 + 2*part +
                             (part > rootIndex ? -1 : 1))*channelOffset
-                        : nullptr)
+                        : nullptr), dMax
                 );
             }
         }
