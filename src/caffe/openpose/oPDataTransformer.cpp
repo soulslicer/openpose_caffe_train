@@ -1218,15 +1218,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (rootIndex != partT)
             {
                 const auto part = (partT > rootIndex ? partT-1 : partT);
-std::cout << part << " ";
-std::cout << 2*part*channelOffset << "\t";
                 // Self
                 if (metaData.jointsSelf.isVisible[part] <= 1)
                 {
                     const auto& centerPoint = metaData.jointsSelf.points[part];
                     putDistanceMaps(
                         channelDistance + 2*part*channelOffset,
-                        channelDistance + 2*(part+1)*channelOffset,
+                        channelDistance + (2*part+1)*channelOffset,
                         maskDistance + 2*part*channelOffset,
                         maskDistance + (2*part+1)*channelOffset,
                         rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
@@ -1241,7 +1239,7 @@ std::cout << 2*part*channelOffset << "\t";
                         const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
                         putDistanceMaps(
                             channelDistance + 2*part*channelOffset,
-                            channelDistance + 2*(part+1)*channelOffset,
+                            channelDistance + (2*part+1)*channelOffset,
                             maskDistance + 2*part*channelOffset,
                             maskDistance + (2*part+1)*channelOffset,
                             rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
@@ -1251,7 +1249,6 @@ std::cout << 2*part*channelOffset << "\t";
             }
         }
     }
-std::cout << std::endl << std::endl;
 
     // Background channel
     // Naive implementation
