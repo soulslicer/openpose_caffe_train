@@ -1228,7 +1228,7 @@ std::cout << 2*part*channelOffset << "\t";
                         channelDistance + 2*part*channelOffset,
                         channelDistance + 2*(part+1)*channelOffset,
                         maskDistance + 2*part*channelOffset,
-                        maskDistance + 2*(part+1)*channelOffset,
+                        maskDistance + (2*part+1)*channelOffset,
                         rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
                     );
                 }
@@ -1243,7 +1243,7 @@ std::cout << 2*part*channelOffset << "\t";
                             channelDistance + 2*part*channelOffset,
                             channelDistance + 2*(part+1)*channelOffset,
                             maskDistance + 2*part*channelOffset,
-                            maskDistance + 2*(part+1)*channelOffset,
+                            maskDistance + (2*part+1)*channelOffset,
                             rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
                         );
                     }
