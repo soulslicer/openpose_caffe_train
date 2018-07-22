@@ -32,7 +32,7 @@ class OPTripletLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual inline const char* type() const { return "OPTriplet"; }
   virtual inline int ExactNumBottomBlobs() const { return 0; }
   virtual inline int MinTopBlobs() const { return 1; }
-  virtual inline int MaxTopBlobs() const { return 2; }
+  virtual inline int MaxTopBlobs() const { return 3; }
 
  protected:
   void Next();
@@ -71,9 +71,14 @@ class OPTripletLayer : public BasePrefetchingDataLayer<Dtype> {
   int vCounter = 0;
   double mDuration;
 
+  bool id_available = 0;
   const int triplet_size = 3;
   std::vector<int> reidKeys;
   std::map<int, std::vector<std::string>> reidData;
+
+  float secondary_prob = 0;
+  std::vector<int> reidKeys_secondary;
+  std::map<int, std::vector<std::string>> reidData_secondary;
   // OpenPose: added end
 };
 

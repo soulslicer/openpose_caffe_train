@@ -529,6 +529,7 @@ message OPTransformationParameter {
   optional string staf_ids = 35 [default = ""];
 
   optional uint32 num_people_image = 36 [default = 3];
+
   // // CLAHE
   // optional float clahe_tile_size = 34 [default = 8.0];
   // optional float clahe_clip_limit = 35 [default = 4.0];

@@ -80,6 +80,9 @@ template <typename Dtype>
 void OPTripletLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
 {
+    // If ID is wanted
+    id_available = top.size() - 2;
+
     std::string train_source = this->layer_param().data_param().source();
     std::ifstream file(train_source + "train_info.txt");
     std::string str;
@@ -90,13 +93,36 @@ void OPTripletLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
         int person_id = std::stoi(splitString[0]);
         std::string image_path = splitString[1];
         if(!reidData.count(person_id)) reidData[person_id] = std::vector<std::string>();
-        else reidData[person_id].emplace_back(train_source + image_path);
+        reidData[person_id].emplace_back(train_source + image_path);
     }
     file.close();
     for (auto& kv : reidData) {
         reidKeys.emplace_back(kv.first);
     }
+    if(!reidData.size()) throw std::runtime_error("Failed to load primary");
 
+    // Secondary
+    if(this->layer_param_.op_transform_param().model_secondary().size()){
+        secondary_prob = this->layer_param_.op_transform_param().prob_secondary();
+
+        std::string train_source = this->layer_param_.op_transform_param().model_secondary();
+        std::ifstream file(train_source + "train_info.txt");
+        std::string str;
+        while (std::getline(file, str))
+        {
+            std::vector<std::string> splitString;
+            boost::split(splitString,str,boost::is_any_of(" "));
+            int person_id = std::stoi(splitString[0]);
+            std::string image_path = splitString[1];
+            if(!reidData_secondary.count(person_id)) reidData_secondary[person_id] = std::vector<std::string>();
+            reidData_secondary[person_id].emplace_back(train_source + image_path);
+        }
+        file.close();
+        for (auto& kv : reidData_secondary) {
+            reidKeys_secondary.emplace_back(kv.first);
+        }
+        if(!reidData_secondary.size()) throw std::runtime_error("Failed to load secondary");
+    }
 
     mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_));
 
@@ -126,6 +152,16 @@ void OPTripletLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
             for (int j = 0; j < Batch<float>::extra_labels_count; ++j)
                 this->prefetch_[i]->extra_labels_[j].Reshape(labelShape);
         this->transformed_label_.Reshape(labelShape);
+
+        // ID
+        if(id_available){
+            top[2]->Reshape(std::vector<int>{labelShape[0],1});
+            for (int i = 0; i < this->prefetch_.size(); ++i){
+                this->prefetch_[i]->extra_labels_[0].Reshape(std::vector<int>{labelShape[0],1});
+            }
+            LOG(INFO) << "ID shape: " << top[2]->shape()[0] << ", " << top[2]->shape()[1] << ", ";
+        }
+
         LOG(INFO) << "Label shape: " << labelShape[0] << ", " << labelShape[1] << ", ";
     }
     else
@@ -199,12 +235,6 @@ void OPTripletLayer<Dtype>::NextSecond()
 }
 // OpenPose: added ended
 
-//def area(a, b):  # returns None if rectangles don't intersect
-//    dx = min(a.x2, b.x2) - max(a.x1, b.x1)
-//    dy = min(a.y2, b.y2) - max(a.y1, b.y1)
-//    if (dx>=0) and (dy>=0):
-//        return dx*dy
-
 float intersectionPercentage(cv::Rect a, cv::Rect b){
     float dx = min(a.br().x, b.br().x) - max(a.tl().x, b.tl().x);
     float dy = min(a.br().y, b.br().y) - max(a.tl().y, b.tl().y);
@@ -212,30 +242,6 @@ float intersectionPercentage(cv::Rect a, cv::Rect b){
     if (dx >= 0 && dy >= 0) intersect_area = dx*dy;
     return max(intersect_area/a.area(), intersect_area/b.area());
 }
-
-//def rotate_bound(image, angle):
-//    # grab the dimensions of the image and then determine the
-//    # center
-//    (h, w) = image.shape[:2]
-//    (cX, cY) = (w // 2, h // 2)
-
-//    # grab the rotation matrix (applying the negative of the
-//    # angle to rotate clockwise), then grab the sine and cosine
-//    # (i.e., the rotation components of the matrix)
-//    M = cv2.getRotationMatrix2D((cX, cY), -angle, 1.0)
-//    cos = np.abs(M[0, 0])
-//    sin = np.abs(M[0, 1])
-
-//    # compute the new bounding dimensions of the image
-//    nW = int((h * sin) + (w * cos))
-//    nH = int((h * cos) + (w * sin))
-
-//    # adjust the rotation matrix to take into account translation
-//    M[0, 2] += (nW / 2) - cX
-//    M[1, 2] += (nH / 2) - cY
-
-//    # perform the actual rotation and return the image
-//    return cv2.warpAffine(image, M, (nW, nH))
 
 std::pair<cv::Mat, cv::Size> rotateBoundSize(cv::Size currSize, float angle){
     int h = currSize.height;
@@ -438,6 +444,11 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     auto* topData = batch->data_.mutable_cpu_data();
     auto* labelData = batch->label_.mutable_cpu_data();
 
+    Dtype* idData = nullptr;
+    if(id_available){
+        idData = batch->extra_labels_[0].mutable_cpu_data();
+    }
+
     //std::cout << batch->data_.shape_string() << std::endl; // 9, 3, 368, 368
     //std::cout << batch->label_.shape_string() << std::endl; // 27, 5
 
@@ -472,23 +483,35 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     for(int i=0; i<batch_size; i++){
 
         auto* batchLabelPtr = labelData + batch->label_.offset(i * num_people_image * triplet_size);
+        Dtype* batchIDPtr = nullptr;
+        if(idData != nullptr) batchIDPtr = idData + batch->extra_labels_[0].offset(i * num_people_image * triplet_size);
+
+        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+        const auto desiredDbIs1 = !secondary_prob || (dice <= (1-secondary_prob));
+        std::map<int, std::vector<std::string>>* reidData_ref;
+        if(desiredDbIs1)
+            reidData_ref = &reidData;
+        else
+            reidData_ref = &reidData_secondary;
 
         std::vector< std::pair<int, std::vector<std::string>>> positive_ids, negative_ids; // 3 each
         for(int j=0; j<num_people_image; j++){
-            positive_ids.emplace_back(*select_randomly(reidData.begin(), reidData.end()));
-            negative_ids.emplace_back(*select_randomly(reidData.begin(), reidData.end()));
+            positive_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
+            negative_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
         }
 
         for(int j=0; j<triplet_size; j++){
             int image_id = i*triplet_size + j;
             cv::Mat backgroundImage = backgroundImages[image_id];
             std::vector<cv::Mat> personImages;
+            std::vector<int> personIDs;
 
             // J=0 Is for Reference Image
             if(j==0){
                 for(auto& pos_id : positive_ids){
                     cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
                     personImages.emplace_back(pos_id_image);
+                    personIDs.emplace_back(pos_id.first);
                 }
             }
             // J=1 Is for +
@@ -496,6 +519,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 for(auto& pos_id : positive_ids){
                     cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
                     personImages.emplace_back(pos_id_image);
+                    personIDs.emplace_back(pos_id.first);
                 }
             }
             // J=2 Is for -
@@ -503,6 +527,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 for(auto& neg_id : negative_ids){
                     cv::Mat neg_id_image = cv::imread(neg_id.second[getRand(0, neg_id.second.size()-1)]);
                     personImages.emplace_back(neg_id_image);
+                    personIDs.emplace_back(neg_id.first);
                 }
             }
 
@@ -516,36 +541,35 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             // Write rects
             for(int k=0; k<rects.size(); k++){
                 cv::Rect& rect = rects[k];
+                int id = personIDs[k];
                 (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[0] = image_id;
                 (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[1] = rect.x;
                 (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[2] = rect.y;
                 (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[3] = rect.x + rect.width;
                 (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[4] = rect.y + rect.height;
+
+                if(batchIDPtr != nullptr){
+                    (batchIDPtr + batch->extra_labels_[0].offset(k * triplet_size + j))[0] = id;
+                }
             }
 
-
-            //memcpy()
-
 //            // Visualize
-//            int xx = 0;
-//            if(personImages.size() != 3) throw std::runtime_error("Error");
 //            for(int k=0; k<rects.size(); k++){
+//                int final_id = -1;
+//                if(batchIDPtr != nullptr){
+//                    auto* testPtr = (batchIDPtr + batch->extra_labels_[0].offset(k * triplet_size + j));
+//                    final_id = testPtr[0];
+//                }
 //                cv::Rect& rect = rects[k];
-//                cv::putText(finalImage, std::to_string(j) + " " + std::to_string(image_id) + " " + std::to_string(rect.x + rect.width) + " " + std::to_string(rect.y + rect.height),  rect.tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+//                cv::putText(finalImage, std::to_string(final_id) + " " + std::to_string(image_id) + " " + std::to_string(rect.x + rect.width) + " " + std::to_string(rect.y + rect.height),  rect.tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+//                cv::imwrite("visualize2/"+std::to_string(image_id)+".jpg", finalImage);
 //            }
-//            cv::imwrite("visualize2/"+std::to_string(image_id)+".jpg", finalImage);
-//            std::cout << image_id << std::endl;
 
         }
 
     }
 
-//    for(int i=0; i<batch->label_.shape()[0]; i++){
-//        std::cout << (labelData + batch->label_.offset(i))[0] << " " << (labelData + batch->label_.offset(i))[1] << " " << (labelData + batch->label_.offset(i))[2] << " " << (labelData + batch->label_.offset(i))[3] << " " << (labelData + batch->label_.offset(i))[4] << std::endl;
-//    }
-
-//    std::cout << "---" << std::endl;
-//    exit(-1);
+    //exit(-1);
 
 
 
