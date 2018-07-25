@@ -630,7 +630,8 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
         const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
         const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
-        cv::merge({b,g,r}, backgroundImage);
+        std::vector<cv::Mat> bgr = {b,g,r};
+        cv::merge(bgr, backgroundImage);
         if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
         {
             const auto xDiff = datumNegativeWidth - finalImageWidth;
@@ -821,7 +822,8 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     const cv::Mat b(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[0]);
     const cv::Mat g(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[datumArea]);
     const cv::Mat r(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[2*datumArea]);
-    cv::merge({b,g,r}, image);
+    std::vector<cv::Mat> bgr = {b,g,r};
+    cv::merge(bgr, image);
     const auto initImageWidth = (int)image.cols;
     const auto initImageHeight = (int)image.rows;
 
@@ -840,7 +842,8 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
         const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
         const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
         const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
-        cv::merge({b,g,r}, backgroundImage);
+        std::vector<cv::Mat> bgr = {b,g,r};
+        cv::merge(bgr, backgroundImage);
         // // Security checks
         // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
         // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
@@ -1101,7 +1104,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const cv::Mat b(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[0]);
         const cv::Mat g(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[datumArea]);
         const cv::Mat r(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[2*datumArea]);
-        cv::merge({b,g,r}, image);
+        std::vector<cv::Mat> bgr = {b,g,r};
+        cv::merge(bgr, image);
         // // Security checks
         // const auto initImageArea = (int)(image.rows * image.cols);
         // CHECK_EQ(initImageArea, datumArea);
@@ -1157,7 +1161,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
         const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
         const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
-        cv::merge({b,g,r}, backgroundImage);
+        std::vector<cv::Mat> bgr = {b,g,r};
+        cv::merge(bgr, backgroundImage);
         // // Security checks
         // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
         // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
