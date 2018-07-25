@@ -570,35 +570,6 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
 
     //exit(-1);
-
-
-
-
-
-//    // Testing Optional
-////    if(vCounter == 2){
-////    auto oPDataTransformerPtr = this->mOPDataTransformer;
-////    oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
-////    }
-//    //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
-//    //std::cout << "Loaded Data" << std::endl;
-
-//    // Timer (every 20 iterations x batch size)
-//    mCounter++;
-//    vCounter++;
-//    const auto repeatEveryXVisualizations = 2;
-//    if (mCounter == 20*repeatEveryXVisualizations)
-//    {
-//        std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s\t"
-//                  << "Ratio: " << mOnes/float(mOnes+mTwos) << std::endl;
-//        mDuration = 0;
-//        mCounter = 0;
-//    }
-//    timer.Stop();
-//    batch_timer.Stop();
-//    DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
-//    DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
-//    DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
 }
 
 INSTANTIATE_CLASS(OPTripletLayer);
