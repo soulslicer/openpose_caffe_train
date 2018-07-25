@@ -1,6 +1,7 @@
 #include <algorithm>    // std::sort, std::unique, std::distance
 #include <caffe/openpose/poseModel.hpp>
 #include <caffe/openpose/getLine.hpp>
+#include <iostream>
 
 namespace caffe {
 // General information:
@@ -459,8 +460,9 @@ namespace caffe {
         std::vector<int> missingBodyParts;
         const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(poseModel);
         for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
-            if (lmdbToOpenPoseKeypoints[i].empty())
+            if (lmdbToOpenPoseKeypoints[i].empty()){
                 missingBodyParts.emplace_back(i);
+            }
         // If masking also non visible points
         if (!isVisible.empty())
         {

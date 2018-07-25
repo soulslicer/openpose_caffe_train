@@ -242,8 +242,21 @@ OPDataTransformer<Dtype>::OPDataTransformer(const std::string& modelString){
 }
 
 template<typename Dtype>
+OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param) // OpenPose: Added std::string
+// : param_(param), phase_(phase) {
+    : param_(param), mCurrentEpoch{-1} {
+
+    LOG(INFO) << "OPDataTransformer constructor done.";
+    // PoseModel
+    std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(param_.model());
+    mModelString = param_.model();
+    srand(time(NULL));
+    // OpenPose: added end
+}
+
+template<typename Dtype>
 OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param,
-                                            Phase phase, const std::string& modelString) // OpenPose: Added std::string
+                                            Phase phase, const std::string& modelString, bool tpaf, bool staf, std::vector<int> stafIDS) // OpenPose: Added std::string
 // : param_(param), phase_(phase) {
     : param_(param), phase_(phase), mCurrentEpoch{-1} {
     // OpenPose: commented
@@ -269,6 +282,9 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
     // }
     // OpenPose: commented end
     // OpenPose: added
+    mTpaf = tpaf;
+    mStaf = staf;
+    mStafIDS = stafIDS;
     LOG(INFO) << "OPDataTransformer constructor done.";
     // PoseModel
     std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(modelString);
@@ -305,9 +321,9 @@ std::string getCurrDir(){
 }
 
 template<typename Dtype>
-void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dtype* transformedLabel, const int rezX, const int rezY, const int gridX, const int gridY, const int stride, const PoseModel mPoseModel, const std::string mModelString){
+void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dtype* transformedLabel, const int rezX, const int rezY, const int gridX, const int gridY, const int stride, const PoseModel mPoseModel, const std::string mModelString, const int numberTotalChannels, bool basic=false, std::string fname="visualize"){
 
-    std::string vizDir = getCurrDir() + "/visualize";
+    std::string vizDir = getCurrDir() + "/" + fname;
     std::string rmCommand = "rm -rf " + vizDir;
     std::string mkdirCommand = "mkdir " + vizDir;
     system(rmCommand.c_str());
@@ -317,23 +333,59 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
     cv::Mat imageAugCloned = imageAugmented.clone();
     int i=0;
     for(cv::Point2f p : metaData.jointsSelf.points){
+        if(metaData.jointsSelf.isVisible[i] <= 1){
         cv::circle(imageAugCloned, p, 3, cv::Scalar(25,255,255),CV_FILLED);
         cv::putText(imageAugCloned, std::to_string(i), p, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1);
+        }
         i++;
+
+        i=0;
+        if(metaData.jointsSelfPrev.points.size()){
+            for(cv::Point2f p : metaData.jointsSelfPrev.points){
+                cv::circle(imageAugCloned, p, 3, cv::Scalar(25,25,255),CV_FILLED);
+                if(metaData.jointsSelf.points.size()){
+                    if(metaData.jointsSelf.isVisible[i] <= 1 && metaData.jointsSelfPrev.isVisible[i] <= 1)
+                        cv::line(imageAugCloned, p, metaData.jointsSelf.points[i], cv::Scalar(25,25,255));
+                }
+                i++;
+            }
+        }
     }
+    int pid=0;
     for(const Joints& j : metaData.jointsOthers){
         int i=0;
         for(cv::Point2f p : j.points){
+            if(j.isVisible[i] <= 1){
             cv::circle(imageAugCloned, p, 3, cv::Scalar(25,255,255),CV_FILLED);
             cv::putText(imageAugCloned, std::to_string(i), p, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1);
+            }
             i++;
         }
+
+        i=0;
+        if(metaData.jointsOthersPrev.size()){
+            for(cv::Point2f p : metaData.jointsOthersPrev[pid].points){
+                cv::circle(imageAugCloned, p, 3, cv::Scalar(25,25,255),CV_FILLED);
+                if(metaData.jointsOthers[pid].points.size()){
+                    if(metaData.jointsOthers[pid].isVisible[i] <= 1 && metaData.jointsOthersPrev[pid].isVisible[i] <= 1)
+                        cv::line(imageAugCloned, p, metaData.jointsOthers[pid].points[i], cv::Scalar(25,25,255));
+                }
+                i++;
+            }
+        }
+
+        pid++;
+    }
+
+    if(basic){
+        std::cout << vizDir + "/basic.png" << std::endl;
+        cv::imwrite(vizDir + "/basic.png", imageAugCloned);
+        return;
     }
 
     // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
     // 2. Comment the following if statement
     const auto channelOffset = gridY * gridX;
-    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel);
     for (auto part = 0; part < numberTotalChannels; part++)
     {
         // Reduce #images saved (ideally mask images should be the same)
@@ -554,6 +606,17 @@ void maskFaceCOCO(cv::Mat& maskMiss, const std::vector<float>& isVisible, const 
     cv::rectangle(maskMiss, dropRectScaled, cv::Scalar(0), CV_FILLED);
 }
 
+template<typename T>
+bool contains(vector<T> v, T x)
+{
+      if (v.empty())
+           return false;
+      if (find(v.begin(), v.end(), x) != v.end())
+           return true;
+      else
+           return false;
+}
+
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
@@ -568,6 +631,9 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
 
     // [31 x 20000 x 1]
     //cout << datum.channels() << " " << datum.height() << " " << datum.width() << " " << labelNum << endl;
+
+    // Skip Vector
+    std::vector<int> skip;
 
     // Load json data
     std::vector<Json::Value> jsonVideoData;
@@ -588,14 +654,51 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
             throw;
         }
         jsonVideoData.emplace_back(root);
+
+        if(root.isMember("skip")){
+            if(i==0 && root["skip"].size())
+            {
+                for(int f=0; f<root["skip"].size(); f++){
+                    skip.push_back(root["skip"][f].asInt());
+                }
+            }
+        }
     }
 
+    // Sample for flip
+    bool rev = 1;
+    rev = getRand(0,1);
+
+    // Sample for step frames
+    int step = 1;
+    if(!skip.size()) step = getRand(1,2);
+
     // Sample the start frame (We can timestep too) NOT DONE!!! Try to do cache also
-    int startIndex = getRand(0,datum.channels()-frames-1);
+    int startIndex = getRand(0,datum.channels()-(frames*step)-1);
+
+    // Dont train on Skip frames
+    int skipCounter = 0;
+    if(skip.size()){
+        while(true){
+            bool mustSkip = false;
+            for(int i=startIndex; i<startIndex+(frames*step); i+=step){
+                if(contains(skip, i)) mustSkip = true;
+            }
+            if(mustSkip){
+                startIndex = getRand(0,datum.channels()-(frames*step)-1);
+            }else break;
+            skipCounter++;
+            if(skipCounter > 500){
+                std::cout << "BAD" << std::endl;
+                break;
+            }
+        }
+    }
+
     vs.images.clear();
     vs.masks.clear();
     vs.jsons.clear();
-    for(int i=startIndex; i<startIndex+frames; i++){
+    for(int i=startIndex; i<startIndex+(frames*step); i+=step){
         //cout << "Looking at frame: " << i << endl;
         vs.images.emplace_back(cv::imread(jsonVideoData[i]["image_path_full"].asString()));
         vs.masks.emplace_back(cv::imread(jsonVideoData[i]["mask_path_full"].asString(),0));
@@ -603,19 +706,80 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
     }
     //cout << "Loaded Images" << endl;
 
+    if(rev){
+        std::reverse(vs.images.begin(), vs.images.end());
+        std::reverse(vs.masks.begin(), vs.masks.end());
+        std::reverse(vs.jsons.begin(), vs.jsons.end());
+    }
+
+    // Sample person to focus?
+    std::vector<int> trackIds;
+    if(jsonVideoData[0]["annorect"].size()){
+        if(jsonVideoData[0]["annorect"][0].isMember("track_id")){
+            for(int i=0; i<jsonVideoData[0]["annorect"].size(); i++){
+                int track_id = jsonVideoData[0]["annorect"][i]["track_id"].asInt();
+                trackIds.emplace_back(track_id);
+            }
+        }
+    }
+    // First select a possible track
+    std::vector<cv::Rect> bboxes;
+    if(trackIds.size()){
+        std::random_shuffle(trackIds.begin(), trackIds.end());
+        int selected_track = trackIds[0];
+        // Iterate each frame
+        for(int i=0; i<jsonVideoData.size(); i++){
+            // If frame has people
+            if(jsonVideoData[i]["annorect"].size()){
+                // Iterate each person and select bbox for that id
+                bool found = false;
+                cv::Rect bbox;
+                for(int j=0; j<jsonVideoData[i]["annorect"].size(); j++){
+                    int track_id = jsonVideoData[i]["annorect"][j]["track_id"].asInt();
+                    if(track_id == selected_track){
+                        found = true;
+                        bbox.x = jsonVideoData[i]["annorect"][j]["rect"][0].asInt();
+                        bbox.y = jsonVideoData[i]["annorect"][j]["rect"][1].asInt();
+                        bbox.width = jsonVideoData[i]["annorect"][j]["rect"][2].asInt() - bbox.x;
+                        bbox.height = jsonVideoData[i]["annorect"][j]["rect"][3].asInt() - bbox.y;
+                        break;
+                    }
+                }
+                // Person found for this frame, push back
+                if(found) bboxes.emplace_back(bbox);
+                // Person not found for this frame
+                else{
+                    // Take last if available
+                    if(bboxes.size()) bboxes.emplace_back(bboxes.back());
+                    // If not
+                    bboxes.emplace_back(cv::Rect(0,0,0,0));
+                }
+            }
+            else{
+                throw std::runtime_error("Handle this");
+            }
+        }
+    }
+    for(cv::Rect& r : bboxes){
+        if(r.x == 0 && r.y == 0){
+            bboxes.clear();
+            break;
+        }
+    }
+    int sampleToFocus = getRand(0,1);
+    if(!sampleToFocus) bboxes.clear();
+
+    // CHECK THIS PART MAKE SURE IT IS ALSO IMAGE CENTRERD!
+
     // Params
     //const auto rezX = (int)metaData.imageSize.width;
     //const auto rezY = (int)metaData.imageSize.height;
     const auto stride = (int)param_.stride();
-    const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
-    const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
-    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel); // numberBodyParts + numberPafChannels + 1
     const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
     const auto finalImageWidth = (int)param_.crop_size_x();
     const auto finalImageHeight = (int)param_.crop_size_y();
     const auto gridX = finalImageWidth / stride;
     const auto gridY = finalImageHeight / stride;
-    const auto channelOffset = gridY * gridX;
 
     // Read background image
     cv::Mat backgroundImage;
@@ -658,6 +822,8 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
     }
 
     // Convert format
+    std::map<int, Joints> personIDJointsLast;
+    cv::Mat imgAugPrev;
     AugmentSelection augmentSelection;
     for(int i=0; i<frames; i++){
         const Json::Value& json = vs.jsons[i];
@@ -672,13 +838,30 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         metaData.writeNumber = json["image_id"].asInt();
         metaData.totalWriteNumber = 0; // WTF IS THIS IT USED BY THE DIAGONAL FUNCTION
         //metaData.objPos.x = 368/2; metaData.objPos.y = 368/2;
-        metaData.objPos.x = metaData.imageSize.width/2.; metaData.objPos.y = metaData.imageSize.height/2; // Set to rotate around centre
+        if(bboxes.size()){
+            metaData.objPos.x = bboxes[i].x + (bboxes[i].width/2);
+            metaData.objPos.y = bboxes[i].y + (bboxes[i].height/2);
+        }else
+            metaData.objPos.x = metaData.imageSize.width/2.; metaData.objPos.y = metaData.imageSize.height/2; // Set to rotate around centre
         metaData.jointsOthers.resize(metaData.numberOtherPeople);
         metaData.scaleSelf = 1;
-        // Iterate each person
+
+        // Handle prev case
         int j=0;
+        metaData.jointsOthersPrev.resize(metaData.jointsOthers.size());
         for(Joints& joints : metaData.jointsOthers){
-            // Can i just load it in direct
+            int personID = json["annorect"][j]["track_id"].asInt();
+            if(personIDJointsLast.count(personID)){
+                metaData.jointsOthersPrev[j] = personIDJointsLast[personID].clone();
+            }
+            j++;
+        }
+
+        // Iterate each person
+        j=0;
+        personIDJointsLast.clear();
+        for(Joints& joints : metaData.jointsOthers){
+            // Can i just load it in direct HARDCODED TO 21
             joints.points.resize(21);
             joints.isVisible.resize(21);
             for(int m=0; m<21; m++){
@@ -687,10 +870,16 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
                 joints.isVisible[m] = json["annorect"][j]["keypoints"][m*3 + 2].asFloat();
                 joints.isVisible[m] = ((int)joints.isVisible[m] + 2) % 3;
             }
+            // Store Person IDS
+            personIDJointsLast[json["annorect"][j]["track_id"].asInt()] = joints.clone();
             j++;
         }
         for (auto& joints : metaData.jointsOthers)
             lmdbJointsToOurModel(joints, mPoseModel);
+        for (auto& joints : metaData.jointsOthersPrev){
+            if(joints.points.size())
+            lmdbJointsToOurModel(joints, mPoseModel);
+        }
 
         // Augment here
         cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;
@@ -737,10 +926,16 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         }
 
         // Create Label for frame
-        Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
-        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug);
-        //vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
-        //exit(-1);
+        Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
+        if(mStaf)
+            generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+        else
+            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+//        if(i == 3 && vid == 3){
+//        vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
+//        exit(-1);
+//        }
+        //imgAugPrev = imgAug.clone();
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
@@ -748,7 +943,7 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
 
         // Get pointers for all
         int dataOffset = imgAug.channels()*imgAug.size().width*imgAug.size().height;
-        int labelOffset = 2*numberTotalChannels * gridY * gridX;
+        int labelOffset = getNumberChannels() * gridY * gridX;
         Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
         Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data(); // Max 6,703,488
 
@@ -778,15 +973,63 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
             Dtype* imgPtr = transformedDataPtr + totalVid*fid*dataOffset + vid*dataOffset;
             cv::Mat testImg;
             caffeToMat(testImg, imgPtr, cv::Size(transformedData->shape()[3], transformedData->shape()[2]));
-            cv::Mat bgLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
-            Dtype* labelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (transformedLabel->shape()[1]-1)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
-            std::copy(labelPtr, labelPtr + bgLabel.size().width*bgLabel.size().height, &bgLabel.at<float>(0,0));
-            bgLabel*=255;
-            bgLabel.convertTo(bgLabel, CV_8UC1);
-            cv::bitwise_not(bgLabel, bgLabel);
-            cv::cvtColor(bgLabel, bgLabel, cv::COLOR_GRAY2BGR);
-            cv::resize(bgLabel, bgLabel, cv::Size(bgLabel.size().width*8,bgLabel.size().height*8));
-            testImg = testImg + bgLabel;
+            //int labelFrame = 2 * getNumberBodyBkgAndPAF(mPoseModel) - 1;
+
+            int labelFrame = 174 + (2*5);
+            int hmLabelFrame = 110 + 5;
+            int maskLabelFrame = 132 + (2*5);
+
+            // Need a way to visalize paf?
+            cv::Mat hmLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+            cv::Mat xLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+            cv::Mat yLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+            cv::Mat maskLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+            Dtype* xLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (labelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+            Dtype* yLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (labelFrame+1)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+            Dtype* hmLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (hmLabelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+            Dtype* maskLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (maskLabelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+            std::copy(xLabelPtr, xLabelPtr + xLabel.size().width*xLabel.size().height, &xLabel.at<float>(0,0));
+            std::copy(yLabelPtr, yLabelPtr + yLabel.size().width*yLabel.size().height, &yLabel.at<float>(0,0));
+            std::copy(hmLabelPtr, hmLabelPtr + hmLabel.size().width*hmLabel.size().height, &hmLabel.at<float>(0,0));
+            std::copy(maskLabelPtr, maskLabelPtr + maskLabel.size().width*maskLabel.size().height, &maskLabel.at<float>(0,0));
+            cv::resize(xLabel, xLabel, cv::Size(xLabel.size().width*8,xLabel.size().height*8));
+            cv::resize(yLabel, yLabel, cv::Size(yLabel.size().width*8,yLabel.size().height*8));
+            cv::resize(hmLabel, hmLabel, cv::Size(hmLabel.size().width*8,hmLabel.size().height*8));
+            cv::resize(maskLabel, maskLabel, cv::Size(maskLabel.size().width*8,maskLabel.size().height*8));
+            for(int v=0; v<xLabel.size().height; v+=5){
+                for(int u=0; u<xLabel.size().height; u+=5){
+                    if(fabs(xLabel.at<float>(cv::Point(u,v))) > 0 || fabs(yLabel.at<float>(cv::Point(u,v))) > 0){
+                        float scalar = 10;
+                        cv::Point2f vector(xLabel.at<float>(cv::Point(u,v)), yLabel.at<float>(cv::Point(u,v)));
+                        cv::Point2f p1(u,v);
+                        cv::Point p2(u + scalar*vector.x, v + scalar*vector.y);
+                        cv::line(testImg, p1, p2, cv::Scalar(255,0,0));
+                    }
+                }
+            }
+            hmLabel*=255;
+            maskLabel*=255;
+            hmLabel.convertTo(hmLabel, CV_8UC1);
+            maskLabel.convertTo(maskLabel, CV_8UC1);
+            cv::cvtColor(hmLabel, hmLabel, cv::COLOR_GRAY2BGR);
+            cv::cvtColor(maskLabel, maskLabel, cv::COLOR_GRAY2BGR);
+            testImg = testImg*0.4 + hmLabel*0.6;
+            testImg = testImg*0.5 + maskLabel*0.5;
+            //testImg = maskLabel;
+
+            // 0,1,2,3,4
+            //labelFrame = 131;
+
+//            cv::Mat bgLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+//            Dtype* labelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (labelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+//            std::copy(labelPtr, labelPtr + bgLabel.size().width*bgLabel.size().height, &bgLabel.at<float>(0,0));
+//            bgLabel*=255;
+//            bgLabel.convertTo(bgLabel, CV_8UC1);
+//            cv::bitwise_not(bgLabel, bgLabel);
+//            cv::cvtColor(bgLabel, bgLabel, cv::COLOR_GRAY2BGR);
+//            cv::resize(bgLabel, bgLabel, cv::Size(bgLabel.size().width*8,bgLabel.size().height*8));
+//            testImg = testImg*0.2 + bgLabel*0.8;
+
             cv::imwrite("/home/raaj/visualize/"+std::to_string(vid)+"-"+std::to_string(fid)+".png",testImg);
         }
     }
@@ -794,6 +1037,60 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
     exit(-1);
 }
 
+
+// OpenPose: added
+template<typename Dtype>
+cv::Mat  OPDataTransformer<Dtype>::parseBackground(const Datum *datumNegative){
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+
+    cv::Mat backgroundImage;
+    if (datumNegative != nullptr)
+    {
+        const std::string& data = datumNegative->data();
+        const int datumNegativeWidth = datumNegative->width();
+        const int datumNegativeHeight = datumNegative->height();
+        const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
+        // OpenCV wrapping --> 1.7x speed up naive image.at<cv::Vec3b>, 1.25x speed up with smart speed up
+        const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
+        const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
+        const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
+        cv::merge({b,g,r}, backgroundImage);
+        // // Security checks
+        // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
+        // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
+        // CHECK_EQ(cv::norm(backgroundImage-image2), 0);
+        // Included data augmentation: cropping
+        // Disable data augmentation --> minX = minY = 0
+        // Data augmentation: cropping
+        if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
+        {
+            const auto xDiff = datumNegativeWidth - finalImageWidth;
+            const auto yDiff = datumNegativeHeight - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                                            (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                                            (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+        }
+        // Resize (if smaller than final crop size)
+        // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+        else
+        {
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+        }
+    }
+
+    return backgroundImage;
+}
 
 // OpenPose: added
 template<typename Dtype>
@@ -811,7 +1108,6 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     const auto finalImageHeight = (int)param_.crop_size_y();
     const auto gridX = finalImageWidth / stride;
     const auto gridY = finalImageHeight / stride;
-    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel); // numberBodyParts + numberPafChannels + 1
 
     // Read meta data (LMDB channel 3)
     MetaData metaData;
@@ -895,7 +1191,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     endAug.pointOffset = estimatePO(metaData, param_);
 
     std::vector<AugmentSelection> augVec(frames);
-
+    MetaData metaDataPrev;
     for(int i=0; i<frames; i++){
         float scale = startAug.scale + (((endAug.scale - startAug.scale) / frames))*i;
         float rotation = startAug.rotation + (((endAug.rotation - startAug.rotation) / frames))*i;
@@ -954,11 +1250,23 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
             imgAug = imageAugmentedTemp;
         }
 
+        // Save Prev
+        if(i != 0){
+            metaDataCopy.jointsOthersPrev = metaDataPrev.jointsOthers;
+            metaDataCopy.jointsSelfPrev = metaDataPrev.jointsSelf;
+        }
+        metaDataPrev = metaDataCopy;
+
         // Create Label for frame
-        Dtype* labelmapTemp = new Dtype[2*numberTotalChannels * gridY * gridX];
-        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug);
-        //vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
-        //exit(-1);
+        Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
+        if(mStaf)
+            generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+        else
+            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+//        if(i == 3 &&  metaData.writeNumber == 1){
+//        vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
+//        exit(-1);
+//        }
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
@@ -966,7 +1274,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
 
         // Get pointers for all
         int dataOffset = imgAug.channels()*imgAug.size().width*imgAug.size().height;
-        int labelOffset = 2*numberTotalChannels * gridY * gridX;
+        int labelOffset = getNumberChannels() * gridY * gridX;
         Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
         Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data(); // Max 6,703,488
 
@@ -984,7 +1292,10 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
-                                         const Datum& datum, const Datum* datumNegative)
+                                         const Datum& datum, const Datum* datumNegative,
+                                         Blob<Dtype> extra_transformed_labels[],
+                                         std::vector<int> extra_strides,
+                                         int extra_labels_count)
 {
     // Secuirty checks
     const int datumChannels = datum.channels();
@@ -1000,14 +1311,23 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative);
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative, extra_transformed_labels, extra_strides, extra_labels_count);
     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
 
 template <typename Dtype>
 int OPDataTransformer<Dtype>::getNumberChannels() const
 {
-    return 2 * getNumberBodyBkgAndPAF(mPoseModel);
+    int totalChannels = 0;
+    if(mTpaf)
+        totalChannels = 2 * getNumberBodyBkgAndPAF(mPoseModel) + getNumberBodyParts(mPoseModel) * 2 + getNumberBodyParts(mPoseModel) * 2;
+    else if(mStaf){
+        int totalStaf = getNumberBodyParts(mPoseModel) * 2 * mStafIDS.size();
+        totalChannels = (totalStaf + (getNumberBodyParts(mPoseModel) + 1)) * 2;
+    }else
+        totalChannels = 2 * getNumberBodyBkgAndPAF(mPoseModel);
+
+    return totalChannels;
     // // For Distance
     // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberPafChannels(mPoseModel)/2);
 }
@@ -1017,7 +1337,10 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
-                                                    const Datum& datum, const Datum* datumNegative)
+                                                    const Datum& datum, const Datum* datumNegative,
+                                                    Blob<Dtype> extra_transformed_labels[],
+                                                    std::vector<int> extra_strides,
+                                                    int extra_labels_count)
 {
     // Parameters
     const std::string& data = datum.data();
@@ -1265,6 +1588,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     cv::Mat imageAugmented;
     cv::Mat backgroundImageAugmented;
     cv::Mat maskMissAugmented;
+    cv::Mat maskMissAugmentedOrig;
     cv::Mat depthAugmented;
     VLOG(2) << "   input size (" << initImageWidth << ", " << initImageHeight << ")";
     // We only do random transform augmentSelection augmentation when training.
@@ -1313,8 +1637,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
                      mPoseModel);
         // Resize mask
-        if (!maskMissAugmented.empty())
+        if (!maskMissAugmented.empty()){
+            maskMissAugmentedOrig = maskMissAugmented.clone();
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+        }
         // Final background image - elementwise multiplication
         if (!backgroundImageAugmented.empty() && !maskBackgroundImageAugmented.empty())
         {
@@ -1332,6 +1658,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Test
     else
     {
+        exit(-1);
         imageAugmented = image;
         maskMissAugmented = maskMiss;
         depthAugmented = depth;
@@ -1388,18 +1715,40 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     else
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 
-    // Generate and copy label
-    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented);
-    if (depthEnabled)
-        generateDepthLabelMap(transformedLabel, depthAugmented);
-    VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
+    if(!mStaf)
+    {
+        // Generate and copy label
+        generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented, stride);
+        if (depthEnabled)
+            generateDepthLabelMap(transformedLabel, depthAugmented);
+        VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    //vizDebug()
-    //vizDebug()
-//    if (metaData.writeNumber == 0 && mPoseModel == PoseModel::PT_21){
-//        vizDebug(imageAugmented, metaData, transformedLabel, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString);
-//        exit(-1);
-//    }
+        // Multilabel case
+        if(extra_labels_count){
+            for(int i=0; i<extra_labels_count; i++){
+                auto gridX_extra = finalImageWidth / extra_strides[i];
+                auto gridY_extra = finalImageHeight / extra_strides[i];
+                cv::Mat maskMissAugmented_extra;
+                cv::resize(maskMissAugmentedOrig, maskMissAugmented_extra, cv::Size{gridX_extra, gridY_extra}, 0, 0, cv::INTER_AREA);
+                generateLabelMap(extra_transformed_labels[i].mutable_cpu_data(), imageAugmented.size(), maskMissAugmented_extra, metaData, imageAugmented, extra_strides[i]);
+            }
+        }
+
+//        if (metaData.writeNumber == 0 && mPoseModel == PoseModel::COCO_21){
+//            vizDebug(imageAugmented, metaData, transformedLabel, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberBodyBkgAndPAF(mPoseModel));
+//            exit(-1);
+//        }
+    }
+    else if (mStaf)
+    {
+        // Generate and copy label
+        generateLabelMapStaf(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented, stride);
+
+//        if (metaData.writeNumber == 0 && mPoseModel == PoseModel::COCO_21){
+//            vizDebug(imageAugmented, metaData, transformedLabel, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
+//            exit(-1);
+//        }
+    }
 }
 
 template<typename Dtype>
@@ -1551,13 +1900,212 @@ void drawPoints(cv::Mat& clone, const MetaData& metaData){
 }
 
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                                                const MetaData& metaData, const cv::Mat& img) const
+void OPDataTransformer<Dtype>::generateLabelMapStaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                                                const MetaData& metaData, const cv::Mat& img, const int stride) const
 {
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
     const auto rezY = (int)imageSize.height;
-    const auto stride = (int)param_.stride();
+    const auto gridX = rezX / stride;
+    const auto gridY = rezY / stride;
+    const auto channelOffset = gridY * gridX;
+    const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
+    const int totalStaf = getNumberBodyParts(mPoseModel) * 2 * mStafIDS.size();
+    const int numberTotalChannels = getNumberChannels() / 2;
+    const int backgroundMaskIndex = numberTotalChannels-1;
+    const int backgroundIndex = getNumberChannels() - 1;
+
+    // Labels to 0
+    std::fill(transformedLabel, transformedLabel + getNumberChannels() * gridY * gridX, 0.f);
+
+    // Initialize labels to [0, 1] (depending on maskMiss)
+    fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
+
+    // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
+    std::vector<int> missingChannels;
+    std::vector<int> missingSID;
+    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel))
+    {
+        // Remove BP/PAF non-labeled channels
+        const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(mPoseModel);
+        for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
+            if (lmdbToOpenPoseKeypoints[i].empty()){
+                missingChannels.emplace_back(totalStaf + i);
+
+                for(int j=0; j<mStafIDS.size(); j++) if(i == mStafIDS[j]) missingSID.emplace_back(j);
+            }
+        for(auto msid : missingSID){
+            for(int i=0; i<numberBodyParts*2; i++)
+                missingChannels.emplace_back(msid*(numberBodyParts*2) + i);
+        }
+        for (const auto& index : missingChannels){
+            std::fill(&transformedLabel[index*channelOffset],
+                    &transformedLabel[index*channelOffset + channelOffset], 0);
+        }
+
+        // Background
+        const auto type = getType(Dtype(0));
+        cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundMaskIndex*channelOffset]);
+
+        // Change BG for COCO
+        if(mPoseModel == PoseModel::COCO_21){
+            cv::Mat clone = img.clone();
+            maskFaceCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            maskRealNeckCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            for(auto jointOther : metaData.jointsOthers){
+                maskRealNeckCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
+                maskFaceCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
+            }
+        }
+
+        // Change BG for MPII
+        if(mPoseModel == PoseModel::MPII_21){
+            cv::Mat clone = img.clone();
+            maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            for(auto jointOther : metaData.jointsOthers){
+                maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, jointOther.points, clone);
+            }
+        }
+    }
+
+    // STAF
+    Dtype* stafPtr = transformedLabel + (numberTotalChannels * channelOffset);
+    for(int mid=0; mid<mStafIDS.size(); mid++){
+        int mStafID = mStafIDS[mid];
+
+        Dtype* stafPtrID = stafPtr + mid*numberBodyParts*2*channelOffset;
+
+        const auto threshold = 1;
+        for(int j=0; j<getNumberBodyParts(mPoseModel); j++){
+            cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+
+            // Self
+            if(metaData.jointsSelfPrev.points.size()){
+                if((metaData.jointsSelf.isVisible[j] <= 1 && metaData.jointsSelfPrev.isVisible[mStafID] <= 1)){
+                    putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                  stafPtrID + ((2*j)+1)*channelOffset,
+                                  nullptr,
+                                  nullptr,
+                                  count, metaData.jointsSelf.points[j], metaData.jointsSelfPrev.points[mStafID],
+                                  stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                }else if(metaData.jointsSelf.isVisible[j] <= 1 && metaData.jointsSelf.isVisible[mStafID] <= 1){
+                    putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                  stafPtrID + ((2*j)+1)*channelOffset,
+                                  nullptr,
+                                  nullptr,
+                                  count, metaData.jointsSelf.points[j], metaData.jointsSelf.points[mStafID],
+                                  stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                }
+            }else if(metaData.jointsSelf.points.size()){
+                if(metaData.jointsSelf.isVisible[j] <= 1 && metaData.jointsSelf.isVisible[mStafID] <= 1){
+                    putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                  stafPtrID + ((2*j)+1)*channelOffset,
+                                  nullptr,
+                                  nullptr,
+                                  count, metaData.jointsSelf.points[j], metaData.jointsSelf.points[mStafID],
+                                  stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                }
+            }
+
+            // Others
+            for(int i=0; i<metaData.jointsOthers.size(); i++){
+                if(metaData.jointsOthersPrev.size()){
+                    if(metaData.jointsOthersPrev[i].points.size()){
+                        if((metaData.jointsOthers[i].isVisible[j] <= 1 && metaData.jointsOthersPrev[i].isVisible[mStafID] <= 1)){
+                            putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                          stafPtrID + ((2*j)+1)*channelOffset,
+                                          nullptr,
+                                          nullptr,
+                                          count, metaData.jointsOthers[i].points[j], metaData.jointsOthersPrev[i].points[mStafID],
+                                          stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                        }else if(metaData.jointsOthers[i].isVisible[j] <= 1 && metaData.jointsOthers[i].isVisible[mStafID] <= 1){
+                            putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                          stafPtrID + ((2*j)+1)*channelOffset,
+                                          nullptr,
+                                          nullptr,
+                                          count, metaData.jointsOthers[i].points[j], metaData.jointsOthers[i].points[mStafID],
+                                          stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                        }
+                    }else{
+                        if(metaData.jointsOthers[i].isVisible[j] <= 1 && metaData.jointsOthers[i].isVisible[mStafID] <= 1){
+                            putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                          stafPtrID + ((2*j)+1)*channelOffset,
+                                          nullptr,
+                                          nullptr,
+                                          count, metaData.jointsOthers[i].points[j], metaData.jointsOthers[i].points[mStafID],
+                                          stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                        }
+                    }
+                }else{
+                    if(metaData.jointsOthers[i].isVisible[j] <= 1 && metaData.jointsOthers[i].isVisible[mStafID] <= 1){
+                        putVectorMaps(stafPtrID + 2*j*channelOffset,
+                                      stafPtrID + ((2*j)+1)*channelOffset,
+                                      nullptr,
+                                      nullptr,
+                                      count, metaData.jointsOthers[i].points[j], metaData.jointsOthers[i].points[mStafID],
+                                      stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                    }
+                }
+            }
+
+        }
+    }
+
+
+
+
+    // Body parts
+    Dtype* hmPtr = transformedLabel + (numberTotalChannels * channelOffset) + (totalStaf * channelOffset);
+    for (auto part = 0; part < numberBodyParts; part++)
+    {
+        // Self
+        if(metaData.jointsSelf.isVisible.size()){
+            if (metaData.jointsSelf.isVisible[part] <= 1)
+            {
+                const auto& centerPoint = metaData.jointsSelf.points[part];
+                putGaussianMaps(hmPtr + (part)*channelOffset,
+                                centerPoint, stride, gridX, gridY, param_.sigma());
+            }
+        }
+        // For every other person
+        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+        {
+            if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
+            {
+                const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+                putGaussianMaps(hmPtr + (part)*channelOffset,
+                                centerPoint, stride, gridX, gridY, param_.sigma());
+            }
+        }
+    }
+
+    // Background channel
+    // Naive implementation
+    for (auto gY = 0; gY < gridY; gY++)
+    {
+        const auto yOffset = gY*gridX;
+        for (auto gX = 0; gX < gridX; gX++)
+        {
+            const auto xyOffset = yOffset + gX;
+            Dtype maximum = 0.;
+            for (auto part = (numberTotalChannels) + (totalStaf) ; part < backgroundIndex ; part++)
+            {
+                const auto index = part * channelOffset + xyOffset;
+                maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
+            }
+            transformedLabel[backgroundIndex*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
+        }
+    }
+
+}
+
+template<typename Dtype>
+void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                                                const MetaData& metaData, const cv::Mat& img, const int stride) const
+{
+    // Label size = image size / stride
+    const auto rezX = (int)imageSize.width;
+    const auto rezY = (int)imageSize.height;
     const auto gridX = rezX / stride;
     const auto gridY = rezY / stride;
     const auto channelOffset = gridY * gridX;
@@ -1568,7 +2116,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2); // numberBodyParts + numberPafChannels + 1
 
     // Labels to 0
-    std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * gridY * gridX, 0.f);
+    if(mTpaf)
+        std::fill(transformedLabel, transformedLabel + getNumberChannels() * gridY * gridX, 0.f);
+    else
+        std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * gridY * gridX, 0.f);
 
     // Initialize labels to [0, 1] (depending on maskMiss)
     fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
@@ -1753,6 +2304,77 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         }
     }
 
+    // Fill masks for tpaf if valid
+    if(mTpaf){
+        // HARDCODED TO 21
+        int hmWeightStart = 2 * (getNumberBodyParts(PoseModel::COCO_21) + 1);
+        int tpafWeightStart = 2 * getNumberBodyBkgAndPAF(PoseModel::COCO_21);
+        for(int i=0; i<getNumberBodyParts(PoseModel::COCO_21); i++){
+            memcpy(transformedLabel + tpafWeightStart*gridY*gridX + 2*i*gridY*gridX,
+                   transformedLabel + hmWeightStart*gridY*gridX + i*gridY*gridX, sizeof(Dtype)*gridY*gridX);
+            memcpy(transformedLabel + tpafWeightStart*gridY*gridX + (2*i+1)*gridY*gridX,
+                   transformedLabel + hmWeightStart*gridY*gridX + i*gridY*gridX, sizeof(Dtype)*gridY*gridX);
+        }
+
+        // TPAFs
+        // Fill from data of other person metaData (and self metaData)
+        Dtype* tpafMaskStartPointer = transformedLabel + (2 * getNumberBodyBkgAndPAF(mPoseModel) * channelOffset);
+        Dtype* tpafStartPointer = transformedLabel + ((2 * getNumberBodyBkgAndPAF(mPoseModel) + getNumberBodyParts(mPoseModel) * 2) * channelOffset);
+
+        // ASK!! Resolution too low for direction? perhaps distance between too small to encode?
+        // What about meaning of count? Iterate joint, then person, or person then joint
+        // Delta value is too noisy for no change?
+        // Encode angles-scalar?
+        // Encode x,y change directly?
+
+        const auto threshold = 1;
+        for(int j=0; j<getNumberBodyParts(mPoseModel); j++){
+            cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+
+            // Self
+            if(metaData.jointsSelfPrev.points.size()){
+                if((metaData.jointsSelf.isVisible[j] <= 1 && metaData.jointsSelfPrev.isVisible[j] <= 1)){
+                    putVectorMaps(tpafStartPointer + 2*j*channelOffset,
+                                  tpafStartPointer + ((2*j)+1)*channelOffset,
+                                  tpafMaskStartPointer + 2*j*channelOffset,
+                                  tpafMaskStartPointer + ((2*j)+1)*channelOffset,
+                                  count, metaData.jointsSelf.points[j], metaData.jointsSelfPrev.points[j],
+                                  stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+                }
+            }
+
+            // Others
+            for(int i=0; i<metaData.jointsOthers.size(); i++){
+                if(!metaData.jointsOthersPrev.size()) continue;
+                if(!metaData.jointsOthersPrev[i].points.size()) continue;
+                if(!(metaData.jointsOthers[i].isVisible[j] <= 1 && metaData.jointsOthersPrev[i].isVisible[j] <= 1)) continue;
+                putVectorMaps(tpafStartPointer + 2*j*channelOffset,
+                              tpafStartPointer + ((2*j)+1)*channelOffset,
+                              tpafMaskStartPointer + 2*j*channelOffset,
+                              tpafMaskStartPointer + ((2*j)+1)*channelOffset,
+                              count, metaData.jointsOthers[i].points[j], metaData.jointsOthersPrev[i].points[j],
+                              stride, gridX, gridY, param_.sigma(), threshold, 0, 0, true, false, 0);
+            }
+
+        }
+
+//        for(int i=0; i<metaData.jointsOthers.size(); i++){
+//            Joints& currentJoints = metaData.jointsOthers[i];
+//            Joints& prevJoints = metaData.jointsOthersPrev[i];
+//            if(!prevJoints.points.size() || !currentJoints.points.size()) continue;
+//            for(int j=0; j<prevJoints.points.size(); j++){
+//                if(!(currentJoints.isVisible[j] <= 1 && prevJoints.isVisible[j] <= 1)) continue;
+
+
+//                putVectorMaps(tpafStartPointer + 2*j*channelOffset,
+//                              tpafStartPointer + ((2*j)+1)*channelOffset,
+//                              tpafMaskStartPointer + 2*j*channelOffset,
+//                              tpafMaskStartPointer + ((2*j)+1)*channelOffset,);
+//            }
+//        }
+
+    }
+
     // PAFs
     const auto& labelMapA = getPafIndexA(mPoseModel);
     const auto& labelMapB = getPafIndexB(mPoseModel);
@@ -1775,7 +2397,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                        param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                        stride, gridX, gridY, param_.sigma(), threshold,
                         diagonal, diagonalProportion);
             }
         }
@@ -1794,7 +2416,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
                               count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                        param_.stride(), gridX, gridY, param_.sigma(), threshold,
+                        stride, gridX, gridY, param_.sigma(), threshold,
                         diagonal, diagonalProportion);
             }
         }
@@ -1819,7 +2441,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 const auto& centerPoint = metaData.jointsSelf.points[part];
                 putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                                centerPoint, stride, gridX, gridY, param_.sigma());
             }
         }
         // For every other person
@@ -1829,7 +2451,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
                 putGaussianMaps(transformedLabel + (part+numberTotalChannels+numberPafChannels)*channelOffset,
-                                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                                centerPoint, stride, gridX, gridY, param_.sigma());
             }
         }
     }
@@ -1891,7 +2513,8 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
                                              cv::Mat& count, const cv::Point2f& centerA,
                                              const cv::Point2f& centerB, const int stride, const int gridX,
                                              const int gridY, const float sigma, const int threshold,
-                                             const int diagonal, const float diagonalProportion) const
+                                             const int diagonal, const float diagonalProportion,
+                                             const bool normalize, const bool demask, const float tanval) const
 // void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask,
 //                                              cv::Mat& count, const cv::Point2f& centerA,
 //                                              const cv::Point2f& centerB, const int stride, const int gridX,
@@ -1902,7 +2525,13 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
     const auto centerBLabelScale = scaleLabel * centerB;
     cv::Point2f directionAB = centerBLabelScale - centerALabelScale;
     const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y);
-    directionAB *= (Dtype(1) / distanceAB);
+    if(normalize) directionAB *= (Dtype(1) / distanceAB);
+
+    if(tanval){
+        cv::Point2f directionABOrig = centerB - centerA;
+        const auto distanceABOrig = std::sqrt(directionABOrig.x*directionABOrig.x + directionABOrig.y*directionABOrig.y);
+        directionAB *= tanh(tanval * distanceABOrig);
+    }
 
     // // For Distance
     // const auto dMin = Dtype(0);
@@ -1913,18 +2542,21 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
     // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
     if (!isnan(directionAB.x) && !isnan(directionAB.y))
     {
-        const int minX = std::max(0,
+        int minX = std::max(0,
                                   int(std::round(std::min(centerALabelScale.x, centerBLabelScale.x) - threshold)));
-        const int maxX = std::min(gridX,
+        int maxX = std::min(gridX,
                                   int(std::round(std::max(centerALabelScale.x, centerBLabelScale.x) + threshold)));
-        const int minY = std::max(0,
+        int minY = std::max(0,
                                   int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
-        const int maxY = std::min(gridY,
+        int maxY = std::min(gridY,
                                   int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
         (void)diagonalProportion;
         (void)diagonal;
         (void)entryX;
         (void)entryY;
+
+        //minX = 0; maxX = gridX; minY = 0; maxY = gridY;
+
         // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
         for (auto gY = minY; gY < maxY; gY++)
         {
@@ -1957,6 +2589,18 @@ void OPDataTransformer<Dtype>::putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype
                         // entryD[xyOffset] = (entryD[xyOffset]*counter + entryDValue) / (counter + 1);
                     }
                     counter++;
+                }
+            }
+        }
+
+        if(demask){
+            for (auto gY = 0; gY < gridY; gY++)
+            {
+                for (auto gX = 0; gX < gridX; gX++)
+                {
+                    const auto xyOffset = gY*gridX + gX;
+                     maskX[xyOffset] *= 0;
+                     maskY[xyOffset] *= 0;
                 }
             }
         }

@@ -16,6 +16,8 @@
 // OpenPose: added
 #include "caffe/openpose/oPDataTransformer.hpp"
 #include <boost/thread/thread.hpp>
+
+#include <boost/algorithm/string.hpp>
 // OpenPose: added end
 
 namespace caffe {
@@ -66,6 +68,7 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   unsigned long long mOnes;
   unsigned long long mTwos;
   int mCounter;
+  int vCounter = 0;
   double mDuration;
 
   int frame_size = 6;

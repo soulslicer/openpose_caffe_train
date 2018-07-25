@@ -58,6 +58,8 @@ const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
 const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {});
 
+const std::vector<std::vector<int>>& getLmdbToOpenPoseKeypoints(const PoseModel poseModel);
+
 }  // namespace caffe
 
 #endif  // CAFFE_OPENPOSE_POSE_MODEL_HPP

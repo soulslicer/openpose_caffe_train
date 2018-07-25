@@ -47,6 +47,8 @@ template <typename Dtype>
 class Batch {
  public:
   Blob<Dtype> data_, label_;
+  static const int extra_labels_count = 4;
+  Blob<Dtype> extra_labels_[extra_labels_count];
 };
 
 template <typename Dtype>

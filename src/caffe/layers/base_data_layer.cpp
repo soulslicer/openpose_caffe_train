@@ -48,6 +48,7 @@ template <typename Dtype>
 void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   BaseDataLayer<Dtype>::LayerSetUp(bottom, top);
+  int extra_labels_count = top.size()-2;
 
   // Before starting the prefetch thread, we make cpu_data and gpu_data
   // calls so that the prefetch thread does not accidentally make simultaneous
@@ -56,7 +57,11 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
   for (int i = 0; i < prefetch_.size(); ++i) {
     prefetch_[i]->data_.mutable_cpu_data();
     if (this->output_labels_) {
-      prefetch_[i]->label_.mutable_cpu_data();
+      prefetch_[i]->label_.mutable_gpu_data();
+
+      // Added
+      for(int j=0; j<prefetch_[i]->extra_labels_count; j++)
+        prefetch_[i]->extra_labels_[j].mutable_cpu_data();
     }
   }
 #ifndef CPU_ONLY
@@ -65,6 +70,10 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
       prefetch_[i]->data_.mutable_gpu_data();
       if (this->output_labels_) {
         prefetch_[i]->label_.mutable_gpu_data();
+
+        // Added
+        for(int j=0; j<prefetch_[i]->extra_labels_count; j++)
+          prefetch_[i]->extra_labels_[j].mutable_gpu_data();
       }
     }
   }
@@ -93,6 +102,9 @@ void BasePrefetchingDataLayer<Dtype>::InternalThreadEntry() {
         batch->data_.data().get()->async_gpu_push(stream);
         if (this->output_labels_) {
           batch->label_.data().get()->async_gpu_push(stream);
+          // Added
+          for(int j=0; j<batch->extra_labels_count; j++)
+              batch->extra_labels_[j].data().get()->async_gpu_push(stream);
         }
         CUDA_CHECK(cudaStreamSynchronize(stream));
       }
@@ -123,6 +135,15 @@ void BasePrefetchingDataLayer<Dtype>::Forward_cpu(
     // Reshape to loaded labels.
     top[1]->ReshapeLike(prefetch_current_->label_);
     top[1]->set_cpu_data(prefetch_current_->label_.mutable_cpu_data());
+
+    // Added
+    if(top.size() > 2){
+        for(int j=0; j<top.size()-2; j++){
+            top[j+2]->ReshapeLike(prefetch_current_->extra_labels_[j]);
+            top[j+2]->set_cpu_data(prefetch_current_->extra_labels_[j].mutable_cpu_data());
+        }
+    }
+
   }
 }
 

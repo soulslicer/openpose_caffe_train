@@ -387,6 +387,7 @@ message LayerParameter {
   optional DummyDataParameter dummy_data_param = 109;
   optional EltwiseParameter eltwise_param = 110;
   optional ELUParameter elu_param = 140;
+  optional EltwiseAffineParameter eltwise_affine_param = 211;
   optional EmbedParameter embed_param = 137;
   optional ExpParameter exp_param = 111;
   optional FlattenParameter flatten_param = 135;
@@ -410,9 +411,11 @@ message LayerParameter {
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
+  optional ROIPoolingParameter roi_pooling_param = 8266711;
   optional ScaleParameter scale_param = 142;
   optional SigmoidParameter sigmoid_param = 124;
   optional SoftmaxParameter softmax_param = 125;
+  optional SmoothL1LossParameter smooth_l1_loss_param = 8266712;
   optional SPPParameter spp_param = 132;
   optional SliceParameter slice_param = 126;
   optional TanHParameter tanh_param = 127;
@@ -421,7 +424,19 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   // OpenPose: new layer
   optional OPTransformationParameter op_transform_param = 147;
+  optional TripletLossParameter triplet_loss_param = 148;
   // OpenPose: end new layer
+}
+
+message EltwiseAffineParameter {
+
+  // Initial value of a_i. Default is a_i=1.0 for all i.
+  optional FillerParameter slope_filler = 1;
+
+  optional FillerParameter bias_filler = 2;
+
+  // Whether or not slope paramters are shared across channels.
+  optional bool channel_shared = 3 [default = false];
 }
 
 // Message that stores parameters used to apply transformation
@@ -498,11 +513,27 @@ message OPTransformationParameter {
   optional string source_secondary = 25 [default = ""];
   optional string model_secondary = 26 [default = ""];
   optional float prob_secondary = 27 [default = 0.0];
-  optional uint32 normalization = 28 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+
+  optional string source_tertiary = 28 [default = ""];
+  optional string model_tertiary = 29 [default = ""];
+  optional float prob_tertiary = 30 [default = 0.0];
+
+  optional string extra_strides = 31 [default = ""];
+
+  optional uint32 normalization = 32 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+
+  optional uint32 tpaf = 33 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+
+  optional uint32 staf = 34 [default = 0]; // 0 for x/256 - 0.5; 1 for x-channel average
+
+  optional string staf_ids = 35 [default = ""];
+
+  optional uint32 num_people_image = 36 [default = 3];
+
   // // CLAHE
-  // optional float clahe_tile_size = 26 [default = 8.0];
-  // optional float clahe_clip_limit = 27 [default = 4.0];
-  // optional bool do_clahe = 28 [default = false];
+  // optional float clahe_tile_size = 34 [default = 8.0];
+  // optional float clahe_clip_limit = 35 [default = 4.0];
+  // optional bool do_clahe = 36 [default = false];
 }
 // OpenPose: end new parameter
 
@@ -641,6 +672,14 @@ message ContrastiveLossParameter {
   // legacy_version = true uses (margin - d^2). This is kept to support /
   // reproduce existing models and results
   optional bool legacy_version = 2 [default = false];
+}
+
+message TripletLossParameter {
+  //margin for negative triplet
+  optional float margin = 1 [default = 1.0];
+  optional uint32 losstype = 2 [default = 1];
+  optional uint32 num_negatives = 3 [default = 3];
+  optional uint32 use_pair = 4 [default = 0];
 }
 
 message ConvolutionParameter {
@@ -1151,6 +1190,17 @@ message ReshapeParameter {
   optional int32 num_axes = 3 [default = -1];
 }
 
+// Message that stores parameters used by ROIPoolingLayer
+message ROIPoolingParameter {
+  // Pad, kernel size, and stride are all given as a single value for equal
+  // dimensions in height and width or as Y, X pairs.
+  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
+  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
+  // Multiplicative spatial scale factor to translate ROI coords from their
+  // input scale to the scale used when pooling
+  optional float spatial_scale = 3 [default = 1];
+}
+
 message ScaleParameter {
   // The first axis of bottom[0] (the first input Blob) along which to apply
   // bottom[1] (the second input Blob).  May be negative to index from the end
@@ -1195,6 +1245,13 @@ message SigmoidParameter {
     CUDNN = 2;
   }
   optional Engine engine = 1 [default = DEFAULT];
+}
+
+message SmoothL1LossParameter {
+  // SmoothL1Loss(x) =
+  //   0.5 * (sigma * x) ** 2    -- if x < 1.0 / sigma / sigma
+  //   |x| - 0.5 / sigma / sigma -- otherwise
+  optional float sigma = 1 [default = 1];
 }
 
 message SliceParameter {
@@ -1386,6 +1443,7 @@ message V1LayerParameter {
   optional TransformationParameter transform_param = 36;
   optional LossParameter loss_param = 42;
   optional V0LayerParameter layer = 1;
+  optional TripletLossParameter triplet_loss_param = 43;
 }
 
 // DEPRECATED: V0LayerParameter is the old way of specifying layer parameters

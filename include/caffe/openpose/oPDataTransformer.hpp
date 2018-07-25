@@ -24,6 +24,25 @@
 
 namespace caffe {
 
+#include  <random>
+#include  <iterator>
+
+template<typename Iter, typename RandomGenerator>
+Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
+    std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
+    std::advance(start, dis(g));
+    return start;
+}
+
+template<typename Iter>
+Iter select_randomly(Iter start, Iter end) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    return select_randomly(start, end, gen);
+}
+
+int getRand(int min, int max);
+
 struct VSeq{
     std::vector<cv::Mat> images;
     std::vector<cv::Mat> imagesAug;
@@ -39,8 +58,9 @@ template <typename Dtype>
 class OPDataTransformer {
 public:
     explicit OPDataTransformer(const std::string& modelString);
+    explicit OPDataTransformer(const OPTransformationParameter& param);
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
-        const std::string& modelString); // OpenPose: Added std::string
+                               const std::string& modelString, bool tpaf = false, bool staf = false, std::vector<int> stafIDS = {}); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
 
     /**
@@ -79,13 +99,21 @@ protected:
     // Image and label
 public:
     void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
-                   const Datum* datumNegative = nullptr);
+                   const Datum* datumNegative = nullptr,
+                   // Extra labels addition
+                   Blob<Dtype> extra_transformed_labels[] = nullptr,
+                   std::vector<int> extra_strides = std::vector<int>(0),
+                   int extra_labels_count = 0);
     void TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum* datumNegative = nullptr);
     void TransformVideoSF(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum* datumNegative = nullptr);
     void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
+
+    cv::Mat parseBackground(const Datum* background);
+
+
 protected:
     // OpenPose: added end
     // Tranformation parameters
@@ -103,19 +131,28 @@ protected:
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
     std::string mModelString;
+    bool mTpaf, mStaf;
+    std::vector<int> mStafIDS;
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
-                              const Datum* datumNegative);
+                              const Datum* datumNegative,
+                              // Extra labels addition
+                              Blob<Dtype> extra_transformed_labels[] = nullptr,
+                              std::vector<int> extra_strides = std::vector<int>(0),
+                              int extra_labels_count = 0);
     void generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                          const MetaData& metaData, const cv::Mat& img) const;
+                          const MetaData& metaData, const cv::Mat& img, const int stride) const;
+    void generateLabelMapStaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                          const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;
     void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY, cv::Mat& count,
                        const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride,
                        const int gridX, const int gridY, const float sigma, const int threshold,
-                       const int diagonal, const float diagonalProportion) const;
+                       const int diagonal, const float diagonalProportion, const bool normalize = true, const bool demask = false, const float tanval = 0) const;
+
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,
