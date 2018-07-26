@@ -619,6 +619,74 @@ bool contains(vector<T> v, T x)
 
 // OpenPose: added
 template<typename Dtype>
+cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, std::vector<cv::Rect> &rects){
+
+    // Data
+    const auto stride = (int)param_.stride();
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+
+    // Setup a metaData object
+    MetaData metaData;
+    metaData.imageSize = img.size();
+    metaData.isValidation = false;
+    metaData.numberOtherPeople = rects.size();
+    int selectedRect = getRand(0, rects.size()-1);
+    //metaData.objPos.x = rects[selectedRect].x + (rects[selectedRect].width/2);
+    //metaData.objPos.y = rects[selectedRect].y + (rects[selectedRect].height/2);
+    metaData.objPos.x = metaData.imageSize.width/2.; metaData.objPos.y = metaData.imageSize.height/2; // Set to rotate around centre
+
+    metaData.jointsOthers.resize(rects.size());
+    metaData.scaleSelf = 1;
+
+    // Store Rect as joints
+    int i=0;
+    for(cv::Rect& rect : rects){
+        //metaData.jointsOthers[i].isVisible.emplace_back(1);
+        //metaData.jointsOthers[i].isVisible.emplace_back(1);
+        cv::Point a = rect.tl();
+        cv::Point b = cv::Point(a.x + rect.width, a.y);
+        cv::Point c = rect.br();
+        cv::Point d = cv::Point(c.x - rect.width, c.y);
+        metaData.jointsOthers[i].points.emplace_back(a);
+        metaData.jointsOthers[i].points.emplace_back(b);
+        metaData.jointsOthers[i].points.emplace_back(c);
+        metaData.jointsOthers[i].points.emplace_back(d);
+        i++;
+    }
+
+    // Augment
+    cv::Mat imgAug = img.clone();
+    AugmentSelection augmentSelection;
+    augmentSelection.scale = estimateScale(metaData, param_);
+    applyScale(metaData, augmentSelection.scale, mPoseModel);
+    augmentSelection.RotAndFinalSize = estimateRotation(
+                    metaData,
+                    cv::Size{(int)std::round(metaData.imageSize.width * augmentSelection.scale),
+                             (int)std::round(metaData.imageSize.height * augmentSelection.scale)},
+                    param_);
+    applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
+    augmentSelection.cropCenter = estimateCrop(metaData, param_);
+    applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, mPoseModel);
+    augmentSelection.flip = estimateFlip(metaData, param_);
+    augmentSelection.flip = 1;
+    applyFlip(metaData, augmentSelection.flip, finalImageWidth, param_, mPoseModel, false);
+    applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
+
+    // Modify Rect back
+    i = 0;
+    for(cv::Rect& rect : rects){
+        rect = cv::boundingRect(metaData.jointsOthers[i].points);
+        i++;
+    }
+
+    return imgAug;
+}
+
+// OpenPose: added
+template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                                                   const Datum& datum, const Datum* datumNegative)
 {
@@ -1056,7 +1124,8 @@ cv::Mat  OPDataTransformer<Dtype>::parseBackground(const Datum *datumNegative){
         const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
         const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
         const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
-        cv::merge({b,g,r}, backgroundImage);
+        std::vector<cv::Mat> bgr{b,g,r};
+        cv::merge(bgr, backgroundImage);
         // // Security checks
         // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
         // CHECK_EQ(datumNegativeArea2, datumNegativeArea);

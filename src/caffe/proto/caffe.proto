@@ -530,6 +530,8 @@ message OPTransformationParameter {
 
   optional uint32 num_people_image = 36 [default = 3];
 
+  optional uint32 secondary_mode = 37 [default = 0];
+
   // // CLAHE
   // optional float clahe_tile_size = 34 [default = 8.0];
   // optional float clahe_clip_limit = 35 [default = 4.0];

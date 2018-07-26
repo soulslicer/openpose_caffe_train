@@ -57,7 +57,11 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
   for (int i = 0; i < prefetch_.size(); ++i) {
     prefetch_[i]->data_.mutable_cpu_data();
     if (this->output_labels_) {
+#ifdef CPU_ONLY
+      prefetch_[i]->label_.mutable_cpu_data();
+#else
       prefetch_[i]->label_.mutable_gpu_data();
+#endif
 
       // Added
       for(int j=0; j<prefetch_[i]->extra_labels_count; j++)

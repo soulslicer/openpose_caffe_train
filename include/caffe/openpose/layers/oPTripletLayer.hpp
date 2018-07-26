@@ -22,6 +22,14 @@
 
 namespace caffe {
 
+struct TFrame{
+    std::string imagePath;
+    std::map<int, cv::Rect> persons;
+};
+struct TVideo{
+    std::vector<TFrame> frames;
+};
+
 template <typename Dtype>
 class OPTripletLayer : public BasePrefetchingDataLayer<Dtype> {
  public:
@@ -79,6 +87,9 @@ class OPTripletLayer : public BasePrefetchingDataLayer<Dtype> {
   float secondary_prob = 0;
   std::vector<int> reidKeys_secondary;
   std::map<int, std::vector<std::string>> reidData_secondary;
+
+  int curr_video = -1;
+  std::vector<TVideo> videos;
   // OpenPose: added end
 };
 

@@ -35,12 +35,12 @@ namespace caffe {
         if(joints.points.size()) swapLeftRightKeypoints(joints, poseModel);
     }
 
-    void flipKeypoints(Joints& joints, const int widthMinusOne, const PoseModel poseModel)
+    void flipKeypoints(Joints& joints, const int widthMinusOne, const PoseModel poseModel, bool swapLeftRight = true)
     {
         if(!joints.points.size()) return;
         for (auto& point : joints.points)
             point.x = widthMinusOne - point.x;
-        swapLeftRightKeypoints(joints, poseModel);
+        if(swapLeftRight) swapLeftRightKeypoints(joints, poseModel);
     }
 
     // Public functions
@@ -366,7 +366,7 @@ namespace caffe {
     }
 
     void applyFlip(MetaData& metaData, const bool flip, const int imageWidth,
-                   const OPTransformationParameter& param_, const PoseModel poseModel)
+                   const OPTransformationParameter& param_, const PoseModel poseModel, bool swapLeftRight)
     {
         // Update metaData
         if (flip)
@@ -381,7 +381,7 @@ namespace caffe {
                     if(metaData.jointsOthersPrev.size())
                     flipKeypoints(metaData.jointsOthersPrev[p], metaData.objPosOthers[p], widthMinusOne, poseModel);
                 }else {
-                    flipKeypoints(metaData.jointsOthers[p], widthMinusOne, poseModel);
+                    flipKeypoints(metaData.jointsOthers[p], widthMinusOne, poseModel, swapLeftRight);
                     if(metaData.jointsOthersPrev.size())
                     flipKeypoints(metaData.jointsOthersPrev[p], widthMinusOne, poseModel);
                 }

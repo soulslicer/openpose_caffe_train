@@ -38,7 +38,7 @@ namespace caffe {
                       const OPTransformationParameter& param_);
     void applyFlip(cv::Mat& imageAugmented, const bool flip, const cv::Mat& image);
     void applyFlip(MetaData& metaData, const bool flip, const int imageWidth,
-                   const OPTransformationParameter& param_, const PoseModel poseModel);
+                   const OPTransformationParameter& param_, const PoseModel poseModel, bool swapLeftRight = true);
     void rotatePoint(cv::Point2f& point2f, const cv::Mat& R);
     // Rotation + scale + cropping + flipping
     void applyAllAugmentation(cv::Mat& imageAugmented, const cv::Mat& rotationMatrix,

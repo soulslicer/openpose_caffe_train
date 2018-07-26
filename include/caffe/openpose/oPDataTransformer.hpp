@@ -41,6 +41,16 @@ Iter select_randomly(Iter start, Iter end) {
     return select_randomly(start, end, gen);
 }
 
+template <class T>
+bool vec_contains(std::vector<T> const &v, T const &x) {
+    if (v.empty())
+         return false;
+    if (find(v.begin(), v.end(), x) != v.end())
+         return true;
+    else
+         return false;
+}
+
 int getRand(int min, int max);
 
 struct VSeq{
@@ -112,6 +122,8 @@ public:
     int getNumberChannels() const;
 
     cv::Mat parseBackground(const Datum* background);
+
+    cv::Mat opConvert(const cv::Mat& img, std::vector<cv::Rect>& rects);
 
 
 protected:

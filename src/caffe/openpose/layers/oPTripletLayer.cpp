@@ -102,7 +102,7 @@ void OPTripletLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     if(!reidData.size()) throw std::runtime_error("Failed to load primary");
 
     // Secondary
-    if(this->layer_param_.op_transform_param().model_secondary().size()){
+    if(this->layer_param_.op_transform_param().model_secondary().size() && this->layer_param_.op_transform_param().secondary_mode() == 0){
         secondary_prob = this->layer_param_.op_transform_param().prob_secondary();
 
         std::string train_source = this->layer_param_.op_transform_param().model_secondary();
@@ -122,6 +122,35 @@ void OPTripletLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
             reidKeys_secondary.emplace_back(kv.first);
         }
         if(!reidData_secondary.size()) throw std::runtime_error("Failed to load secondary");
+    }
+    else if(this->layer_param_.op_transform_param().model_secondary().size() && this->layer_param_.op_transform_param().secondary_mode() == 1){
+        secondary_prob = this->layer_param_.op_transform_param().prob_secondary();
+        std::string jsonPath = this->layer_param_.op_transform_param().model_secondary();
+
+        Json::Value root;
+        std::ifstream file(jsonPath);
+        file >> root;
+
+        if(root.size() == 0) throw std::runtime_error("Failed to load JSON");
+
+        for(int i=0; i<root.size(); i++){
+            TVideo tVideo;
+            for(int j=0; j<root[i].size(); j++){
+                TFrame tFrame;
+                tFrame.imagePath = root[i][j]["image_path_full"].asString();
+                for(int k=0; k<root[i][j]["annorect"].size(); k++){
+                    int tid = root[i][j]["annorect"][k]["track_id"].asInt();
+                    if(!root[i][j]["annorect"][k].isMember("fake_rect")) continue;
+                    float x1 = root[i][j]["annorect"][k]["fake_rect"][0].asFloat();
+                    float y1 = root[i][j]["annorect"][k]["fake_rect"][1].asFloat();
+                    float x2 = root[i][j]["annorect"][k]["fake_rect"][2].asFloat();
+                    float y2 = root[i][j]["annorect"][k]["fake_rect"][3].asFloat();
+                    tFrame.persons[tid] = cv::Rect(cv::Point(x1,y1), cv::Point(x2,y2));
+                }
+                tVideo.frames.emplace_back(tFrame);
+            }
+            videos.emplace_back(tVideo);
+        }
     }
 
     mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_));
@@ -235,12 +264,13 @@ void OPTripletLayer<Dtype>::NextSecond()
 }
 // OpenPose: added ended
 
-float intersectionPercentage(cv::Rect a, cv::Rect b){
+float intersectionPercentage(cv::Rect a, cv::Rect b, bool a_select = false){
     float dx = min(a.br().x, b.br().x) - max(a.tl().x, b.tl().x);
     float dy = min(a.br().y, b.br().y) - max(a.tl().y, b.tl().y);
     float intersect_area = 0;
     if (dx >= 0 && dy >= 0) intersect_area = dx*dy;
-    return max(intersect_area/a.area(), intersect_area/b.area());
+    if(a_select) return intersect_area/a.area();
+    else return max(intersect_area/a.area(), intersect_area/b.area());
 }
 
 std::pair<cv::Mat, cv::Size> rotateBoundSize(cv::Size currSize, float angle){
@@ -494,82 +524,303 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         else
             reidData_ref = &reidData_secondary;
 
-        std::vector< std::pair<int, std::vector<std::string>>> positive_ids, negative_ids; // 3 each
-        for(int j=0; j<num_people_image; j++){
-            positive_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
-            negative_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
+        // Not Video Mode
+        if(desiredDbIs1 || (!desiredDbIs1 && !videos.size())){
+
+            std::vector< std::pair<int, std::vector<std::string>>> positive_ids, negative_ids; // 3 each
+            for(int j=0; j<num_people_image; j++){
+                positive_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
+                negative_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
+            }
+
+            for(int j=0; j<triplet_size; j++){
+                int image_id = i*triplet_size + j;
+                cv::Mat backgroundImage = backgroundImages[image_id];
+                std::vector<cv::Mat> personImages;
+                std::vector<int> personIDs;
+
+                // J=0 Is for Reference Image
+                if(j==0){
+                    for(auto& pos_id : positive_ids){
+                        cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
+                        personImages.emplace_back(pos_id_image);
+                        personIDs.emplace_back(pos_id.first);
+                    }
+                }
+                // J=1 Is for +
+                else if(j==1){
+                    for(auto& pos_id : positive_ids){
+                        cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
+                        personImages.emplace_back(pos_id_image);
+                        personIDs.emplace_back(pos_id.first);
+                    }
+                }
+                // J=2 Is for -
+                else if(j==2){
+                    for(auto& neg_id : negative_ids){
+                        cv::Mat neg_id_image = cv::imread(neg_id.second[getRand(0, neg_id.second.size()-1)]);
+                        personImages.emplace_back(neg_id_image);
+                        personIDs.emplace_back(neg_id.first);
+                    }
+                }
+
+                // Generate Image
+                cv::Mat finalImage; std::vector<cv::Rect> rects;
+                generateImage(backgroundImage, personImages, finalImage, rects);
+
+                // Convert image to Caffe
+                matToCaffeInt(topData + batch->data_.offset(image_id), finalImage);
+
+                // Write rects
+                for(int k=0; k<rects.size(); k++){
+                    cv::Rect& rect = rects[k];
+                    int id = personIDs[k];
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[0] = image_id;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[1] = rect.x;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[2] = rect.y;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[3] = rect.x + rect.width;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[4] = rect.y + rect.height;
+
+                    if(batchIDPtr != nullptr){
+                        (batchIDPtr + batch->extra_labels_[0].offset(k * triplet_size + j))[0] = id;
+                    }
+                }
+
+    //            // Visualize
+    //            for(int k=0; k<rects.size(); k++){
+    //                int final_id = -1;
+    //                if(batchIDPtr != nullptr){
+    //                    auto* testPtr = (batchIDPtr + batch->extra_labels_[0].offset(k * triplet_size + j));
+    //                    final_id = testPtr[0];
+    //                }
+    //                cv::Rect& rect = rects[k];
+    //                cv::putText(finalImage, std::to_string(final_id) + " " + std::to_string(image_id) + " " + std::to_string(rect.x + rect.width) + " " + std::to_string(rect.y + rect.height),  rect.tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+    //                cv::imwrite("visualize2/"+std::to_string(image_id)+".jpg", finalImage);
+    //            }
+
+            }
+
         }
+        // Video Mode
+        else{
 
-        for(int j=0; j<triplet_size; j++){
-            int image_id = i*triplet_size + j;
-            cv::Mat backgroundImage = backgroundImages[image_id];
-            std::vector<cv::Mat> personImages;
-            std::vector<int> personIDs;
+            /* 1. We randomly select two videos
+             * 2. We select 3 random frames (2 from same video, 1 from other video (or same video with more prob))
+             * 3. We then select 3 random people from each frame (ensure a and + has same ID), if there are less than 3 we repeat it
+             * 4. Visualize it
+             */
 
-            // J=0 Is for Reference Image
-            if(j==0){
-                for(auto& pos_id : positive_ids){
-                    cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
-                    personImages.emplace_back(pos_id_image);
-                    personIDs.emplace_back(pos_id.first);
+            // SHOULD THE + VIDEO BE DONE INCREMENTALLY?
+
+            // OR IF WE RANDOMIZE MAKE SURE DONT SELECT SAME VID?
+
+            // Pick Video wanted
+            float diff_vid_prob = 0.5;
+            const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+            const auto same_vid = !diff_vid_prob || (dice <= (1-diff_vid_prob));
+            //int pos_vid = ++curr_video % (videos.size()-1);
+            int pos_vid = getRand(0, videos.size()-1);
+            int neg_vid = pos_vid;
+            if(!same_vid) neg_vid = getRand(0, videos.size()-1);
+
+            // HACK FOR NOW
+            //pos_vid = 1;
+            //neg_vid = 1;
+
+            int anch_frame, pos_frame, neg_frame;
+            std::vector<int> anch_people_chosen_ids; std::vector<cv::Rect> anch_people_chosen_rects;
+            std::vector<int> pos_people_chosen_ids; std::vector<cv::Rect> pos_people_chosen_rects;
+            std::vector<int> neg_people_chosen_ids; std::vector<cv::Rect> neg_people_chosen_rects;
+            while(1){
+                // Reset var
+                anch_people_chosen_ids.clear(); anch_people_chosen_rects.clear();
+                pos_people_chosen_ids.clear(); pos_people_chosen_rects.clear();
+                neg_people_chosen_ids.clear(); neg_people_chosen_rects.clear();
+
+                // Pick 2 anchor and positive frames
+                anch_frame = getRand(0, videos[pos_vid].frames.size()-1);
+                pos_frame = getRand(0, videos[pos_vid].frames.size()-1);
+                neg_frame = getRand(0, videos[neg_vid].frames.size()-1);
+
+                // If neg frame and pos frame are same, then the pos frame needs at least 2 people
+                if(videos[pos_vid].frames[anch_frame].persons.size() < 2 ||
+                   videos[pos_vid].frames[pos_frame].persons.size() < 2 ||
+                   videos[neg_vid].frames[neg_frame].persons.size() < 1){
+                    std::cout << "Video Frame has bad no of people" << std::endl;
+                    continue;
+                }
+
+                // Iterate through each person
+                bool pick_failed = false;
+
+                for(int j=0; j<num_people_image; j++){
+
+                    // Try to select a non-selected person always (if available)
+                    // Pick a person ID from the anchor frame
+                    std::pair<int, cv::Rect> person_data_anchor;
+                    while(1){
+                        person_data_anchor = *select_randomly(videos[pos_vid].frames[anch_frame].persons.begin(), videos[pos_vid].frames[anch_frame].persons.end());
+                        if(anch_people_chosen_ids.size() == videos[pos_vid].frames[anch_frame].persons.size()) break;
+                        if(vec_contains(anch_people_chosen_ids, person_data_anchor.first)) continue;
+                        else break;
+                    }
+                    int person_data_anchor_id = person_data_anchor.first;
+                    cv::Rect person_data_anchor_bbox = person_data_anchor.second;
+
+                    // Possiblity of limiting the bounding box to face etc, then we need to store keypoints directly
+
+                    // Check if anchor experiences significant overlap within the frame with other people
+                    bool intersectBad = false;
+                    for (auto& kv : videos[pos_vid].frames[anch_frame].persons) {
+                        if(kv.first == person_data_anchor_id) continue;
+                        if(intersectionPercentage(person_data_anchor_bbox, kv.second, true) > 0.3) intersectBad = true;
+                    }
+                    if(intersectBad){
+                        pick_failed = true;
+                        std::cout << "VID: " << pos_vid << " Frame: " << anch_frame << " PID: " << person_data_anchor_id << " First Intersection Problem" << std::endl;
+                        break;
+                    }
+
+                    // Check if the person is available in the pos frame
+                    if(!videos[pos_vid].frames[pos_frame].persons.count(person_data_anchor_id)){
+                        pick_failed = true;
+                        std::cout << "VID: " << pos_vid << " Frame: " << pos_frame << " PID: " << person_data_anchor_id << " Unable to find in other frame" << std::endl;
+                        break;
+                    }
+                    cv::Rect person_data_pos_bbox = videos[pos_vid].frames[pos_frame].persons[person_data_anchor_id];
+
+                    // Check if + experiences significant overlap within the frame with other people
+                    intersectBad = false;
+                    for (auto& kv : videos[pos_vid].frames[pos_frame].persons) {
+                        if(kv.first == person_data_anchor_id) continue;
+                        if(intersectionPercentage(person_data_pos_bbox, kv.second, true) > 0.3) intersectBad = true;
+                    }
+                    if(intersectBad){
+                        pick_failed = true;
+                        std::cout << "VID: " << pos_vid << " Frame: " << pos_frame << " PID: " << person_data_anchor_id << " Second Intersection Problem" << std::endl;
+                        break;
+                    }
+
+                    // Add some noise to the bounding box
+
+                    // Try select negative that is not in list if its the same neg vid
+                    std::pair<int, cv::Rect> person_data_neg;
+                    if(pos_vid == neg_vid){
+                        while(1){
+                            person_data_neg = *select_randomly(videos[neg_vid].frames[neg_frame].persons.begin(), videos[neg_vid].frames[neg_frame].persons.end());
+
+                            // Dont choose a neg that is overlapped completely with another
+                            intersectBad = false;
+                            for (auto& kv : videos[neg_vid].frames[neg_frame].persons) {
+                                if(kv.first == person_data_neg.first) continue;
+                                if(intersectionPercentage(person_data_neg.second, kv.second, true) > 0.8) intersectBad = true;
+                            }
+                            if(intersectBad){
+                                std::cout << "Neg selection intersect bad" << std::endl;
+                                continue;
+                            }
+
+                            if(person_data_neg.first == person_data_anchor_id) continue;
+                            else break;
+                        }
+                    }else{
+                        person_data_neg = *select_randomly(videos[neg_vid].frames[neg_frame].persons.begin(), videos[neg_vid].frames[neg_frame].persons.end());
+                    }
+
+                    // Add Anchor
+                    anch_people_chosen_ids.emplace_back(person_data_anchor_id);
+                    anch_people_chosen_rects.emplace_back(person_data_anchor_bbox);
+
+                    // Add Pos
+                    pos_people_chosen_ids.emplace_back(person_data_anchor_id);
+                    pos_people_chosen_rects.emplace_back(person_data_pos_bbox);
+
+                    // Add Neg
+                    neg_people_chosen_ids.emplace_back(person_data_neg.first);
+                    neg_people_chosen_rects.emplace_back(person_data_neg.second);
+                }
+
+                // Failed to find anything in this frame
+                if(pick_failed) continue;
+
+                // Break
+                if(anch_people_chosen_ids.size() == num_people_image) {
+                    //std::cout << anch_people_chosen_ids[0] << " " << anch_people_chosen_ids[1] << " " << anch_people_chosen_ids[2] << std::endl;
+                    //std::cout << pos_people_chosen_ids[0] << " " << pos_people_chosen_ids[1] << " " << pos_people_chosen_ids[2] << std::endl;
+                    //std::cout << neg_people_chosen_ids[0] << " " << neg_people_chosen_ids[1] << " " << neg_people_chosen_ids[2] << std::endl;
+                    break;
                 }
             }
-            // J=1 Is for +
-            else if(j==1){
-                for(auto& pos_id : positive_ids){
-                    cv::Mat pos_id_image = cv::imread(pos_id.second[getRand(0, pos_id.second.size()-1)]);
-                    personImages.emplace_back(pos_id_image);
-                    personIDs.emplace_back(pos_id.first);
+
+            // OP Convert
+            std::vector<cv::Mat> vizImages;
+            for(int j=0; j<3; j++){
+                cv::Mat img;
+                std::vector<cv::Rect>* rects;
+
+                // Anchor
+                if(j==0){
+                    img = cv::imread(videos[pos_vid].frames[anch_frame].imagePath);
+                    img = mOPDataTransformer->opConvert(img, anch_people_chosen_rects);
+                    rects = &anch_people_chosen_rects;
+                    cv::Mat vizImage = img.clone(); cv::rectangle(vizImage, anch_people_chosen_rects[0], cv::Scalar(255,0,0)); cv::rectangle(vizImage, anch_people_chosen_rects[1], cv::Scalar(0,255,0)); cv::rectangle(vizImage, anch_people_chosen_rects[2], cv::Scalar(00,0,255)); vizImages.emplace_back(vizImage);
                 }
-            }
-            // J=2 Is for -
-            else if(j==2){
-                for(auto& neg_id : negative_ids){
-                    cv::Mat neg_id_image = cv::imread(neg_id.second[getRand(0, neg_id.second.size()-1)]);
-                    personImages.emplace_back(neg_id_image);
-                    personIDs.emplace_back(neg_id.first);
+                // +
+                if(j==1){
+                    img = cv::imread(videos[pos_vid].frames[pos_frame].imagePath);
+                    img = mOPDataTransformer->opConvert(img, pos_people_chosen_rects);
+                    rects = &pos_people_chosen_rects;
+                    cv::Mat vizImage = img.clone(); cv::rectangle(vizImage, pos_people_chosen_rects[0], cv::Scalar(255,0,0)); cv::rectangle(vizImage, pos_people_chosen_rects[1], cv::Scalar(0,255,0)); cv::rectangle(vizImage, pos_people_chosen_rects[2], cv::Scalar(0,0,255)); vizImages.emplace_back(vizImage);
                 }
-            }
-
-            // Generate Image
-            cv::Mat finalImage; std::vector<cv::Rect> rects;
-            generateImage(backgroundImage, personImages, finalImage, rects);
-
-            // Convert image to Caffe
-            matToCaffeInt(topData + batch->data_.offset(image_id), finalImage);
-
-            // Write rects
-            for(int k=0; k<rects.size(); k++){
-                cv::Rect& rect = rects[k];
-                int id = personIDs[k];
-                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[0] = image_id;
-                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[1] = rect.x;
-                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[2] = rect.y;
-                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[3] = rect.x + rect.width;
-                (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[4] = rect.y + rect.height;
-
-                if(batchIDPtr != nullptr){
-                    (batchIDPtr + batch->extra_labels_[0].offset(k * triplet_size + j))[0] = id;
+                // -
+                if(j==2){
+                    img = cv::imread(videos[neg_vid].frames[neg_frame].imagePath);
+                    img = mOPDataTransformer->opConvert(img, neg_people_chosen_rects);
+                    rects = &neg_people_chosen_rects;
+                    cv::Mat vizImage = img.clone(); cv::putText(vizImage, std::to_string(neg_people_chosen_ids[0]), neg_people_chosen_rects[0].tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2); cv::putText(vizImage, std::to_string(neg_people_chosen_ids[1]), cv::Point(neg_people_chosen_rects[1].tl().x, neg_people_chosen_rects[1].tl().y + 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2); cv::putText(vizImage, std::to_string(neg_people_chosen_ids[2]), cv::Point(neg_people_chosen_rects[2].tl().x, neg_people_chosen_rects[2].tl().y + 40), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+                    cv::rectangle(vizImage, neg_people_chosen_rects[0], cv::Scalar(255,0,0)); cv::rectangle(vizImage, neg_people_chosen_rects[1], cv::Scalar(0,255,0)); cv::rectangle(vizImage, neg_people_chosen_rects[2], cv::Scalar(0,0,255)); vizImages.emplace_back(vizImage);
                 }
+
+                // Convert image to Caffe
+                int image_id = i*triplet_size + j;
+                matToCaffeInt(topData + batch->data_.offset(image_id), img);
+
+                // Write rects
+                for(int k=0; k<rects->size(); k++){
+                    cv::Rect& rect = rects->at(k);
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[0] = image_id;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[1] = rect.x;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[2] = rect.y;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[3] = rect.x + rect.width;
+                    (batchLabelPtr + batch->label_.offset(k * triplet_size + j))[4] = rect.y + rect.height;
+                }
+
+                // Visualize
+                cv::Mat cImg = img.clone();
+                for(int k=0; k<rects->size(); k++){
+                    cv::Rect& rect = rects->at(k);
+                    cv::putText(cImg, std::to_string(k) + " " + std::to_string(image_id) + " " + std::to_string(rect.x + rect.width) + " " + std::to_string(rect.y + rect.height),  rect.tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+                    cv::rectangle(cImg, rect, cv::Scalar((k==0)*255, (k==1)*255, (k==2)*255));
+                }
+                cv::imwrite("visualize2/"+std::to_string(image_id)+".jpg", cImg);
+
             }
 
-//            // Visualize
-//            for(int k=0; k<rects.size(); k++){
-//                int final_id = -1;
-//                if(batchIDPtr != nullptr){
-//                    auto* testPtr = (batchIDPtr + batch->extra_labels_[0].offset(k * triplet_size + j));
-//                    final_id = testPtr[0];
-//                }
-//                cv::Rect& rect = rects[k];
-//                cv::putText(finalImage, std::to_string(final_id) + " " + std::to_string(image_id) + " " + std::to_string(rect.x + rect.width) + " " + std::to_string(rect.y + rect.height),  rect.tl(), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
-//                cv::imwrite("visualize2/"+std::to_string(image_id)+".jpg", finalImage);
-//            }
+//            cv::imshow("anchor", vizImages[0]);
+//            cv::imshow("pos", vizImages[1]);
+//            cv::imshow("neg", vizImages[2]);
+//            cv::waitKey(-1);
+
 
         }
 
     }
 
-    //exit(-1);
+    // Video Incremental Implement
+
+    // Put BG Image on black areas
+
+    exit(-1);
 }
 
 INSTANTIATE_CLASS(OPTripletLayer);
