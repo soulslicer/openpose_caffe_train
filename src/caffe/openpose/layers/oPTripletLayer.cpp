@@ -15,6 +15,8 @@
 #include "caffe/openpose/getLine.hpp"
 #include "caffe/openpose/layers/oPTripletLayer.hpp"
 #include <opencv2/opencv.hpp>
+#include <chrono>
+#include <thread>
 // OpenPose: added end
 
 #include <iostream>
@@ -617,11 +619,11 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             bool intersect_log = false;
 
             // Pick Video wanted
-            float diff_vid_prob = 0.33;
+            float diff_vid_prob = 0.5;
             const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
             const auto same_vid = !diff_vid_prob || (dice <= (1-diff_vid_prob));
-            //int pos_vid = ++curr_video % (videos.size()-1);
-            int pos_vid = getRand(0, videos.size()-1);
+            int pos_vid = ++curr_video % (videos.size()-1);
+            //int pos_vid = getRand(0, videos.size()-1);
             int neg_vid = pos_vid;
             if(!same_vid) neg_vid = getRand(0, videos.size()-1);
 
@@ -636,14 +638,16 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             int ext_counter = 0;
             while(1){
                 ext_counter++;
-                if(ext_counter > 500){
+                if(ext_counter > 800){
                     const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
                     const auto same_vid = !diff_vid_prob || (dice <= (1-diff_vid_prob));
-                    //int pos_vid = ++curr_video % (videos.size()-1);
-                    pos_vid = getRand(0, videos.size()-1);
+                    int prev_pos_vid = pos_vid;
+                    pos_vid = ++curr_video % (videos.size()-1);
+                    //pos_vid = getRand(0, videos.size()-1);
                     neg_vid = pos_vid;
                     if(!same_vid) neg_vid = getRand(0, videos.size()-1);
                     ext_counter = 0;
+                    std::cout << "Skipping Vid " << prev_pos_vid << std::endl;
                 }
 
                 // Reset var
@@ -768,6 +772,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
                 // Break
                 if(anch_people_chosen_ids.size() == num_people_image) {
+                    std::cout << pos_vid << " " << neg_vid << " " << anch_frame << " " << pos_frame << " " << neg_frame << std::endl;
                     //std::cout << anch_people_chosen_ids[0] << " " << anch_people_chosen_ids[1] << " " << anch_people_chosen_ids[2] << std::endl;
                     //std::cout << pos_people_chosen_ids[0] << " " << pos_people_chosen_ids[1] << " " << pos_people_chosen_ids[2] << std::endl;
                     //std::cout << neg_people_chosen_ids[0] << " " << neg_people_chosen_ids[1] << " " << neg_people_chosen_ids[2] << std::endl;
@@ -835,12 +840,14 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 //            cv::imshow("anchor", vizImages[0]);
 //            cv::imshow("pos", vizImages[1]);
 //            cv::imshow("neg", vizImages[2]);
-//            cv::waitKey(-1);
+//            cv::waitKey(100);
 
 
         }
 
     }
+
+    //std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     // Video Incremental Implement
 
