@@ -1205,50 +1205,50 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     std::fill(maskDistance,
               maskDistance + 2*(numberBodyParts-1) * channelOffset,
               0.f);
-    if (addDistance)
-    {
-        auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
-                              * channelOffset;
-        const auto rootIndex = getRootIndex(mPoseModel);
-        const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
-        // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-        const cv::Point2f dMax{(float)gridX/(float)stride, (float)gridY/(float)stride};
-        for (auto partT = 0; partT < numberBodyParts; partT++)
-        {
-            if (rootIndex != partT)
-            {
-                const auto part = (partT > rootIndex ? partT-1 : partT);
-                // Self
-                if (metaData.jointsSelf.isVisible[part] <= 1)
-                {
-                    const auto& centerPoint = metaData.jointsSelf.points[part];
-                    putDistanceMaps(
-                        channelDistance + 2*part*channelOffset,
-                        channelDistance + (2*part+1)*channelOffset,
-                        maskDistance + 2*part*channelOffset,
-                        maskDistance + (2*part+1)*channelOffset,
-                        rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
-                    );
-                }
-                // For every other person
-                for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
-                {
-                    if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
-                    {
-                        const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
-                        const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
-                        putDistanceMaps(
-                            channelDistance + 2*part*channelOffset,
-                            channelDistance + (2*part+1)*channelOffset,
-                            maskDistance + 2*part*channelOffset,
-                            maskDistance + (2*part+1)*channelOffset,
-                            rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
-                        );
-                    }
-                }
-            }
-        }
-    }
+    // if (addDistance)
+    // {
+    //     auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
+    //                           * channelOffset;
+    //     const auto rootIndex = getRootIndex(mPoseModel);
+    //     const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
+    //     // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
+    //     const cv::Point2f dMax{(float)gridX/(float)stride, (float)gridY/(float)stride};
+    //     for (auto partT = 0; partT < numberBodyParts; partT++)
+    //     {
+    //         if (rootIndex != partT)
+    //         {
+    //             const auto part = (partT > rootIndex ? partT-1 : partT);
+    //             // Self
+    //             if (metaData.jointsSelf.isVisible[part] <= 1)
+    //             {
+    //                 const auto& centerPoint = metaData.jointsSelf.points[part];
+    //                 putDistanceMaps(
+    //                     channelDistance + 2*part*channelOffset,
+    //                     channelDistance + (2*part+1)*channelOffset,
+    //                     maskDistance + 2*part*channelOffset,
+    //                     maskDistance + (2*part+1)*channelOffset,
+    //                     rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+    //                 );
+    //             }
+    //             // For every other person
+    //             for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+    //             {
+    //                 if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
+    //                 {
+    //                     const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+    //                     const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
+    //                     putDistanceMaps(
+    //                         channelDistance + 2*part*channelOffset,
+    //                         channelDistance + (2*part+1)*channelOffset,
+    //                         maskDistance + 2*part*channelOffset,
+    //                         maskDistance + (2*part+1)*channelOffset,
+    //                         rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+    //                     );
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     // Background channel
     // Naive implementation
