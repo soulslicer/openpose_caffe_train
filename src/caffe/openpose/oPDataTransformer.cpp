@@ -1165,9 +1165,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // If foot
         if (mPoseModel == PoseModel::COCO_25_17 || mPoseModel == PoseModel::COCO_25_17E)
         {
-            maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+            maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f);
             for (const auto& jointsOther : metaData.jointsOthers)
-                maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+                maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.8f);
         }
     }
 
