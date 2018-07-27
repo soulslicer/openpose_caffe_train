@@ -622,8 +622,8 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             float diff_vid_prob = 0.5;
             const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
             const auto same_vid = !diff_vid_prob || (dice <= (1-diff_vid_prob));
-            int pos_vid = ++curr_video % (videos.size()-1);
-            //int pos_vid = getRand(0, videos.size()-1);
+            //int pos_vid = ++curr_video % (videos.size()-1);
+            int pos_vid = getRand(0, videos.size()-1);
             int neg_vid = pos_vid;
             if(!same_vid) neg_vid = getRand(0, videos.size()-1);
 
@@ -642,8 +642,8 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                     const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
                     const auto same_vid = !diff_vid_prob || (dice <= (1-diff_vid_prob));
                     int prev_pos_vid = pos_vid;
-                    pos_vid = ++curr_video % (videos.size()-1);
-                    //pos_vid = getRand(0, videos.size()-1);
+                    //pos_vid = ++curr_video % (videos.size()-1);
+                    pos_vid = getRand(0, videos.size()-1);
                     neg_vid = pos_vid;
                     if(!same_vid) neg_vid = getRand(0, videos.size()-1);
                     ext_counter = 0;
