@@ -1052,8 +1052,8 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
             const auto ankle = ratioStride * points.at(ankleIndex);
             const auto distance = (int)std::round(ratio*getNorm(knee, ankle));
             const cv::Point momentum = (ankle-knee)*0.15f;
-            cv::Rect roi{(int)std::round(ankle.x /*+ momentum.x*/)-distance,
-                         (int)std::round(ankle.y /*+ momentum.y*/)-distance,
+            cv::Rect roi{(int)std::round(ankle.x + momentum.x)-distance,
+                         (int)std::round(ankle.y + momentum.y)-distance,
                          2*distance, 2*distance};
             // Apply ROI
             keepRoiInside(roi, maskMiss.size());
