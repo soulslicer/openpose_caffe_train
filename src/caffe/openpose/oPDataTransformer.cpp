@@ -913,71 +913,71 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         generateDepthLabelMap(transformedLabel, depthAugmented);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // // if (mPoseModel == PoseModel::COCO_25E)
-    // {
-    //     if (metaData.writeNumber < 3)
-    //     // if (metaData.writeNumber < 5)
-    //     // if (metaData.writeNumber < 10)
-    //     // if (metaData.writeNumber < 100)
-    //     {
-    //         // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
-    //         // 2. Comment the following if statement
-    //         const auto rezX = (int)imageAugmented.cols;
-    //         const auto rezY = (int)imageAugmented.rows;
-    //         const auto gridX = rezX / stride;
-    //         const auto gridY = rezY / stride;
-    //         const auto channelOffset = gridY * gridX;
-    //         const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
-    //         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + param_.add_distance() * 2 * (numberBodyParts-1);
-    //         for (auto part = 0; part < numberTotalChannels; part++)
-    //         {
-    //             // Reduce #images saved (ideally mask images should be the same)
-    //             // if (part < 1)
-    //             // if (part == numberTotalChannels-1)
-    //             // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
-    //             // if (part < numberPafChannels || part == numberTotalChannels-1)
-    //             // if (part < 3 || part >= numberTotalChannels - 3)
-    //             {
-    //                 cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
-    //                 for (auto subPart = 0; subPart < 2; subPart++)
-    //                 {
-    //                     cv::Mat labelMap = finalImage(cv::Rect{subPart*gridX, 0, gridX, gridY});
-    //                     for (auto gY = 0; gY < gridY; gY++)
-    //                     {
-    //                         const auto yOffset = gY*gridX;
-    //                         for (auto gX = 0; gX < gridX; gX++)
-    //                         {
-    //                             const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-    //                             labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(transformedLabel[channelIndex + yOffset + gX]));
-    //                         }
-    //                     }
-    //                 }
-    //                 cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //                 cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
-    //                 for (auto subPart = 0; subPart < 2; subPart++)
-    //                 {
-    //                     cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
-    //                     cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
-    //                 }
-    //                 // Write on disk
-    //                 char imagename [100];
-    //                 sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", mModelString.c_str(),
-    //                         metaData.writeNumber, part);
-    //                 cv::imwrite(imagename, finalImage);
-    //             }
-    //         }
-    //         if (depthEnabled)
-    //         {
-    //             cv::Mat depthMap;
-    //             cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-    //             char imagename [100];
-    //             sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", mModelString.c_str(),
-    //                     metaData.writeNumber);
-    //             cv::imwrite(imagename, depthMap);
-    //         }
-    //     }
-    // }
+    // Debugging - Visualize - Write on disk
+    // if (mPoseModel == PoseModel::COCO_25E)
+    {
+        if (metaData.writeNumber < 3)
+        // if (metaData.writeNumber < 5)
+        // if (metaData.writeNumber < 10)
+        // if (metaData.writeNumber < 100)
+        {
+            // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
+            // 2. Comment the following if statement
+            const auto rezX = (int)imageAugmented.cols;
+            const auto rezY = (int)imageAugmented.rows;
+            const auto gridX = rezX / stride;
+            const auto gridY = rezY / stride;
+            const auto channelOffset = gridY * gridX;
+            const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
+            const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + param_.add_distance() * 2 * (numberBodyParts-1);
+            for (auto part = 0; part < numberTotalChannels; part++)
+            {
+                // Reduce #images saved (ideally mask images should be the same)
+                // if (part < 1)
+                // if (part == numberTotalChannels-1)
+                // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
+                // if (part < numberPafChannels || part == numberTotalChannels-1)
+                // if (part < 3 || part >= numberTotalChannels - 3)
+                {
+                    cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
+                    for (auto subPart = 0; subPart < 2; subPart++)
+                    {
+                        cv::Mat labelMap = finalImage(cv::Rect{subPart*gridX, 0, gridX, gridY});
+                        for (auto gY = 0; gY < gridY; gY++)
+                        {
+                            const auto yOffset = gY*gridX;
+                            for (auto gX = 0; gX < gridX; gX++)
+                            {
+                                const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
+                                labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(transformedLabel[channelIndex + yOffset + gX]));
+                            }
+                        }
+                    }
+                    cv::resize(finalImage, finalImage, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+                    cv::applyColorMap(finalImage, finalImage, cv::COLORMAP_JET);
+                    for (auto subPart = 0; subPart < 2; subPart++)
+                    {
+                        cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
+                        cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
+                    }
+                    // Write on disk
+                    char imagename [100];
+                    sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", mModelString.c_str(),
+                            metaData.writeNumber, part);
+                    cv::imwrite(imagename, finalImage);
+                }
+            }
+            if (depthEnabled)
+            {
+                cv::Mat depthMap;
+                cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
+                char imagename [100];
+                sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", mModelString.c_str(),
+                        metaData.writeNumber);
+                cv::imwrite(imagename, depthMap);
+            }
+        }
+    }
 }
 
 template<typename Dtype>
