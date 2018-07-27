@@ -619,7 +619,7 @@ bool contains(vector<T> v, T x)
 
 // OpenPose: added
 template<typename Dtype>
-cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, std::vector<cv::Rect> &rects){
+cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, const cv::Mat &bg, std::vector<cv::Rect> &rects){
 
     // Data
     const auto stride = (int)param_.stride();
@@ -627,16 +627,29 @@ cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, std::vector<cv::
     const auto finalImageWidth = (int)param_.crop_size_x();
     const auto finalImageHeight = (int)param_.crop_size_y();
 
+    // Force resize to 1280?
+    float ratio = (float)img.size().width / (float)img.size().height;
+    cv::Mat convImg;
+    cv::resize(img, convImg, cv::Size(720*ratio,720));
+    float xChange = (float)convImg.size().width / (float)img.size().width;
+    float yChange = (float)convImg.size().height / (float)img.size().height;
+    // Resize the rects also
+    for(cv::Rect& rect : rects){
+        rect.x *= xChange;
+        rect.y *= yChange;
+        rect.width *= xChange;
+        rect.height *= yChange;
+    }
+
     // Setup a metaData object
     MetaData metaData;
-    metaData.imageSize = img.size();
+    metaData.imageSize = convImg.size();
     metaData.isValidation = false;
     metaData.numberOtherPeople = rects.size();
     int selectedRect = getRand(0, rects.size()-1);
     //metaData.objPos.x = rects[selectedRect].x + (rects[selectedRect].width/2);
     //metaData.objPos.y = rects[selectedRect].y + (rects[selectedRect].height/2);
     metaData.objPos.x = metaData.imageSize.width/2.; metaData.objPos.y = metaData.imageSize.height/2; // Set to rotate around centre
-
     metaData.jointsOthers.resize(rects.size());
     metaData.scaleSelf = 1;
 
@@ -645,10 +658,10 @@ cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, std::vector<cv::
     for(cv::Rect& rect : rects){
         //metaData.jointsOthers[i].isVisible.emplace_back(1);
         //metaData.jointsOthers[i].isVisible.emplace_back(1);
-        cv::Point a = rect.tl();
-        cv::Point b = cv::Point(a.x + rect.width, a.y);
-        cv::Point c = rect.br();
-        cv::Point d = cv::Point(c.x - rect.width, c.y);
+        cv::Point2f a = rect.tl();
+        cv::Point2f b = cv::Point(a.x + rect.width, a.y);
+        cv::Point2f c = rect.br();
+        cv::Point2f d = cv::Point(c.x - rect.width, c.y);
         metaData.jointsOthers[i].points.emplace_back(a);
         metaData.jointsOthers[i].points.emplace_back(b);
         metaData.jointsOthers[i].points.emplace_back(c);
@@ -657,7 +670,7 @@ cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, std::vector<cv::
     }
 
     // Augment
-    cv::Mat imgAug = img.clone();
+    cv::Mat imgAug = convImg.clone();
     AugmentSelection augmentSelection;
     augmentSelection.scale = estimateScale(metaData, param_);
     applyScale(metaData, augmentSelection.scale, mPoseModel);
@@ -673,7 +686,23 @@ cv::Mat OPDataTransformer<Dtype>::opConvert(const cv::Mat &img, std::vector<cv::
     augmentSelection.flip = 1;
     applyFlip(metaData, augmentSelection.flip, finalImageWidth, param_, mPoseModel, false);
     applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
-                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
+                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, convImg, 0);
+
+    // Background
+    if(!bg.empty()){
+        cv::Mat backgroundImage;
+        applyCrop(backgroundImage, {finalImageWidth/2, finalImageHeight/2}, bg, 0, finalCropSize);
+
+        cv::Mat maskImg(convImg.size(), CV_8UC1, cv::Scalar(255));
+
+        cv::Mat maskImgAug;
+        applyAllAugmentation(maskImgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                                 augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, maskImg, 0);
+        cv::bitwise_not(maskImgAug, maskImgAug);
+
+        cv::Mat finalImg;
+        cv::add(imgAug, backgroundImage, imgAug, maskImgAug);
+    }
 
     // Modify Rect back
     i = 0;

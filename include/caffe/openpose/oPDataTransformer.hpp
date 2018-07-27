@@ -123,7 +123,7 @@ public:
 
     cv::Mat parseBackground(const Datum* background);
 
-    cv::Mat opConvert(const cv::Mat& img, std::vector<cv::Rect>& rects);
+    cv::Mat opConvert(const cv::Mat& img, const cv::Mat& bg, std::vector<cv::Rect>& rects);
 
 
 protected:
