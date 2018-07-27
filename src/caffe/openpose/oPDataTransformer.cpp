@@ -1104,8 +1104,8 @@ void fillMaskChannels(Dtype* transformedLabel, const int gridX, const int gridY,
 }
 
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                                                const MetaData& metaData) const
+void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize,
+                                                const cv::Mat& maskMiss, const MetaData& metaData) const
 {
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
@@ -1162,13 +1162,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             for (const auto& jointsOther : metaData.jointsOthers)
                 maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
         }
-        // If foot
-        if (mPoseModel == PoseModel::COCO_25_17 || mPoseModel == PoseModel::COCO_25_17E)
-        {
-            maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
-            for (const auto& jointsOther : metaData.jointsOthers)
-                maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
-        }
+        // // If foot
+        // if (mPoseModel == PoseModel::COCO_25_17 || mPoseModel == PoseModel::COCO_25_17E)
+        // {
+        //     maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+        //     for (const auto& jointsOther : metaData.jointsOthers)
+        //         maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+        // }
     }
 
     // Background channel
@@ -1205,6 +1205,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     std::fill(maskDistance,
               maskDistance + 2*(numberBodyParts-1) * channelOffset,
               0.f);
+// COMENTED OUT
     // if (addDistance)
     // {
     //     auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
@@ -1333,6 +1334,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     //                        std::bind1st(std::multiplies<Dtype>(), ratio)) ;
     // }
 
+// COMENTED OUT
     // // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     // // Self
     // const auto objPosX = Dtype(metaData.objPos.x * Dtype(1)/stride);
