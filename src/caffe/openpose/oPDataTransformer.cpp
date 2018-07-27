@@ -1043,7 +1043,7 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
 {
     for (auto part = 0 ; part < 2 ; part++)
     {
-        const auto kneeIndex = 9+part*5;
+        const auto kneeIndex = 10+part*3;
         const auto ankleIndex = kneeIndex+1;
         if (isVisible.at(kneeIndex) != 2 && isVisible.at(ankleIndex) != 2)
         {
