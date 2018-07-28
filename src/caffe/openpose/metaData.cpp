@@ -74,7 +74,8 @@ namespace caffe {
                     // Set final visibility flag
                     // If some not labeled and some labeled --> isVisible == 3
                     if (thereAre2s && (thereAre0s || thereAre1s))
-                        joints.isVisible[i] = 3;
+                        // joints.isVisible[i] = 3;
+                        joints.isVisible[i] = 2;
                     else if (thereAre2s)
                         joints.isVisible[i] = 2;
                     else if (thereAre0s)
