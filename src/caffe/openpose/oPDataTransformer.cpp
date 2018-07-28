@@ -916,10 +916,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Debugging - Visualize - Write on disk
     // if (mPoseModel == PoseModel::COCO_25E)
     {
-        if (metaData.writeNumber < 3)
+        // if (metaData.writeNumber < 3)
         // if (metaData.writeNumber < 5)
         // if (metaData.writeNumber < 10)
-        // if (metaData.writeNumber < 100)
+        if (metaData.writeNumber < 100)
         {
             // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
             // 2. Comment the following if statement
@@ -934,7 +934,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                // if (part == numberTotalChannels-1)
+                if (part == numberTotalChannels-1) // Background channel
                 // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
@@ -1334,25 +1334,24 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     //                        std::bind1st(std::multiplies<Dtype>(), ratio)) ;
     // }
 
-// COMENTED OUT
-    // // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
-    // // Self
-    // const auto objPosX = Dtype(metaData.objPos.x * Dtype(1)/stride);
-    // const auto objPosY = Dtype(metaData.objPos.y * Dtype(1)/stride);
-    // const auto scaleX = Dtype(metaData.scaleSelf * gridX);
-    // const auto scaleY = Dtype(metaData.scaleSelf * gridY);
-    // maskOutIsVisible3(transformedLabel, metaData.jointsSelf.isVisible,
-    //                   objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
-    // // For every other person
-    // for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
-    // {
-    //     const auto objPosX = Dtype(metaData.objPosOthers[otherPerson].x * Dtype(1)/stride);
-    //     const auto objPosY = Dtype(metaData.objPosOthers[otherPerson].y * Dtype(1)/stride);
-    //     const auto scaleX = Dtype(metaData.scaleOthers[otherPerson] * gridX);
-    //     const auto scaleY = Dtype(metaData.scaleOthers[otherPerson] * gridY);
-    //     maskOutIsVisible3(transformedLabel, metaData.jointsOthers[otherPerson].isVisible,
-    //                       objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
-    // }
+    // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
+    // Self
+    const auto objPosX = Dtype(metaData.objPos.x * Dtype(1)/stride);
+    const auto objPosY = Dtype(metaData.objPos.y * Dtype(1)/stride);
+    const auto scaleX = Dtype(metaData.scaleSelf * gridX);
+    const auto scaleY = Dtype(metaData.scaleSelf * gridY);
+    maskOutIsVisible3(transformedLabel, metaData.jointsSelf.isVisible,
+                      objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
+    // For every other person
+    for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+    {
+        const auto objPosX = Dtype(metaData.objPosOthers[otherPerson].x * Dtype(1)/stride);
+        const auto objPosY = Dtype(metaData.objPosOthers[otherPerson].y * Dtype(1)/stride);
+        const auto scaleX = Dtype(metaData.scaleOthers[otherPerson] * gridX);
+        const auto scaleY = Dtype(metaData.scaleOthers[otherPerson] * gridY);
+        maskOutIsVisible3(transformedLabel, metaData.jointsOthers[otherPerson].isVisible,
+                          objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
+    }
 
     // MPII hands special cases (4/4)
     // Make background channel as non-masked out region for visible labels (for cases with no all people labeled)
