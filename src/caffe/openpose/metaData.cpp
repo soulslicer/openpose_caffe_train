@@ -55,23 +55,53 @@ namespace caffe {
                 //     v=2: out of image / unlabeled
                 //     v=3: on of it's parents is v=2
                 joints.isVisible[i] = 1;
-                for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+                // >1 elements
+                if (lmdbToOurModel[i].size() > 1)
                 {
-                    // If any of them is 2 --> 2 (not in the image or unlabeled)
-                    if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                    // See whether to make it 2 (all of them are not visible) or 3 (>= 1 of them are visible)
+                    bool thereAre0s = false;
+                    bool thereAre1s = false;
+                    bool thereAre2s = false;
+                    for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
                     {
-                        // Keypoint to keypoint correspondence
-                        if (lmdbToOurModel[i].size() < 2)
-                            joints.isVisible[i] = 2;
-                        // Fake neck, midhip: When interpolated from >=2 keypoints, and at least 1 of them is missing
-                        else
-                            joints.isVisible[i] = 3;
-                        break;
+                        if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
+                            thereAre0s = true;
+                        else if (jointsOld.isVisible[lmdbToOurModelIndex] == 1)
+                            thereAre1s = true;
+                        else if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                            thereAre2s = true;
                     }
-                    // If no 2 but 0 -> 0 (ocluded but located)
-                    else if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
+                    // Set final visibility flag
+                    // If some not labeled and some labeled --> isVisible == 3
+                    if (thereAre2s && (thereAre0s || thereAre1s))
+                        joints.isVisible[i] = 3;
+                    else if (thereAre2s)
+                        joints.isVisible[i] = 2;
+                    else if (thereAre0s)
                         joints.isVisible[i] = 0;
                     // Else 1 (if all are 1s)
+                }
+                // Only 1 element
+                else
+                {
+                    for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+                    {
+                        // If any of them is 2 --> 2 (not in the image or unlabeled)
+                        if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                        {
+                            // Keypoint to keypoint correspondence
+                            if (lmdbToOurModel[i].size() < 2)
+                                joints.isVisible[i] = 2;
+                            // Fake neck, midhip: When interpolated from >=2 keypoints, and at least 1 of them is missing
+                            else
+                                joints.isVisible[i] = 3;
+                            break;
+                        }
+                        // If no 2 but 0 -> 0 (ocluded but located)
+                        else if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
+                            joints.isVisible[i] = 0;
+                        // Else 1 (if all are 1s)
+                    }
                 }
             }
             // If point not defined
