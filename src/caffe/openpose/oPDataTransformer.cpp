@@ -380,17 +380,34 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
                          const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
 {
     // Get valid bounding box
-    Dtype objPosX = objPosX2;
-    Dtype objPosY = objPosY2;
-    Dtype scaleX = scaleX2;
-    Dtype scaleY = scaleY2;
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
-// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+    Dtype minX = std::numeric_limits<Dtype>::max();
+    Dtype maxX = Dtype(0);
+    Dtype minY = std::numeric_limits<Dtype>::max();
+    Dtype maxY = Dtype(0);
+    for (auto i = 0 ; i < points.size() ; i++)
+    {
+        if (isVisible[i] <= 1)
+        {
+            // X
+            if (maxX < points[i].x)
+                maxX = points[i].x;
+            if (minX > points[i].x)
+                minX = points[i].x;
+            // Y
+            if (maxY < points[i].y)
+                maxY = points[i].y;
+            if (minY > points[i].y)
+                minY = points[i].y;
+        }
+    }
+    const auto objPosX = (maxX + minX) / 2;
+    const auto objPosY = (maxY + minY) / 2;
+    const auto scaleX = maxX - minX;
+    const auto scaleY = maxX - minX;
+    // const auto objPosX = objPosX2;
+    // const auto objPosY = objPosY2;
+    // const auto scaleX = scaleX2;
+    // const auto scaleY = scaleY2;
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     const auto type = getType(Dtype(0));
     std::vector<int> missingBodyPartsBase;
