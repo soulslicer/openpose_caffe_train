@@ -374,10 +374,23 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
 }
 
 template <typename Dtype>
-void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<float>& isVisible,
-                         const Dtype objPosX, const Dtype objPosY, const Dtype scaleX, const Dtype scaleY,
+void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f> points,
+                         const std::vector<float>& isVisible,
+                         const Dtype objPosX2, const Dtype objPosY2, const Dtype scaleX2, const Dtype scaleY2,
                          const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
 {
+    // Get valid bounding box
+    Dtype objPosX = objPosX2;
+    Dtype objPosY = objPosY2;
+    Dtype scaleX = scaleX2;
+    Dtype scaleY = scaleY2;
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
+// TODO: I NEED A RECTANGLE BASED ON KEYPOINTS, NOT IN SCALE.......
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     const auto type = getType(Dtype(0));
     std::vector<int> missingBodyPartsBase;
@@ -1343,7 +1356,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto objPosY = Dtype(metaData.objPos.y * Dtype(1)/stride);
     const auto scaleX = Dtype(metaData.scaleSelf * gridX);
     const auto scaleY = Dtype(metaData.scaleSelf * gridY);
-    maskOutIfVisibleIs3(transformedLabel, metaData.jointsSelf.isVisible,
+    const auto& joints = metaData.jointsSelf;
+    maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible,
                         objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
     // For every other person
     for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1352,7 +1366,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto objPosY = Dtype(metaData.objPosOthers[otherPerson].y * Dtype(1)/stride);
         const auto scaleX = Dtype(metaData.scaleOthers[otherPerson] * gridX);
         const auto scaleY = Dtype(metaData.scaleOthers[otherPerson] * gridY);
-        maskOutIfVisibleIs3(transformedLabel, metaData.jointsOthers[otherPerson].isVisible,
+        const auto& joints = metaData.jointsOthers[otherPerson];
+        maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible,
                             objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
     }
 
