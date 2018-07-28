@@ -930,11 +930,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             const auto channelOffset = gridY * gridX;
             const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
             const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + param_.add_distance() * 2 * (numberBodyParts-1);
+            const auto bkgChannel = getNumberBodyBkgAndPAF(mPoseModel) - 1;
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                if (part == numberTotalChannels-1) // Background channel
+                if (part == bkgChannel) // Background channel
                 // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
@@ -1205,7 +1206,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     std::fill(maskDistance,
               maskDistance + 2*(numberBodyParts-1) * channelOffset,
               0.f);
-// COMENTED OUT
+// COMMENTED OUT
     // if (addDistance)
     // {
     //     auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
@@ -1334,6 +1335,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     //                        std::bind1st(std::multiplies<Dtype>(), ratio)) ;
     // }
 
+// THIS WAS COMMENTED OUT
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     // Self
     const auto objPosX = Dtype(metaData.objPos.x * Dtype(1)/stride);
