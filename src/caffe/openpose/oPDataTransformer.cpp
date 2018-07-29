@@ -427,10 +427,10 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     {
         // Get ROI
         cv::Rect roi{
-            int(std::round(objPosX - scaleX/2 - 0.5*scaleX)),
-            int(std::round(objPosY - scaleY/2 - 0.5*scaleY)),
-            int(std::round(scaleX*2.0)),
-            int(std::round(scaleY*2.0))
+            int(std::round(objPosX - scaleX/2 - 0.3*scaleX)),
+            int(std::round(objPosY - scaleY/2 - 0.3*scaleY)),
+            int(std::round(scaleX*1.6)),
+            int(std::round(scaleY*1.6))
         };
         keepRoiInside(roi, cv::Size{gridX, gridY});
         // Apply ROI
