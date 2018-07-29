@@ -381,9 +381,9 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
 {
     // Get valid bounding box
     Dtype minX = std::numeric_limits<Dtype>::max();
-    Dtype maxX = Dtype(0);
+    Dtype maxX = std::numeric_limits<Dtype>::lowest();
     Dtype minY = std::numeric_limits<Dtype>::max();
-    Dtype maxY = Dtype(0);
+    Dtype maxY = std::numeric_limits<Dtype>::lowest();
     for (auto i = 0 ; i < points.size() ; i++)
     {
         if (isVisible[i] <= 1)
@@ -404,6 +404,10 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     const auto objPosY = (maxY + minY) / 2;
     const auto scaleX = maxX - minX;
     const auto scaleY = maxX - minX;
+std::cout << "objPosX " << objPosX << " vs. " << objPosX2
+<< "; objPosY " << objPosY << " vs. " << objPosY2
+<< "; scaleX " << scaleX << " vs. " << scaleX2
+<< "; scaleY " << scaleY << " vs. " << scaleY2 << std::endl;
     // const auto objPosX = objPosX2;
     // const auto objPosY = objPosY2;
     // const auto scaleX = scaleX2;
