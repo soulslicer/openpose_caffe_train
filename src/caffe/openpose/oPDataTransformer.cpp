@@ -272,6 +272,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     const auto multiplier = 2.0 * sigma * sigma;
     const auto strideInv = 1/Dtype(stride);
+    const auto pointTargetScaled = strideInv*pointTarget;
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -285,9 +286,9 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
             //ln(100) = -ln(1%)
             if (exponent <= 4.6052)
             {
-                const auto xyOffset = yOffset + gX;
                 // Fill distance elements
-                const cv::Point2f directionAB = strideInv*pointTarget - cv::Point2f{(float)gX, (float)gY};
+                const auto xyOffset = yOffset + gX;
+                const cv::Point2f directionAB = pointTargetScaled - cv::Point2f{(float)gX, (float)gY};
                 const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
@@ -304,7 +305,8 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
                 }
                 counter++;
-// std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
+if (entryDistX[xyOffset] > 0.33 || entryDistY[xyOffset] > 0.33)
+std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
             }
         }
     }
