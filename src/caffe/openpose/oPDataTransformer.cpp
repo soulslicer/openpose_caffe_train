@@ -262,10 +262,9 @@ void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int str
 }
 
 template<typename Dtype>
-void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY,
-                     Dtype* maskDistX, Dtype* maskDistY,
-                     const cv::Point2f& rootPoint, const cv::Point2f& pointTarget, const int stride,
-                     const int gridX, const int gridY, const float sigma,
+void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dtype* maskDistY,
+                     cv::Mat& count, const cv::Point2f& rootPoint, const cv::Point2f& pointTarget,
+                     const int stride, const int gridX, const int gridY, const float sigma,
                      const cv::Point2f& dMax)
 {
     // No distance
@@ -286,13 +285,27 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY,
             if (exponent <= 4.6052)
             {
                 const auto xyOffset = yOffset + gX;
+                // Fill distance elements
                 const cv::Point2f directionAB = pointTarget - cv::Point2f{(float)gX, (float)gY};
                 const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
-                entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
-                entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
+                // entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
+                // entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
+                auto& counter = count.at<uchar>(gY, gX);
+                if (counter == 0)
+                {
+                    entryDistX[xyOffset] = Dtype(entryDValue.x);
+                    entryDistY[xyOffset] = Dtype(entryDValue.y);
+                    // Fill masks
+                    maskDistX[xyOffset] = Dtype(1);
+                    maskDistY[xyOffset] = Dtype(1);
+                }
+                else
+                {
+                    entryDistX[xyOffset] = (entryDistX[xyOffset]*counter + Dtype(entryDValue.x)) / (counter + 1);
+                    entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
+                }
+                counter++;
 std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
-                maskDistX[xyOffset] = Dtype(1);
-                maskDistY[xyOffset] = Dtype(1);
             }
         }
     }
@@ -1246,6 +1259,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
               0.f);
     if (addDistance)
     {
+        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
         auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                               * channelOffset;
         const auto rootIndex = getRootIndex(mPoseModel);
@@ -1266,7 +1280,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                         channelDistance + (2*part+1)*channelOffset,
                         maskDistance + 2*part*channelOffset,
                         maskDistance + (2*part+1)*channelOffset,
-                        rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+                        count, rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
                     );
                 }
                 // For every other person
@@ -1281,7 +1295,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                             channelDistance + (2*part+1)*channelOffset,
                             maskDistance + 2*part*channelOffset,
                             maskDistance + (2*part+1)*channelOffset,
-                            rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+                            count, rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
                         );
                     }
                 }
