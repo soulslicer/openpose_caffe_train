@@ -376,7 +376,6 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
 template <typename Dtype>
 void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f> points,
                          const std::vector<float>& isVisible, const int stride,
-                         const Dtype objPosX2, const Dtype objPosY2, const Dtype scaleX2, const Dtype scaleY2,
                          const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
 {
     // Get valid bounding box
@@ -407,7 +406,7 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     const auto objPosX = (maxX + minX) / 2;
     const auto objPosY = (maxY + minY) / 2;
     const auto scaleX = maxX - minX;
-    const auto scaleY = maxX - minX;
+    const auto scaleY = maxY - minY;
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     const auto type = getType(Dtype(0));
     std::vector<int> missingBodyPartsBase;
@@ -1366,26 +1365,17 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     //                        std::bind1st(std::multiplies<Dtype>(), ratio)) ;
     // }
 
-// THIS WAS COMMENTED OUT
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     // Self
-    const auto objPosX = Dtype(metaData.objPos.x * Dtype(1)/stride);
-    const auto objPosY = Dtype(metaData.objPos.y * Dtype(1)/stride);
-    const auto scaleX = Dtype(metaData.scaleSelf * gridX);
-    const auto scaleY = Dtype(metaData.scaleSelf * gridY);
     const auto& joints = metaData.jointsSelf;
     maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible, stride,
-                        objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
+                        gridX, gridY, backgroundMaskIndex, mPoseModel);
     // For every other person
     for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
     {
-        const auto objPosX = Dtype(metaData.objPosOthers[otherPerson].x * Dtype(1)/stride);
-        const auto objPosY = Dtype(metaData.objPosOthers[otherPerson].y * Dtype(1)/stride);
-        const auto scaleX = Dtype(metaData.scaleOthers[otherPerson] * gridX);
-        const auto scaleY = Dtype(metaData.scaleOthers[otherPerson] * gridY);
         const auto& joints = metaData.jointsOthers[otherPerson];
         maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible, stride,
-                            objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
+                            gridX, gridY, backgroundMaskIndex, mPoseModel);
     }
 
     // MPII hands special cases (4/4)
