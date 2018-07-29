@@ -375,7 +375,7 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
 
 template <typename Dtype>
 void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f> points,
-                         const std::vector<float>& isVisible,
+                         const std::vector<float>& isVisible, const int stride,
                          const Dtype objPosX2, const Dtype objPosY2, const Dtype scaleX2, const Dtype scaleY2,
                          const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
 {
@@ -400,6 +400,10 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
                 minY = points[i].y;
         }
     }
+    minX /= stride;
+    maxX /= stride;
+    minY /= stride;
+    maxY /= stride;
     const auto objPosX = (maxX + minX) / 2;
     const auto objPosY = (maxY + minY) / 2;
     const auto scaleX = maxX - minX;
@@ -1378,7 +1382,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto scaleX = Dtype(metaData.scaleSelf * gridX);
     const auto scaleY = Dtype(metaData.scaleSelf * gridY);
     const auto& joints = metaData.jointsSelf;
-    maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible,
+    maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible, stride,
                         objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
     // For every other person
     for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1388,7 +1392,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto scaleX = Dtype(metaData.scaleOthers[otherPerson] * gridX);
         const auto scaleY = Dtype(metaData.scaleOthers[otherPerson] * gridY);
         const auto& joints = metaData.jointsOthers[otherPerson];
-        maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible,
+        maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible, stride,
                             objPosX, objPosY, scaleX, scaleY, gridX, gridY, backgroundMaskIndex, mPoseModel);
     }
 
