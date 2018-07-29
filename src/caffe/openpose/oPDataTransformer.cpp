@@ -288,8 +288,6 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 // Fill distance elements
                 const cv::Point2f directionAB = pointTarget - cv::Point2f{(float)gX, (float)gY};
                 const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
-                // entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
-                // entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
