@@ -405,8 +405,14 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     maxY /= stride;
     const auto objPosX = (maxX + minX) / 2;
     const auto objPosY = (maxY + minY) / 2;
-    const auto scaleX = maxX - minX;
-    const auto scaleY = maxY - minY;
+    auto scaleX = maxX - minX;
+    auto scaleY = maxY - minY;
+    // Sometimes width is too narrow (only 1-2 keypoints in width), then we use at least half the size of the opposite
+    // direction (height)
+    if (scaleX < scaleY / 2)
+        scaleX = scaleY / 2;
+    else if (scaleY < scaleX / 2)
+        scaleY = scaleX / 2;
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     const auto type = getType(Dtype(0));
     std::vector<int> missingBodyPartsBase;
