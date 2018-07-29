@@ -1264,14 +1264,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto rootIndex = getRootIndex(mPoseModel);
         // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
         const cv::Point2f dMax{(float)gridX, (float)gridY};
-std::cout << "DMax: " << dMax << " " << stride << "end" << std::endl;
         for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
         {
             if (rootIndex != partOrigin)
             {
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
                 // Self
-                if (metaData.jointsSelf.isVisible[partOrigin] <= 1)
+                if (metaData.jointsSelf.isVisible[partOrigin] <= 1
+                    && metaData.jointsSelf.isVisible[rootIndex] <= 1)
                 {
                     const auto& centerPoint = metaData.jointsSelf.points[partOrigin];
                     const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
@@ -1286,7 +1286,8 @@ std::cout << "DMax: " << dMax << " " << stride << "end" << std::endl;
                 // For every other person
                 for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
                 {
-                    if (metaData.jointsOthers[otherPerson].isVisible[partOrigin] <= 1)
+                    if (metaData.jointsOthers[otherPerson].isVisible[partOrigin] <= 1
+                        && metaData.jointsOthers[otherPerson].isVisible[rootIndex] <= 1)
                     {
                         const auto& centerPoint = metaData.jointsOthers[otherPerson].points[partOrigin];
                         const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
