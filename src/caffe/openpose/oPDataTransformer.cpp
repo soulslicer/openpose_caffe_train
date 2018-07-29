@@ -408,14 +408,6 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     const auto objPosY = (maxY + minY) / 2;
     const auto scaleX = maxX - minX;
     const auto scaleY = maxX - minX;
-std::cout << "objPosX " << objPosX << " vs. " << objPosX2
-<< "; objPosY " << objPosY << " vs. " << objPosY2
-<< "; scaleX " << scaleX << " vs. " << scaleX2
-<< "; scaleY " << scaleY << " vs. " << scaleY2 << std::endl;
-    // const auto objPosX = objPosX2;
-    // const auto objPosY = objPosY2;
-    // const auto scaleX = scaleX2;
-    // const auto scaleY = scaleY2;
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     const auto type = getType(Dtype(0));
     std::vector<int> missingBodyPartsBase;
@@ -430,10 +422,10 @@ std::cout << "objPosX " << objPosX << " vs. " << objPosX2
     {
         // Get ROI
         cv::Rect roi{
-            int(std::round(objPosX - scaleX/2 - 0.1*scaleX)),
-            int(std::round(objPosY - scaleY/2 - 0.2*scaleY)),
-            int(std::round(scaleX*1.2)),
-            int(std::round(scaleY*1.4))
+            int(std::round(objPosX - scaleX/2 - 0.5*scaleX)),
+            int(std::round(objPosY - scaleY/2 - 0.5*scaleY)),
+            int(std::round(scaleX*2.0)),
+            int(std::round(scaleY*2.0))
         };
         keepRoiInside(roi, cv::Size{gridX, gridY});
         // Apply ROI
