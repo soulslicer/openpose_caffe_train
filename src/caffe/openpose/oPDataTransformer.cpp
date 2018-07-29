@@ -952,7 +952,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Debugging - Visualize - Write on disk
     // if (mPoseModel == PoseModel::COCO_25E)
     {
-        // if (metaData.writeNumber < 3)
+        if (metaData.writeNumber < 3)
         // if (metaData.writeNumber < 5)
         // if (metaData.writeNumber < 10)
         if (metaData.writeNumber < 100)
@@ -971,7 +971,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                if (part == bkgChannel) // Background channel
+                if (part == bkgChannel || metaData.writeNumber < 3) // Background channel
                 // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
@@ -1243,8 +1243,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
               maskDistance + 2*(numberBodyParts-1) * channelOffset,
               0.f);
 // COMMENTED OUT
-    // if (addDistance)
-    // {
+    if (addDistance)
+    {
     //     auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
     //                           * channelOffset;
     //     const auto rootIndex = getRootIndex(mPoseModel);
@@ -1286,7 +1286,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     //             }
     //         }
     //     }
-    // }
+    }
 
     // Background channel
     // Naive implementation
