@@ -303,9 +303,6 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 {
                     entryDistX[xyOffset] = (entryDistX[xyOffset]*counter + Dtype(entryDValue.x)) / (counter + 1);
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
-                    // Fill masks
-                    maskDistX[xyOffset] = Dtype(1);
-                    maskDistY[xyOffset] = Dtype(1);
                 }
                 counter++;
 if (entryDistX[xyOffset] > 0.33 || entryDistY[xyOffset] > 0.33)
@@ -1263,17 +1260,17 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
               0.f);
     if (addDistance)
     {
-        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
         auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                               * channelOffset;
         const auto rootIndex = getRootIndex(mPoseModel);
         const auto distanceFactor = 4; // To try to make average distance to 1
         // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-        const cv::Point2f dMax{(float)gridX*distanceFactor, (float)gridY*distanceFactor};
+        const cv::Point2f dMax{(float)gridX/(float)distanceFactor, (float)gridY/(float)distanceFactor};
         for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
         {
             if (rootIndex != partOrigin)
             {
+                cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
                 // Self
                 if (metaData.jointsSelf.isVisible[partOrigin] <= 1
