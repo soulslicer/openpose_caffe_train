@@ -290,6 +290,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY,
                 const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
                 entryDistX[xyOffset] = std::min(Dtype(1), std::max(entryDistX[xyOffset], Dtype(entryDValue.x)));
                 entryDistY[xyOffset] = std::min(Dtype(1), std::max(entryDistY[xyOffset], Dtype(entryDValue.y)));
+std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
                 maskDistX[xyOffset] = Dtype(1);
                 maskDistY[xyOffset] = Dtype(1);
             }
@@ -971,7 +972,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                if (part == bkgChannel || metaData.writeNumber < 3) // Background channel
+                // if (part == bkgChannel) // Background channel
+                if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Background channel and even distance channels
                 // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
