@@ -1263,7 +1263,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               * channelOffset;
         const auto rootIndex = getRootIndex(mPoseModel);
         // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-        const cv::Point2f dMax{(float)gridX/(float)stride, (float)gridY/(float)stride};
+        const cv::Point2f dMax{(float)gridX, (float)gridY};
         for (auto partT = 0; partT < numberBodyParts; partT++)
         {
             if (rootIndex != partT)
