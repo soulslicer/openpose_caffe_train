@@ -271,6 +271,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     const auto multiplier = 2.0 * sigma * sigma;
+    const auto strideInv = 1/Dtype(stride);
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -286,7 +287,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
             {
                 const auto xyOffset = yOffset + gX;
                 // Fill distance elements
-                const cv::Point2f directionAB = pointTarget - cv::Point2f{(float)gX, (float)gY};
+                const cv::Point2f directionAB = strideInv*pointTarget - cv::Point2f{(float)gX, (float)gY};
                 const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
@@ -1234,7 +1235,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             const auto& centerPoint = metaData.jointsSelf.points[part];
             putGaussianMaps(
                 transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
-                centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                centerPoint, stride, gridX, gridY, param_.sigma());
         }
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1244,7 +1245,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
                 putGaussianMaps(
                     transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
-                    centerPoint, param_.stride(), gridX, gridY, param_.sigma());
+                    centerPoint, stride, gridX, gridY, param_.sigma());
             }
         }
     }
@@ -1257,7 +1258,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
               0.f);
     if (addDistance)
     {
-        const auto strideInv = 1/Dtype(stride);
         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
         auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                               * channelOffset;
@@ -1272,14 +1272,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 // Self
                 if (metaData.jointsSelf.isVisible[part] <= 1)
                 {
-                    const auto& centerPoint = strideInv * metaData.jointsSelf.points[part];
-                    const auto rootPoint = strideInv * metaData.jointsSelf.points[rootIndex];
+                    const auto& centerPoint = metaData.jointsSelf.points[part];
+                    const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
                     putDistanceMaps(
                         channelDistance + 2*part*channelOffset,
                         channelDistance + (2*part+1)*channelOffset,
                         maskDistance + 2*part*channelOffset,
                         maskDistance + (2*part+1)*channelOffset,
-                        count, rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+                        count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(), dMax
                     );
                 }
                 // For every other person
@@ -1287,14 +1287,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 {
                     if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
                     {
-                        const auto& centerPoint = strideInv * metaData.jointsOthers[otherPerson].points[part];
-                        const auto& rootPoint = strideInv * metaData.jointsOthers[otherPerson].points[rootIndex];
+                        const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+                        const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
                         putDistanceMaps(
                             channelDistance + 2*part*channelOffset,
                             channelDistance + (2*part+1)*channelOffset,
                             maskDistance + 2*part*channelOffset,
                             maskDistance + (2*part+1)*channelOffset,
-                            count, rootPoint, centerPoint, param_.stride(), gridX, gridY, param_.sigma(), dMax
+                            count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(), dMax
                         );
                     }
                 }
