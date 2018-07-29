@@ -305,8 +305,6 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
                 }
                 counter++;
-if (entryDistX[xyOffset] > 0.33 || entryDistY[xyOffset] > 0.33)
-std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
             }
         }
     }
@@ -980,14 +978,16 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             const auto gridY = rezY / stride;
             const auto channelOffset = gridY * gridX;
             const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
-            const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + param_.add_distance() * 2 * (numberBodyParts-1);
+            const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
+                                           + param_.add_distance() * 2 * (numberBodyParts-1);
             const auto bkgChannel = getNumberBodyBkgAndPAF(mPoseModel) - 1;
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
                 // if (part == bkgChannel) // Background channel
-                if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Background channel and even distance channels
+                if (part >= bkgChannel) // Bkg channel + even distance
+                // if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
                 // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
@@ -1002,7 +1002,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                             for (auto gX = 0; gX < gridX; gX++)
                             {
                                 const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-                                labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(transformedLabel[channelIndex + yOffset + gX]));
+                                labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(
+                                    transformedLabel[channelIndex + yOffset + gX]));
                             }
                         }
                     }
