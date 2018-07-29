@@ -304,7 +304,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
                 }
                 counter++;
-std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
+// std::cout << entryDistX[xyOffset] << " " << entryDistY[xyOffset] << std::endl;
             }
         }
     }
@@ -1265,7 +1265,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
         const cv::Point2f dMax{(float)gridX/(float)stride, (float)gridY/(float)stride};
 std::cout << "DMax: " << dMax << stride << "end" << std::endl;
-std::cout << "rootIndex: " << rootIndex << "rootIndex end" << std::endl;
         for (auto partT = 0; partT < numberBodyParts; partT++)
         {
             if (rootIndex != partT)
@@ -1274,7 +1273,7 @@ std::cout << "rootIndex: " << rootIndex << "rootIndex end" << std::endl;
                 // Self
                 if (metaData.jointsSelf.isVisible[part] <= 1)
                 {
-                    const auto& centerPoint = metaData.jointsSelf.points[part];
+                    const auto& centerPoint = metaData.jointsSelf.points[partT];
                     const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
                     putDistanceMaps(
                         channelDistance + 2*part*channelOffset,
@@ -1289,7 +1288,7 @@ std::cout << "rootIndex: " << rootIndex << "rootIndex end" << std::endl;
                 {
                     if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
                     {
-                        const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+                        const auto& centerPoint = metaData.jointsOthers[otherPerson].points[partT];
                         const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
                         putDistanceMaps(
                             channelDistance + 2*part*channelOffset,
