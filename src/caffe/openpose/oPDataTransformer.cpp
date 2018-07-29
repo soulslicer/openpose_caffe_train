@@ -1257,11 +1257,11 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
               0.f);
     if (addDistance)
     {
+        const auto strideInv = 1/Dtype(stride);
         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
         auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                               * channelOffset;
         const auto rootIndex = getRootIndex(mPoseModel);
-        const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
         // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
         const cv::Point2f dMax{(float)gridX/(float)stride, (float)gridY/(float)stride};
         for (auto partT = 0; partT < numberBodyParts; partT++)
@@ -1272,7 +1272,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 // Self
                 if (metaData.jointsSelf.isVisible[part] <= 1)
                 {
-                    const auto& centerPoint = metaData.jointsSelf.points[part];
+                    const auto& centerPoint = strideInv * metaData.jointsSelf.points[part];
+                    const auto rootPoint = strideInv * metaData.jointsSelf.points[rootIndex];
                     putDistanceMaps(
                         channelDistance + 2*part*channelOffset,
                         channelDistance + (2*part+1)*channelOffset,
@@ -1286,8 +1287,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 {
                     if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
                     {
-                        const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
-                        const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
+                        const auto& centerPoint = strideInv * metaData.jointsOthers[otherPerson].points[part];
+                        const auto& rootPoint = strideInv * metaData.jointsOthers[otherPerson].points[rootIndex];
                         putDistanceMaps(
                             channelDistance + 2*part*channelOffset,
                             channelDistance + (2*part+1)*channelOffset,
