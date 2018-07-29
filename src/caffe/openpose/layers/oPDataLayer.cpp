@@ -296,11 +296,15 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         if (backgroundDb)
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
+                                            mDistanceAverage,
+                                            mDistanceAverageCounter,
                                             datum,
                                             &datumBackground);
         else
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
+                                            mDistanceAverage,
+                                            mDistanceAverageCounter,
                                             datum);
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
@@ -330,9 +334,20 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     if (mCounter == 20*repeatEveryXVisualizations)
     {
         std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s\t"
-                  << "Ratio: " << mOnes/float(mOnes+mTwos) << std::endl;
+                  << "Ratio: " << mOnes/float(mOnes+mTwos)
+                  << "\nAverage distance: ";
+                  // << std::endl;
         mDuration = 0;
         mCounter = 0;
+        auto& oPDataTransformerPtr = this->mOPDataTransformer;
+        // Update average
+        auto distanceAverage = mDistanceAverage;
+        for (auto i = 0 ; i < distanceAverage.size() ; i++)
+            distanceAverage[i] /= mDistanceAverageCounter[i];
+        // Print average
+        for (auto& distance : distanceAverage)
+            std::cout << distance << " ";
+        std::cout << std::endl;
     }
     timer.Stop();
     batch_timer.Stop();
