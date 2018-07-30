@@ -181,14 +181,20 @@ namespace caffe {
             {
                 // LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
                 //           << "datasetString: " << metaData.datasetString;
-                LOG(INFO) << "Error reading metaData\n"
+                LOG(INFO) << "\n"
+                          << "----------------------\n"
+                          << "----------------------\n"
+                          << "----------------------\n"
+                          << "ERROR READING METADATA\n"
+                          << "----------------------\n"
                           << "imageSize: " << metaData.imageSize
                           << "; metaData.annotationListIndex: " << metaData.annotationListIndex
                           << "; metaData.writeNumber: " << metaData.writeNumber
                           << "; metaData.totalWriteNumber: " << metaData.totalWriteNumber
                           << "; metaData.epoch: " << metaData.epoch << "\n"
-                          << "; isVisible: " << isVisible << "\n";
+                          << "; isVisible: " << isVisible << "\n"
                           // << "Data:\n" << data;
+                          << "----------------------\n";
                 return false;
                 // CHECK(false);
             }
