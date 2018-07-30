@@ -125,7 +125,7 @@ namespace caffe {
 
     // Public functions
     template<typename Dtype>
-    void readMetaData(MetaData& metaData, int& currentEpoch, const char* data,
+    bool readMetaData(MetaData& metaData, int& currentEpoch, const char* data,
                       const size_t offsetPerLine, const PoseCategory poseCategory, const PoseModel poseModel)
     {
         // Dataset name
@@ -179,16 +179,18 @@ namespace caffe {
             const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
             if (isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
             {
-                LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
-                          << "datasetString: " << metaData.datasetString;
-                LOG(INFO) <<"imageSize: " << metaData.imageSize
+                // LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
+                //           << "datasetString: " << metaData.datasetString;
+                LOG(INFO) << "Error reading metaData\n"
+                          << "imageSize: " << metaData.imageSize
                           << "; metaData.annotationListIndex: " << metaData.annotationListIndex
                           << "; metaData.writeNumber: " << metaData.writeNumber
                           << "; metaData.totalWriteNumber: " << metaData.totalWriteNumber
                           << "; metaData.epoch: " << metaData.epoch << "\n"
                           << "; isVisible: " << isVisible << "\n";
                           // << "Data:\n" << data;
-                CHECK(false);
+                return false;
+                // CHECK(false);
             }
             // // Equivalent code to above code
             // CHECK_LE(isVisible, 2); // isVisible in range [0, 2]
@@ -269,10 +271,12 @@ namespace caffe {
         // Transform joints in metaData from getNumberBodyPartsLmdb(mPoseModel) (specified in prototxt)
         // to getNumberBodyAndPafChannels(mPoseModel) (specified in prototxt)
         lmdbJointsToOurModel(metaData, poseModel);
+
+        return true;
     }
 
-    template void readMetaData<float>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
+    template bool readMetaData<float>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
                                       const PoseCategory poseCategory, const PoseModel poseModel);
-    template void readMetaData<double>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
+    template bool readMetaData<double>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
                                        const PoseCategory poseCategory, const PoseModel poseModel);
 }  // namespace caffe

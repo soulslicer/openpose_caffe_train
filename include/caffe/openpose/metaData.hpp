@@ -39,7 +39,7 @@ namespace caffe {
     };
 
     template<typename Dtype>
-    void readMetaData(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
+    bool readMetaData(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
                       const PoseCategory poseCategory, const PoseModel poseModel);
 
 }  // namespace caffe
