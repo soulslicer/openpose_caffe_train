@@ -1308,7 +1308,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
-                const auto dMaxPart = 1 / distanceAverage[partTarget] * dMax;
+                const auto dMaxPart = distanceAverage[partTarget] * dMax;
                 // Self
                 if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                     && metaData.jointsSelf.isVisible[rootIndex] <= 1)
