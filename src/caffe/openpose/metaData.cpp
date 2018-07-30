@@ -180,7 +180,8 @@ namespace caffe {
             if (isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
             {
                 LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
-                          << "datasetString: " << metaData.datasetString <<"; imageSize: " << metaData.imageSize
+                          << "datasetString: " << metaData.datasetString;
+                LOG(INFO) <<"imageSize: " << metaData.imageSize
                           << "; metaData.annotationListIndex: " << metaData.annotationListIndex
                           << "; metaData.writeNumber: " << metaData.writeNumber
                           << "; metaData.totalWriteNumber: " << metaData.totalWriteNumber
