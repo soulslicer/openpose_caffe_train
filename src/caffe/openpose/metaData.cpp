@@ -1,3 +1,4 @@
+#include <iostream>
 #include <caffe/openpose/getLine.hpp>
 #include <caffe/openpose/metaData.hpp>
 #include <glog/logging.h>
@@ -176,7 +177,17 @@ namespace caffe {
                 jointPoint -= cv::Point2f{1.f,1.f};
             // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
-            CHECK_LE(isVisible, 2); // isVisible in range [0, 2]
+            if (isVisible > 2)
+            {
+                LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
+                          << "datasetString: " << metaData.datasetString <<"; imageSize: " << metaData.imageSize
+                          << "; metaData.annotationListIndex: " << metaData.annotationListIndex
+                          << "; metaData.writeNumber: " << metaData.writeNumber
+                          << "; metaData.totalWriteNumber: " << metaData.totalWriteNumber
+                          << "; metaData.epoch: " << metaData.epoch << "\n";
+                          // << "Data:\n" << data;
+                CHECK_LE(isVisible, 2); // isVisible in range [0, 2]
+            }
             jointSelf.isVisible[part] = std::round(isVisible);
             if (jointSelf.isVisible[part] != 2)
             {

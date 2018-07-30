@@ -339,7 +339,6 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                   // << std::endl;
         mDuration = 0;
         mCounter = 0;
-        auto& oPDataTransformerPtr = this->mOPDataTransformer;
         // Update average
         auto distanceAverage = mDistanceAverage;
         for (auto i = 0 ; i < distanceAverage.size() ; i++)

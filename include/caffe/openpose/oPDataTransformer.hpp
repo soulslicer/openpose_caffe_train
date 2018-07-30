@@ -67,8 +67,8 @@ protected:
     // Image and label
 public:
     void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
-                   std::vector<long double>& distanceAverage,
-                   std::vector<unsigned long long>& distanceAverageCounter,
+                   std::vector<long double>& distanceAverageNew,
+                   std::vector<unsigned long long>& distanceAverageNewCounter,
                    const Datum& datum, const Datum* datumNegative = nullptr);
     int getNumberChannels() const;
 protected:
@@ -97,8 +97,9 @@ protected:
     void generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const;
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData,
-                          std::vector<long double>& distanceAverage,
-                          std::vector<unsigned long long>& distanceAverageCounter);
+                          const std::vector<float>& distanceAverage,
+                          std::vector<long double>& distanceAverageNew,
+                          std::vector<unsigned long long>& distanceAverageNewCounter);
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,

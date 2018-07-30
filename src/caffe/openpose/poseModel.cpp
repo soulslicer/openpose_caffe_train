@@ -429,6 +429,24 @@ namespace caffe {
                          3,4,6,7,9, 10,11,12,13,14, 15,16,17,18,19, 20,21,22,23,24}, // 0, 2, 5, 8 already done, 1 not required
     };
 
+    const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
+        std::vector<float>{}, // 18 (COCO_18, DOME_18)
+        std::vector<float>{}, // 19 (COCO_19, DOME_19)
+        std::vector<float>{}, // 59 (DOME_59), COCO_59_17, MPII_59
+        std::vector<float>{}, // COCO_19b
+        std::vector<float>{}, // COCO_19_V2
+        std::vector<float>{3.99662, 2.83036, 6.70038, 7.98778, 2.83036, 6.6937, 7.98559, 9.03892,
+                           9.25788, 13.5094, 18.4561, 9.25499, 13.5129, 18.452,
+                           4.45502, 4.45194, 4.06345, 4.0489,
+                           15.6355, 15.6056, 15.0701, 15.6164, 15.6026, 15.0402}, // 25 (COCO_25, COCO_25_17)
+        std::vector<float>{}, // 65 (MPII_65_42)
+        std::vector<float>{}, // CAR_12
+        std::vector<float>{3.99662, 2.83036, 6.70038, 7.98778, 2.83036, 6.6937, 7.98559, 9.03892,
+                           9.25788, 13.5094, 18.4561, 9.25499, 13.5129, 18.452,
+                           4.45502, 4.45194, 4.06345, 4.0489,
+                           15.6355, 15.6056, 15.0701, 15.6164, 15.6026, 15.0402}, // 25 (COCO_25E, COCO_25_17E)
+    };
+
     const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
         1u,     // 18 (COCO_18, DOME_18)
         1u,     // 19 (COCO_19, DOME_19)
@@ -490,6 +508,11 @@ namespace caffe {
     const std::vector<int>& getPafIndexB(const PoseModel poseModel)
     {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
+    }
+
+    const std::vector<float>& getDistanceAverage(const PoseModel poseModel)
+    {
+        return DISTANCE_AVERAGE.at(poseModelToIndex(poseModel));
     }
 
     unsigned int getRootIndex(const PoseModel poseModel)
