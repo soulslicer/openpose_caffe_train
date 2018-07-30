@@ -272,10 +272,12 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     const auto multiplier = 2.0 * sigma * sigma;
     const auto strideInv = 1/Dtype(stride);
-    const auto pointTargetScaled = strideInv*pointTarget;
+    const auto pointTargetScaledDown = strideInv*pointTarget;
     // Distance average
     const cv::Point2f directionNorm = pointTarget - rootPoint;
-    distanceAverageNew += strideInv*std::sqrt(directionNorm.x*directionNorm.x/dMax.x/dMax.x + directionNorm.y*directionNorm.y/dMax.y/dMax.y);
+    distanceAverageNew += strideInv*std::sqrt(
+        directionNorm.x*directionNorm.x/dMax.x/dMax.x
+        + directionNorm.y*directionNorm.y/dMax.y/dMax.y);
     // Fill distance elements
     for (auto gY = 0; gY < gridY; gY++)
     {
@@ -292,7 +294,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
             {
                 // Fill distance elements
                 const auto xyOffset = yOffset + gX;
-                const cv::Point2f directionAB = pointTargetScaled - cv::Point2f{(float)gX, (float)gY};
+                const cv::Point2f directionAB = pointTargetScaledDown - cv::Point2f{(float)gX, (float)gY};
                 const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
@@ -569,9 +571,9 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
-                                                  const Datum& datum, const Datum* datumNegative,
-                                                  std::vector<long double>& distanceAverageNew,
-                                                  std::vector<unsigned long long>& distanceAverageNewCounter)
+                                                    const Datum& datum, const Datum* datumNegative,
+                                                    std::vector<long double>& distanceAverageNew,
+                                                    std::vector<unsigned long long>& distanceAverageNewCounter)
 {
     // Parameters
     const std::string& data = datum.data();
@@ -603,7 +605,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     else
         validMetaData = readMetaData<Dtype>(metaData, mCurrentEpoch, &data[3 * datumArea], datumWidth, mPoseCategory,
                                             mPoseModel);
-    // Labels to 0 and return
+    // If error reading meta data --> Labels to 0 and return
     if (!validMetaData)
     {
         const auto channelOffset = gridY * gridX;
@@ -1298,9 +1300,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                               * channelOffset;
         const auto rootIndex = getRootIndex(mPoseModel);
-        const auto distanceFactor = 4; // To try to make average distance to 1
         // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-        const cv::Point2f dMax{(float)gridX/(float)distanceFactor, (float)gridY/(float)distanceFactor};
+        const cv::Point2f dMax{(float)gridX, (float)gridY};
         for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
         {
             if (rootIndex != partOrigin)
