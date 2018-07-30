@@ -271,11 +271,10 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     const auto multiplier = 2.0 * sigma * sigma;
-    const auto strideInv = 1/Dtype(stride);
-    const auto pointTargetScaledDown = strideInv*pointTarget;
+    const auto pointTargetScaledDown = 1/Dtype(stride)*pointTarget;
     // Distance average
     const cv::Point2f directionNorm = pointTarget - rootPoint;
-    distanceAverageNew += strideInv*std::sqrt(
+    distanceAverageNew += std::sqrt(
         directionNorm.x*directionNorm.x/dMax.x/dMax.x
         + directionNorm.y*directionNorm.y/dMax.y/dMax.y);
     // Fill distance elements
