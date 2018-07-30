@@ -603,25 +603,15 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     else
         validMetaData = readMetaData<Dtype>(metaData, mCurrentEpoch, &data[3 * datumArea], datumWidth, mPoseCategory,
                                             mPoseModel);
+    // Labels to 0 and return
     if (!validMetaData)
     {
-        // Label size = image size / stride
-        // const auto rezX = (int)imageSize.width;
-        // const auto rezY = (int)imageSize.height;
-        // const auto stride = (int)param_.stride();
-        // const auto gridX = rezX / stride;
-        // const auto gridY = rezY / stride;
         const auto channelOffset = gridY * gridX;
         const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
-        // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
-        // numberBodyParts + numberPafChannels + 1
         const auto addDistance = param_.add_distance();
         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + addDistance * 2 * (numberBodyParts-1);
-        // // For old distance
-        // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2);
-
-        // Labels to 0
         std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
+        return;
     }
     const auto depthEnabled = metaData.depthEnabled;
 
