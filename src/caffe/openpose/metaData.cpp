@@ -128,12 +128,14 @@ namespace caffe {
     void readMetaData(MetaData& metaData, int& currentEpoch, const char* data,
                       const size_t offsetPerLine, const PoseCategory poseCategory, const PoseModel poseModel)
     {
+std::cout << __LINE__ << std::endl;
         // Dataset name
         metaData.datasetString = decodeString(data);
         // Image Dimension
         metaData.imageSize = cv::Size{(int)decodeNumber<Dtype>(&data[offsetPerLine+4]),
                                       (int)decodeNumber<Dtype>(&data[offsetPerLine])};
 
+std::cout << __LINE__ << std::endl;
         // Validation, #people, counters
         metaData.numberOtherPeople = (int)data[2*offsetPerLine];
         metaData.peopleIndex = (int)data[2*offsetPerLine+1];
@@ -144,7 +146,9 @@ namespace caffe {
         // Count epochs according to counters
         if (metaData.writeNumber == 0)
             currentEpoch++;
+std::cout << __LINE__ << std::endl;
         metaData.epoch = currentEpoch;
+std::cout << __LINE__ << std::endl;
         if (metaData.writeNumber % 1000 == 0)
         {
             LOG(INFO) << "datasetString: " << metaData.datasetString <<"; imageSize: " << metaData.imageSize
@@ -155,17 +159,20 @@ namespace caffe {
         }
 
         // Objpos
+std::cout << __LINE__ << std::endl;
         metaData.objPos.x = decodeNumber<Dtype>(&data[3*offsetPerLine]);
         metaData.objPos.y = decodeNumber<Dtype>(&data[3*offsetPerLine+4]);
         // Matlab (1-index) to C++ (0-index) --> (0,0 goes to -1,-1)
         if (poseCategory == PoseCategory::COCO)
             metaData.objPos -= cv::Point2f{1.f,1.f};
         // scaleSelf, jointsSelf
+std::cout << __LINE__ << std::endl;
         metaData.scaleSelf = decodeNumber<Dtype>(&data[4*offsetPerLine]);
         auto& jointSelf = metaData.jointsSelf;
         const auto numberPartsInLmdb = getNumberBodyPartsLmdb(poseModel);
         jointSelf.points.resize(numberPartsInLmdb);
         jointSelf.isVisible.resize(numberPartsInLmdb);
+std::cout << __LINE__ << std::endl;
         for (auto part = 0 ; part < numberPartsInLmdb; part++)
         {
             // Point
@@ -177,17 +184,20 @@ namespace caffe {
                 jointPoint -= cv::Point2f{1.f,1.f};
             // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
-            if (isVisible > 2)
+            if (isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
             {
                 LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
                           << "datasetString: " << metaData.datasetString <<"; imageSize: " << metaData.imageSize
                           << "; metaData.annotationListIndex: " << metaData.annotationListIndex
                           << "; metaData.writeNumber: " << metaData.writeNumber
                           << "; metaData.totalWriteNumber: " << metaData.totalWriteNumber
-                          << "; metaData.epoch: " << metaData.epoch << "\n";
+                          << "; metaData.epoch: " << metaData.epoch << "\n"
+                          << "; isVisible: " << isVisible << "\n";
                           // << "Data:\n" << data;
-                CHECK_LE(isVisible, 2); // isVisible in range [0, 2]
+                CHECK(false);
             }
+            // // Equivalent code to above code
+            // CHECK_LE(isVisible, 2); // isVisible in range [0, 2]
             jointSelf.isVisible[part] = std::round(isVisible);
             if (jointSelf.isVisible[part] != 2)
             {
@@ -199,11 +209,13 @@ namespace caffe {
             }
             // LOG(INFO) << jointPoint.x << " " << jointPoint.y << " " << jointSelf.isVisible[part];
         }
+std::cout << __LINE__ << std::endl;
 
         // Others (7 lines loaded)
         metaData.objPosOthers.resize(metaData.numberOtherPeople);
         metaData.scaleOthers.resize(metaData.numberOtherPeople);
         metaData.jointsOthers.resize(metaData.numberOtherPeople);
+std::cout << __LINE__ << std::endl;
         for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
         {
             metaData.objPosOthers[person].x = decodeNumber<Dtype>(&data[(8+person)*offsetPerLine]);
@@ -215,6 +227,7 @@ namespace caffe {
                                                                 *offsetPerLine+4*person]);
         }
         // 8 + numberOtherPeople lines loaded
+std::cout << __LINE__ << std::endl;
         for (auto person = 0 ; person < metaData.numberOtherPeople ; person++)
         {
             auto& currentPerson = metaData.jointsOthers[person];
@@ -246,6 +259,7 @@ namespace caffe {
                 }
             }
         }
+std::cout << __LINE__ << std::endl;
         if (poseCategory == PoseCategory::DOME)
         {
             // Image path
@@ -262,9 +276,11 @@ namespace caffe {
         else
             metaData.depthEnabled = false;
 
+std::cout << __LINE__ << std::endl;
         // Transform joints in metaData from getNumberBodyPartsLmdb(mPoseModel) (specified in prototxt)
         // to getNumberBodyAndPafChannels(mPoseModel) (specified in prototxt)
         lmdbJointsToOurModel(metaData, poseModel);
+std::cout << __LINE__ << std::endl;
     }
 
     template void readMetaData<float>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
