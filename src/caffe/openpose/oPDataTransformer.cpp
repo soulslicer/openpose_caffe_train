@@ -265,7 +265,8 @@ template<typename Dtype>
 void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dtype* maskDistY,
                      cv::Mat& count, const cv::Point2f& rootPoint, const cv::Point2f& pointTarget,
                      const int stride, const int gridX, const int gridY, const float sigma,
-                     const cv::Point2f& dMax, long double& distanceAverageNew)
+                     const cv::Point2f& dMax, long double& distanceAverageNew,
+                     unsigned long long& distanceAverageNewCounter)
 {
     // No distance
     // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
@@ -274,9 +275,10 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     const auto pointTargetScaledDown = 1/Dtype(stride)*pointTarget;
     // Distance average
     const cv::Point2f directionNorm = pointTarget - rootPoint;
-    distanceAverageNew += std::sqrt(
+    distanceAverageNew += stride*std::sqrt(
         directionNorm.x*directionNorm.x/dMax.x/dMax.x
         + directionNorm.y*directionNorm.y/dMax.y/dMax.y);
+    distanceAverageNewCounter++;
     // Fill distance elements
     for (auto gY = 0; gY < gridY; gY++)
     {
@@ -1320,9 +1322,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                         maskDistance + 2*partTarget*channelOffset,
                         maskDistance + (2*partTarget+1)*channelOffset,
                         count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(), dMaxPart,
-                        distanceAverageNew[partTarget]
+                        distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                     );
-                    distanceAverageNewCounter[partTarget]++;
                 }
                 // For every other person
                 for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1338,9 +1339,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                             maskDistance + 2*partTarget*channelOffset,
                             maskDistance + (2*partTarget+1)*channelOffset,
                             count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(), dMaxPart,
-                            distanceAverageNew[partTarget]
+                            distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                         );
-                        distanceAverageNewCounter[partTarget]++;
                     }
                 }
             }
