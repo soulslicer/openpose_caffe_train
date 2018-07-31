@@ -526,7 +526,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
                                          std::vector<long double>& distanceAverageNew,
                                          std::vector<unsigned long long>& distanceAverageNewCounter,
                                          const Datum& datum,
-                                         const Datum* datumNegative)
+                                         const Datum* const datumNegative)
 {
     // Secuirty checks
     const int datumChannels = datum.channels();
@@ -570,60 +570,15 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 // }
 
 // OpenPose: added
-template<typename Dtype>
-void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
-                                                    const Datum& datum, const Datum* datumNegative,
-                                                    std::vector<long double>& distanceAverageNew,
-                                                    std::vector<unsigned long long>& distanceAverageNewCounter)
+cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, const std::string& mediaDirectory,
+                  const std::string& imageSource, const int datumWidth, const int datumHeight, const int datumArea)
 {
-    // Parameters
-    const std::string& data = datum.data();
-    const int datumHeight = datum.height();
-    const int datumWidth = datum.width();
-    const auto datumArea = (int)(datumHeight * datumWidth);
-    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
-    const auto stride = (int)param_.stride();
-    const auto finalImageWidth = (int)param_.crop_size_x();
-    const auto finalImageHeight = (int)param_.crop_size_y();
-    const auto gridX = finalImageWidth / stride;
-    const auto gridY = finalImageHeight / stride;
-
-    // Time measurement
-    CPUTimer timer1;
-    timer1.Start();
-
-    // const bool hasUInt8 = data.size() > 0;
-    CHECK(data.size() > 0);
-
-    // Read meta data (LMDB channel 3)
-    MetaData metaData;
-    bool validMetaData;
-    // DOME
-    if (mPoseCategory == PoseCategory::DOME)
-        validMetaData = readMetaData<Dtype>(metaData, mCurrentEpoch, data.c_str(), datumWidth, mPoseCategory,
-                                            mPoseModel);
-    // COCO & MPII
-    else
-        validMetaData = readMetaData<Dtype>(metaData, mCurrentEpoch, &data[3 * datumArea], datumWidth, mPoseCategory,
-                                            mPoseModel);
-    // If error reading meta data --> Labels to 0 and return
-    if (!validMetaData)
-    {
-        const auto channelOffset = gridY * gridX;
-        const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
-        const auto addDistance = param_.add_distance();
-        const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + addDistance * 2 * (numberBodyParts-1);
-        std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
-        return;
-    }
-    const auto depthEnabled = metaData.depthEnabled;
-
     // Read image (LMDB channel 1)
     cv::Mat image;
     // DOME
-    if (mPoseCategory == PoseCategory::DOME)
+    if (poseCategory == PoseCategory::DOME)
     {
-        const auto imageFullPath = param_.media_directory() + metaData.imageSource;
+        const auto imageFullPath = mediaDirectory + imageSource;
         image = cv::imread(imageFullPath, CV_LOAD_IMAGE_COLOR);
         if (image.empty())
             throw std::runtime_error{"Empty image at " + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -680,9 +635,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         // CHECK_EQ(initImageArea, datumArea);
         // CHECK_EQ(cv::norm(image-image2), 0);
     }
-    const auto initImageWidth = (int)image.cols;
-    const auto initImageHeight = (int)image.rows;
+    return image;
+}
 
+cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidth, const int finalImageHeight,
+                            const cv::Size finalCropSize)
+{
     // Read background image
     cv::Mat backgroundImage;
     if (datumNegative != nullptr)
@@ -762,9 +720,60 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
         }
     }
+    return backgroundImage;
+}
 
+template<typename Dtype>
+bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, cv::Mat& imageAugmented,
+                             cv::Mat& maskMissAugmented,
+                             const Datum& datum, const Datum* const datumNegative,
+                             const OPTransformationParameter& param_, const PoseCategory poseCategory,
+                             const PoseModel poseModel, const Phase phase_)
+{
+    // Parameters
+    const std::string& data = datum.data();
+    const int datumHeight = datum.height();
+    const int datumWidth = datum.width();
+    const auto datumArea = (int)(datumHeight * datumWidth);
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+
+    // Time measurement
+    CPUTimer timer1;
+    timer1.Start();
+
+    // const bool hasUInt8 = data.size() > 0;
+    CHECK(data.size() > 0);
+
+    // Read meta data (LMDB channel 3)
+    bool validMetaData;
+    // DOME
+    if (poseCategory == PoseCategory::DOME)
+        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, data.c_str(), datumWidth, poseCategory,
+                                            poseModel);
+    // COCO & MPII
+    else
+        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, &data[3 * datumArea], datumWidth, poseCategory,
+                                            poseModel);
+    // If error reading meta data --> Labels to 0 and return
+    if (!validMetaData)
+        return false;
+
+    // Read image (LMDB channel 1)
+    const auto image = readImage(data, poseCategory, param_.media_directory(), metaData.imageSource, datumWidth,
+                                 datumHeight, datumArea);
+
+    // Read background image
+    const auto backgroundImage = readBackgroundImage(datumNegative, finalImageWidth, finalImageHeight, finalCropSize);
+
+    const auto initImageWidth = (int)image.cols;
+    const auto initImageHeight = (int)image.rows;
     // Read mask miss (LMDB channel 2)
-    const cv::Mat maskMiss = (mPoseCategory == PoseCategory::COCO
+    const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO
         // COCO
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
         // DOME & MPII
@@ -772,7 +781,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // // Naive copy
     // cv::Mat maskMiss2;
     // // COCO
-    // if (mPoseCategory == PoseCategory::COCO)
+    // if (poseCategory == PoseCategory::COCO)
     // {
     //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0});
     //     for (auto y = 0; y < maskMiss2.rows; y++)
@@ -803,14 +812,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  bgr[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // Depth image
-    cv::Mat depth;
-    if (depthEnabled)
-    {
-        const auto depthFullPath = param_.media_directory() + metaData.depthSource;
-        depth = cv::imread(depthFullPath, CV_LOAD_IMAGE_ANYDEPTH);
-        if (image.empty())
-            throw std::runtime_error{"Empty depth at " + depthFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    }
+    // const bool depthEnabled = metaData.depthEnabled;
 
     // timer1.Start();
     // // Clahe
@@ -828,12 +830,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     timer1.Start();
     AugmentSelection augmentSelection;
     // // Debug - Visualize original
-    // debugVisualize(image, metaData, augmentSelection, mPoseModel, phase_, param_);
+    // debugVisualize(image, metaData, augmentSelection, poseModel, phase_, param_);
     // Augmentation
-    cv::Mat imageAugmented;
     cv::Mat backgroundImageAugmented;
-    cv::Mat maskMissAugmented;
-    cv::Mat depthAugmented;
     VLOG(2) << "   input size (" << initImageWidth << ", " << initImageHeight << ")";
     // We only do random transform augmentSelection augmentation when training.
     if (phase_ == TRAIN) // 80% time is spent here
@@ -844,21 +843,21 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
         cv::Mat maskBackgroundImageAugmented;
         // Swap center?
-        swapCenterPoint(metaData, param_, mPoseModel);
+        swapCenterPoint(metaData, param_, poseModel);
         // Augmentation (scale, rotation, cropping, and flipping)
         // Order does matter, otherwise code will fail doing augmentation
         augmentSelection.scale = estimateScale(metaData, param_);
-        applyScale(metaData, augmentSelection.scale, mPoseModel);
+        applyScale(metaData, augmentSelection.scale, poseModel);
         augmentSelection.RotAndFinalSize = estimateRotation(
             metaData,
             cv::Size{(int)std::round(image.cols * augmentSelection.scale),
                      (int)std::round(image.rows * augmentSelection.scale)},
             param_);
-        applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
+        applyRotation(metaData, augmentSelection.RotAndFinalSize.first, poseModel);
         augmentSelection.cropCenter = estimateCrop(metaData, param_);
-        applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, mPoseModel);
+        applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, poseModel);
         augmentSelection.flip = estimateFlip(metaData, param_);
-        applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+        applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, poseModel);
         // Aug on images - ~80% code time spent in the following `applyAllAugmentation` lines
         applyAllAugmentation(imageAugmented, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
                              augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, image,
@@ -868,7 +867,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                              finalCropSize, maskBackgroundImage, 255);
         // MPII hands special cases (1/4)
         // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
-        if (mPoseModel == PoseModel::MPII_65_42 || mPoseModel == PoseModel::CAR_12)
+        if (poseModel == PoseModel::MPII_65_42 || poseModel == PoseModel::CAR_12)
             maskMissAugmented = maskBackgroundImageAugmented.clone();
         else
         {
@@ -876,9 +875,6 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                                  augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
                                  finalCropSize, maskMiss, 255);
         }
-        applyAllAugmentation(depthAugmented, augmentSelection.RotAndFinalSize.first,
-                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
-                             finalCropSize, depth, 0);
         // backgroundImage augmentation (no scale/rotation)
         const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
         cv::Mat backgroundImageTemp;
@@ -886,7 +882,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
         // Introduce occlusions
         doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
-                     mPoseModel);
+                     poseModel);
         // Resize mask
         if (!maskMissAugmented.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
@@ -901,27 +897,30 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
             imageAugmented = imageAugmentedTemp;
         }
-        if (depthEnabled && !depthAugmented.empty())
-            cv::resize(depthAugmented, depthAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
     }
     // Test
     else
     {
         imageAugmented = image;
         maskMissAugmented = maskMiss;
-        depthAugmented = depth;
         // Resize mask
         if (!maskMissAugmented.empty())
             cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
-        if (depthEnabled)
-            cv::resize(depthAugmented, depthAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
     }
-    // // Debug - Visualize final (augmented) image
-    // debugVisualize(imageAugmented, metaData, augmentSelection, mPoseModel, phase_, param_);
     // Augmentation time
     VLOG(2) << "  Aug: " << timer1.MicroSeconds()*1e-3 << " ms";
+
+    // // Debug - Visualize final (augmented) image
+    // debugVisualize(imageAugmented, metaData, augmentSelection, poseModel, phase_, param_);
+
+    return true;
+}
+
+template<typename Dtype>
+void fillTransformedData(Dtype* transformedData, const cv::Mat& imageAugmented,
+                         const OPTransformationParameter& param_)
+{
     // Data copy
-    timer1.Start();
     // Copy imageAugmented into transformedData + mean-subtraction
     const int imageAugmentedArea = imageAugmented.rows * imageAugmented.cols;
     auto* uCharPtrCvMat = (unsigned char*)(imageAugmented.data);
@@ -981,19 +980,17 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Unknown
     else
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+}
 
-    // Generate and copy label
-    const auto& distanceAverage = getDistanceAverage(mPoseModel);
-    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData,
-                     distanceAverage, distanceAverageNew, distanceAverageNewCounter);
-    if (depthEnabled)
-        generateDepthLabelMap(transformedLabel, depthAugmented);
-    VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
-
+template<typename Dtype>
+void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, const MetaData& metaData,
+               const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
+               const bool addDistance)
+{
     // Debugging - Visualize - Write on disk
-    // if (mPoseModel == PoseModel::COCO_25E)
+    // if (poseModel == PoseModel::COCO_25E)
     {
-        if (metaData.writeNumber < 3)
+        // if (metaData.writeNumber < 3)
         // if (metaData.writeNumber < 5)
         // if (metaData.writeNumber < 10)
         if (metaData.writeNumber < 100)
@@ -1005,10 +1002,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             const auto gridX = rezX / stride;
             const auto gridY = rezY / stride;
             const auto channelOffset = gridY * gridX;
-            const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
-            const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
-                                           + param_.add_distance() * 2 * (numberBodyParts-1);
-            const auto bkgChannel = getNumberBodyBkgAndPAF(mPoseModel) - 1;
+            const auto numberBodyParts = getNumberBodyParts(poseModel); // #BP
+            const auto numberTotalChannels = getNumberBodyBkgAndPAF(poseModel)
+                                           + addDistance * 2 * (numberBodyParts-1);
+            const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
@@ -1016,7 +1013,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                 // if (part == bkgChannel) // Background channel
                 if (part >= bkgChannel) // Bkg channel + even distance
                 // if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
-                // const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
+                // const auto numberPafChannels = getNumberPafChannels(poseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
                 {
@@ -1044,43 +1041,61 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                     }
                     // Write on disk
                     char imagename [100];
-                    sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", mModelString.c_str(),
+                    sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
                             metaData.writeNumber, part);
                     cv::imwrite(imagename, finalImage);
                 }
-            }
-            if (depthEnabled)
-            {
-                cv::Mat depthMap;
-                cv::resize(depthAugmented, depthMap, cv::Size{}, stride, stride, cv::INTER_LINEAR);
-                char imagename [100];
-                sprintf(imagename, "visualize/%s_augment_%04d_label_part_depth.png", mModelString.c_str(),
-                        metaData.writeNumber);
-                cv::imwrite(imagename, depthMap);
             }
         }
     }
 }
 
 template<typename Dtype>
-void OPDataTransformer<Dtype>::generateDepthLabelMap(Dtype* transformedLabel, const cv::Mat& depth) const
+void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
+                                                    const Datum& datum, const Datum* const datumNegative,
+                                                    std::vector<long double>& distanceAverageNew,
+                                                    std::vector<unsigned long long>& distanceAverageNewCounter)
 {
-    const auto gridX = (int)depth.cols;
-    const auto gridY = (int)depth.rows;
-    const auto channelOffset = gridY * gridX;
-    const auto numberBpPafChannels = getNumberBodyAndPafChannels(mPoseModel);
-    // generate depth
-    for (auto gY = 0; gY < gridY; gY++)
+    // Parameters
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+
+    MetaData metaData;
+    cv::Mat imageAugmented;
+    cv::Mat maskMissAugmented;
+    const auto validMetaData = generateAugmentedImages<Dtype>(
+        metaData, mCurrentEpoch, imageAugmented, maskMissAugmented,
+        datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_);
+    // If error reading meta data --> Labels to 0 and return
+    if (!validMetaData)
     {
-        const auto yOffset = gY*gridX;
-        for (auto gX = 0; gX < gridX; gX++)
-        {
-            const auto xyOffset = yOffset + gX;
-            auto depth_val = depth.at<uint16_t>(gY, gX);
-            transformedLabel[(2*numberBpPafChannels+2)*channelOffset + xyOffset] = (depth_val>0)?1.0:0.0;
-            transformedLabel[(2*numberBpPafChannels+3)*channelOffset + xyOffset] = float(depth_val)/1000.0;
-        }
+        const auto channelOffset = gridY * gridX;
+        const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
+        const auto addDistance = param_.add_distance();
+        const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + addDistance * 2 * (numberBodyParts-1);
+        std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
+        return;
     }
+
+    // Time measurement
+    CPUTimer timer1;
+    timer1.Start();
+
+    // Fill transformerData
+    fillTransformedData(transformedData, imageAugmented, param_);
+
+    // Generate and copy label
+    const auto& distanceAverage = getDistanceAverage(mPoseModel);
+    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData,
+                     distanceAverage, distanceAverageNew, distanceAverageNewCounter);
+    VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
+
+    // Debugging - Visualize - Write on disk
+    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
