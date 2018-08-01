@@ -70,7 +70,7 @@ public:
     explicit OPDataTransformer(const std::string& modelString);
     explicit OPDataTransformer(const OPTransformationParameter& param);
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
-                               const std::string& modelString, bool tpaf = false, bool staf = false, std::vector<int> stafIDS = {}); // OpenPose: Added std::string
+                               const std::string& modelString, int tpaf = false, int staf = false, std::vector<int> stafIDS = {}); // OpenPose: Added std::string
     virtual ~OPDataTransformer() {}
 
     /**
@@ -143,7 +143,7 @@ protected:
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
     std::string mModelString;
-    bool mTpaf, mStaf;
+    int mTpaf, mStaf;
     std::vector<int> mStafIDS;
 
     // Label generation
@@ -157,6 +157,8 @@ protected:
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void generateLabelMapStaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                          const MetaData& metaData, const cv::Mat& img, const int stride) const;
+    void generateLabelMapStafWithPaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;

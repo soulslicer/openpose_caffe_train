@@ -453,7 +453,7 @@ namespace caffe {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
     }
 
-    const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible)
+    const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible, bool includeHM)
     {
         std::vector<int> missingChannels;
         // Missing body parts
@@ -493,9 +493,11 @@ namespace caffe {
             const auto it = std::unique(missingChannels.begin(), missingChannels.end());
             missingChannels.resize(std::distance(missingChannels.begin(), it));
             // Body parts to channel indexes (add #PAF channels)
+            if(includeHM){
             std::transform(missingBodyParts.begin(), missingBodyParts.end(), missingBodyParts.begin(),
                            std::bind2nd(std::plus<int>(), getNumberPafChannels(poseModel)));
             missingChannels.insert(missingChannels.end(), missingBodyParts.begin(), missingBodyParts.end());
+            }
         }
         // Return result
         return missingChannels;

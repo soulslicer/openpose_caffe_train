@@ -56,7 +56,7 @@ const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
-const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {});
+const std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {},  bool includeHM = true);
 
 const std::vector<std::vector<int>>& getLmdbToOpenPoseKeypoints(const PoseModel poseModel);
 
