@@ -724,8 +724,8 @@ cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidt
 }
 
 template<typename Dtype>
-bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, cv::Mat& imageAugmented,
-                             cv::Mat& maskMissAugmented,
+bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string& datasetString,
+                             cv::Mat& imageAugmented, cv::Mat& maskMissAugmented,
                              const Datum& datum, const Datum* const datumNegative,
                              const OPTransformationParameter& param_, const PoseCategory poseCategory,
                              const PoseModel poseModel, const Phase phase_)
@@ -753,12 +753,12 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, cv::Mat& ima
     bool validMetaData;
     // DOME
     if (poseCategory == PoseCategory::DOME)
-        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, data.c_str(), datumWidth, poseCategory,
-                                            poseModel);
+        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, data.c_str(), datumWidth,
+                                            poseCategory, poseModel);
     // COCO & MPII
     else
-        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, &data[3 * datumArea], datumWidth, poseCategory,
-                                            poseModel);
+        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, &data[3 * datumArea], datumWidth,
+                                            poseCategory, poseModel);
     // If error reading meta data --> Labels to 0 and return
     if (!validMetaData)
         return false;
@@ -1068,7 +1068,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     cv::Mat imageAugmented;
     cv::Mat maskMissAugmented;
     const auto validMetaData = generateAugmentedImages<Dtype>(
-        metaData, mCurrentEpoch, imageAugmented, maskMissAugmented,
+        metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
         datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_);
     // If error reading meta data --> Labels to 0 and return
     if (!validMetaData)

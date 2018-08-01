@@ -87,6 +87,7 @@ protected:
     PoseModel mPoseModel;
     PoseCategory mPoseCategory;
     int mCurrentEpoch;
+    std::string mDatasetString;
     std::string mModelString;
 
     // Label generation

@@ -125,11 +125,13 @@ namespace caffe {
 
     // Public functions
     template<typename Dtype>
-    bool readMetaData(MetaData& metaData, int& currentEpoch, const char* data,
+    bool readMetaData(MetaData& metaData, int& currentEpoch, std::string& datasetString, const char* data,
                       const size_t offsetPerLine, const PoseCategory poseCategory, const PoseModel poseModel)
     {
         // Dataset name
         metaData.datasetString = decodeString(data);
+        if (datasetString.empty())
+            datasetString = metaData.datasetString;
         // Image Dimension
         metaData.imageSize = cv::Size{(int)decodeNumber<Dtype>(&data[offsetPerLine+4]),
                                       (int)decodeNumber<Dtype>(&data[offsetPerLine])};
@@ -177,7 +179,7 @@ namespace caffe {
                 jointPoint -= cv::Point2f{1.f,1.f};
             // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
-            if (isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
+            if (datasetString != metaData.datasetString || isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
             {
                 // LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
                 //           << "datasetString: " << metaData.datasetString;
@@ -281,8 +283,10 @@ namespace caffe {
         return true;
     }
 
-    template bool readMetaData<float>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
+    template bool readMetaData<float>(MetaData& metaData, int& currentEpoch, std::string& datasetString,
+                                      const char* data, const size_t offsetPerLine,
                                       const PoseCategory poseCategory, const PoseModel poseModel);
-    template bool readMetaData<double>(MetaData& metaData, int& currentEpoch, const char* data, const size_t offsetPerLine,
+    template bool readMetaData<double>(MetaData& metaData, int& currentEpoch, std::string& datasetString,
+                                       const char* data, const size_t offsetPerLine,
                                        const PoseCategory poseCategory, const PoseModel poseModel);
 }  // namespace caffe
