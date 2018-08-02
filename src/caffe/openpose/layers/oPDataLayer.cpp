@@ -250,6 +250,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability)); // Original
     const auto desiredDbIs1 = !secondDb || (dice >= secondProbability+onlyBackgroundProbability);
     const auto desiredDbIs2 = !secondDb || (dice < secondProbability);
+    const auto desiredDbIsBkg = !desiredDbIs1 && !desiredDbIs2;
     // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
@@ -332,14 +333,14 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                                             &(this->transformed_label_),
                                             mDistanceAverage,
                                             mDistanceAverageCounter,
-                                            &datum,
+                                            (desiredDbIsBkg ? nullptr : &datum),
                                             &datumBackground);
         else
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
                                             mDistanceAverage,
                                             mDistanceAverageCounter,
-                                            &datum);
+                                            (desiredDbIsBkg ? nullptr : &datum));
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
