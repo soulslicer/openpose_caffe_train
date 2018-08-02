@@ -292,6 +292,7 @@ namespace caffe {
     {
         // Estimate random flip
         const auto dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+std::cout << (dice <= flipProb) << std::endl;
         return (dice <= flipProb);
     }
 
