@@ -69,7 +69,7 @@ public:
     void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                    std::vector<long double>& distanceAverageNew,
                    std::vector<unsigned long long>& distanceAverageNewCounter,
-                   const Datum& datum, const Datum* const datumNegative = nullptr);
+                   const Datum* datum, const Datum* const datumNegative = nullptr);
     int getNumberChannels() const;
 protected:
     // OpenPose: added end
@@ -91,7 +91,7 @@ protected:
     std::string mModelString;
 
     // Label generation
-    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum& datum,
+    void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum* datum,
                               const Datum* const datumNegative,
                               std::vector<long double>& distanceAverage,
                               std::vector<unsigned long long>& distanceAverageCounter);

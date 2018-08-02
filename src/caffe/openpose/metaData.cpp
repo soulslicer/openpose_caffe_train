@@ -128,6 +128,7 @@ namespace caffe {
     bool readMetaData(MetaData& metaData, int& currentEpoch, std::string& datasetString, const char* data,
                       const size_t offsetPerLine, const PoseCategory poseCategory, const PoseModel poseModel)
     {
+        metaData.filled = true;
         // Dataset name
         metaData.datasetString = decodeString(data);
         if (datasetString.empty())

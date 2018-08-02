@@ -16,6 +16,7 @@ namespace caffe {
 
     struct MetaData
     {
+        bool filled;
         cv::Size imageSize;
         bool isValidation; // Just to check it is false
         int numberOtherPeople;

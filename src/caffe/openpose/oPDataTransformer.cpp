@@ -340,7 +340,8 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
     // const auto dMin = Dtype(0);
     // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
     // const auto dRange = dMax - dMin;
-    // const auto entryDValue = 2*(distanceAB - dMin)/dRange - 1; // Main range: [-1, 1], -1 is 0px-distance, 1 is 368 / stride x sqrt(2) px of distance
+    // const auto entryDValue = 2*(distanceAB - dMin)/dRange - 1; // Main range: [-1, 1],
+    // -1 is 0px-distance, 1 is 368 / stride x sqrt(2) px of distance
 
     // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
     if (!isnan(directionAB.x) && !isnan(directionAB.y))
@@ -353,7 +354,8 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
                                   int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
         const int maxY = std::min(gridY,
                                   int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
-        // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB; // alpha*1 + (1-alpha)*realProportion
+        // alpha*1 + (1-alpha)*realProportion
+        // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB;
         for (auto gY = minY; gY < maxY; gY++)
         {
             const auto yOffset = gY*gridX;
@@ -525,15 +527,18 @@ template<typename Dtype>
 void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                                          std::vector<long double>& distanceAverageNew,
                                          std::vector<unsigned long long>& distanceAverageNewCounter,
-                                         const Datum& datum,
+                                         const Datum* datum,
                                          const Datum* const datumNegative)
 {
     // Secuirty checks
-    const int datumChannels = datum.channels();
+    if (datum != nullptr)
+    {
+        const int datumChannels = datum->channels();
+        CHECK_GE(datumChannels, 1);
+    }
     const int imageNum = transformedData->num();
     const int imageChannels = transformedData->channels();
     const int labelNum = transformedLabel->num();
-    CHECK_GE(datumChannels, 1);
     CHECK_EQ(imageChannels, 3);
     CHECK_EQ(imageNum, labelNum);
     CHECK_GE(imageNum, 1);
@@ -618,8 +623,10 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
         //         const auto xyOffset = yOffset + x;
         //         const auto baseIndex = 3*xyOffset;
         //         uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
-        //         uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + initImageArea]));
-        //         uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*initImageArea]));
+        //         uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(
+        //             static_cast<uint8_t>(data[xyOffset + initImageArea]));
+        //         uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(
+        //             static_cast<uint8_t>(data[xyOffset + 2*initImageArea]));
         //     }
         // }
         // // Security check - Assert
@@ -636,6 +643,48 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
         // CHECK_EQ(cv::norm(image-image2), 0);
     }
     return image;
+}
+
+cv::Mat readMaskMiss(const PoseCategory poseCategory, const int initImageHeight,
+                     const int initImageWidth, const int datumArea,
+                     const std::string& data)
+{
+    // Read mask miss (LMDB channel 2)
+    const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO
+        // COCO
+        ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
+        // DOME & MPII
+        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
+    // // Naive copy
+    // cv::Mat maskMiss2;
+    // // COCO
+    // if (poseCategory == PoseCategory::COCO)
+    // {
+    //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0});
+    //     for (auto y = 0; y < maskMiss2.rows; y++)
+    //     {
+    //         const auto yOffset = (int)(y*initImageWidth);
+    //         for (auto x = 0; x < initImageWidth; x++)
+    //         {
+    //             const auto xyOffset = yOffset + x;
+    //             const auto dIndex = (int)(4*datumArea + xyOffset);
+    //             Dtype dElement;
+    //             // if (hasUInt8)
+    //                 dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
+    //             // else
+    //                 // dElement = datum.float_data(dIndex);
+    //             if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
+    //                 throw std::runtime_error{"Value out of {0,1}" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    //             maskMiss2.at<uchar>(y, x) = dElement; //round(dElement/255);
+    //         }
+    //     }
+    // }
+    // // DOME & MPII
+    // else
+    //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
+    // // Security checks
+    // CHECK_EQ(cv::norm(maskMiss-maskMiss2), 0);
+    return maskMiss;
 }
 
 cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidth, const int finalImageHeight,
@@ -677,8 +726,10 @@ cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidt
         //         const auto xyOffset = yOffset + x;
         //         const auto baseIndex = 3*xyOffset;
         //         uCharPtrCvMat[baseIndex] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset]));
-        //         uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + datumNegativeArea]));
-        //         uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(static_cast<uint8_t>(data[xyOffset + 2*datumNegativeArea]));
+        //         uCharPtrCvMat[baseIndex + 1] = static_cast<Dtype>(
+        //             static_cast<uint8_t>(data[xyOffset + datumNegativeArea]));
+        //         uCharPtrCvMat[baseIndex + 2] = static_cast<Dtype>(
+        //             static_cast<uint8_t>(data[xyOffset + 2*datumNegativeArea]));
         //     }
         // }
         // // Security check - Assert
@@ -717,7 +768,8 @@ cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidt
         {
             cv::Mat backgroundImageTemp;
             std::swap(backgroundImage, backgroundImageTemp);
-            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight},
+                       0, 0, CV_INTER_CUBIC);
         }
     }
     return backgroundImage;
@@ -726,87 +778,66 @@ cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidt
 template<typename Dtype>
 bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string& datasetString,
                              cv::Mat& imageAugmented, cv::Mat& maskMissAugmented,
-                             const Datum& datum, const Datum* const datumNegative,
+                             const Datum* datum, const Datum* const datumNegative,
                              const OPTransformationParameter& param_, const PoseCategory poseCategory,
                              const PoseModel poseModel, const Phase phase_)
 {
-    // Parameters
-    const std::string& data = datum.data();
-    const int datumHeight = datum.height();
-    const int datumWidth = datum.width();
-    const auto datumArea = (int)(datumHeight * datumWidth);
-    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
-    const auto stride = (int)param_.stride();
-    const auto finalImageWidth = (int)param_.crop_size_x();
-    const auto finalImageHeight = (int)param_.crop_size_y();
-    const auto gridX = finalImageWidth / stride;
-    const auto gridY = finalImageHeight / stride;
-
     // Time measurement
     CPUTimer timer1;
     timer1.Start();
 
-    // const bool hasUInt8 = data.size() > 0;
-    CHECK(data.size() > 0);
+    cv::Mat image;
+    cv::Mat maskMiss;
+    bool validMetaData = true;
+    if (datum != nullptr)
+    {
+        // Parameters
+        const std::string& data = datum->data();
+        const int datumHeight = datum->height();
+        const int datumWidth = datum->width();
+        const auto datumArea = (int)(datumHeight * datumWidth);
 
-    // Read meta data (LMDB channel 3)
-    bool validMetaData;
-    // DOME
-    if (poseCategory == PoseCategory::DOME)
-        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, data.c_str(), datumWidth,
-                                            poseCategory, poseModel);
-    // COCO & MPII
+        // const bool hasUInt8 = data.size() > 0;
+        CHECK(data.size() > 0);
+
+        // Read meta data (LMDB channel 3)
+        bool validMetaData;
+        // DOME
+        if (poseCategory == PoseCategory::DOME)
+            validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, data.c_str(), datumWidth,
+                                                poseCategory, poseModel);
+        // COCO & MPII
+        else
+            validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, &data[3 * datumArea],
+                                                datumWidth, poseCategory, poseModel);
+        // If error reading meta data --> Labels to 0 and return
+        if (validMetaData)
+        {
+            // Read image (LMDB channel 1)
+            image = readImage(data, poseCategory, param_.media_directory(), metaData.imageSource, datumWidth,
+                              datumHeight, datumArea);
+
+            // Read mask miss (LMDB channel 2)
+            const auto initImageWidth = (int)image.cols;
+            const auto initImageHeight = (int)image.rows;
+            maskMiss = readMaskMiss(poseCategory, initImageHeight, initImageWidth, datumArea, data);
+        }
+    }
     else
-        validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, &data[3 * datumArea], datumWidth,
-                                            poseCategory, poseModel);
-    // If error reading meta data --> Labels to 0 and return
-    if (!validMetaData)
-        return false;
+        metaData.filled = false;
 
-    // Read image (LMDB channel 1)
-    const auto image = readImage(data, poseCategory, param_.media_directory(), metaData.imageSource, datumWidth,
-                                 datumHeight, datumArea);
+    // Parameters
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+    const auto initImageWidth = (int)image.cols;
+    const auto initImageHeight = (int)image.rows;
 
     // Read background image
     const auto backgroundImage = readBackgroundImage(datumNegative, finalImageWidth, finalImageHeight, finalCropSize);
-
-    const auto initImageWidth = (int)image.cols;
-    const auto initImageHeight = (int)image.rows;
-    // Read mask miss (LMDB channel 2)
-    const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO
-        // COCO
-        ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
-        // DOME & MPII
-        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
-    // // Naive copy
-    // cv::Mat maskMiss2;
-    // // COCO
-    // if (poseCategory == PoseCategory::COCO)
-    // {
-    //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0});
-    //     for (auto y = 0; y < maskMiss2.rows; y++)
-    //     {
-    //         const auto yOffset = (int)(y*initImageWidth);
-    //         for (auto x = 0; x < initImageWidth; x++)
-    //         {
-    //             const auto xyOffset = yOffset + x;
-    //             const auto dIndex = (int)(4*datumArea + xyOffset);
-    //             Dtype dElement;
-    //             // if (hasUInt8)
-    //                 dElement = static_cast<Dtype>(static_cast<uint8_t>(data[dIndex]));
-    //             // else
-    //                 // dElement = datum.float_data(dIndex);
-    //             if (std::round(dElement/255)!=1 && std::round(dElement/255)!=0)
-    //                 throw std::runtime_error{"Value out of {0,1}" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    //             maskMiss2.at<uchar>(y, x) = dElement; //round(dElement/255);
-    //         }
-    //     }
-    // }
-    // // DOME & MPII
-    // else
-    //     maskMiss2 = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
-    // // Security checks
-    // CHECK_EQ(cv::norm(maskMiss-maskMiss2), 0);
 
     // Time measurement
     VLOG(2) << "  bgr[:] = datum: " << timer1.MicroSeconds()*1e-3 << " ms";
@@ -837,65 +868,74 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
     // We only do random transform augmentSelection augmentation when training.
     if (phase_ == TRAIN) // 80% time is spent here
     {
-        // Mask for background image
-        // Image size, not backgroundImage
-        cv::Mat maskBackgroundImage = (datumNegative != nullptr
-            ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
-        cv::Mat maskBackgroundImageAugmented;
-        // Swap center?
-        swapCenterPoint(metaData, param_, poseModel);
-        // Augmentation (scale, rotation, cropping, and flipping)
-        // Order does matter, otherwise code will fail doing augmentation
-        augmentSelection.scale = estimateScale(metaData, param_);
-        applyScale(metaData, augmentSelection.scale, poseModel);
-        augmentSelection.RotAndFinalSize = estimateRotation(
-            metaData,
-            cv::Size{(int)std::round(image.cols * augmentSelection.scale),
-                     (int)std::round(image.rows * augmentSelection.scale)},
-            param_);
-        applyRotation(metaData, augmentSelection.RotAndFinalSize.first, poseModel);
-        augmentSelection.cropCenter = estimateCrop(metaData, param_);
-        applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, poseModel);
-        augmentSelection.flip = estimateFlip(metaData, param_);
-        applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, poseModel);
-        // Aug on images - ~80% code time spent in the following `applyAllAugmentation` lines
-        applyAllAugmentation(imageAugmented, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
-                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, image,
-                             0);
-        applyAllAugmentation(maskBackgroundImageAugmented, augmentSelection.RotAndFinalSize.first,
-                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
-                             finalCropSize, maskBackgroundImage, 255);
-        // MPII hands special cases (1/4)
-        // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
-        if (poseModel == PoseModel::MPII_65_42 || poseModel == PoseModel::CAR_12)
-            maskMissAugmented = maskBackgroundImageAugmented.clone();
-        else
-        {
-            applyAllAugmentation(maskMissAugmented, augmentSelection.RotAndFinalSize.first,
-                                 augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
-                                 finalCropSize, maskMiss, 255);
-        }
         // backgroundImage augmentation (no scale/rotation)
         const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
         cv::Mat backgroundImageTemp;
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
-        applyFlip(backgroundImageAugmented, augmentSelection.flip, backgroundImageTemp);
-        // Introduce occlusions
-        doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
-                     poseModel);
-        // Resize mask
-        if (!maskMissAugmented.empty())
-            cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
-        // Final background image - elementwise multiplication
-        if (!backgroundImageAugmented.empty() && !maskBackgroundImageAugmented.empty())
+        applyFlip(backgroundImageAugmented, 0.5f, backgroundImageTemp);
+        // cv::Mats based on Datum
+        if (datum != nullptr && validMetaData)
         {
-            // Apply mask to background image
-            cv::Mat backgroundImageAugmentedTemp;
-            backgroundImageAugmented.copyTo(backgroundImageAugmentedTemp, maskBackgroundImageAugmented);
-            // Add background image to image augmented
-            cv::Mat imageAugmentedTemp;
-            addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
-            imageAugmented = imageAugmentedTemp;
+            // Mask for background image
+            // Image size, not backgroundImage
+            cv::Mat maskBackgroundImage = (datumNegative != nullptr
+                ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
+            cv::Mat maskBackgroundImageAugmented;
+            // Swap center?
+            swapCenterPoint(metaData, param_, poseModel);
+            // Augmentation (scale, rotation, cropping, and flipping)
+            // Order does matter, otherwise code will fail doing augmentation
+            augmentSelection.scale = estimateScale(metaData, param_);
+            applyScale(metaData, augmentSelection.scale, poseModel);
+            augmentSelection.RotAndFinalSize = estimateRotation(
+                metaData,
+                cv::Size{(int)std::round(image.cols * augmentSelection.scale),
+                         (int)std::round(image.rows * augmentSelection.scale)},
+                param_);
+            applyRotation(metaData, augmentSelection.RotAndFinalSize.first, poseModel);
+            augmentSelection.cropCenter = estimateCrop(metaData, param_);
+            applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, poseModel);
+            augmentSelection.flip = estimateFlip(param_.flip_prob());
+            applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, poseModel);
+            // Aug on images - ~80% code time spent in the following `applyAllAugmentation` lines
+            applyAllAugmentation(imageAugmented, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                                 augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, image,
+                                 0);
+            applyAllAugmentation(maskBackgroundImageAugmented, augmentSelection.RotAndFinalSize.first,
+                                 augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                                 finalCropSize, maskBackgroundImage, 255);
+            // MPII hands special cases (1/4)
+            // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+            if (poseModel == PoseModel::MPII_65_42 || poseModel == PoseModel::CAR_12)
+                maskMissAugmented = maskBackgroundImageAugmented.clone();
+            else
+            {
+                applyAllAugmentation(maskMissAugmented, augmentSelection.RotAndFinalSize.first,
+                                     augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                                     finalCropSize, maskMiss, 255);
+            }
+            // Introduce occlusions
+            doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
+                         poseModel);
+            // Resize mask
+            if (!maskMissAugmented.empty())
+                cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+            // Final background image - elementwise multiplication
+            if (!backgroundImageAugmented.empty() && !maskBackgroundImageAugmented.empty())
+            {
+                // Apply mask to background image
+                cv::Mat backgroundImageAugmentedTemp;
+                backgroundImageAugmented.copyTo(backgroundImageAugmentedTemp, maskBackgroundImageAugmented);
+                // Add background image to image augmented
+                cv::Mat imageAugmentedTemp;
+                addWeighted(imageAugmented, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
+                imageAugmented = imageAugmentedTemp;
+            }
+        }
+        else
+        {
+            imageAugmented = backgroundImageAugmented;
+            maskMissAugmented = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255});
         }
     }
     // Test
@@ -913,7 +953,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
     // // Debug - Visualize final (augmented) image
     // debugVisualize(imageAugmented, metaData, augmentSelection, poseModel, phase_, param_);
 
-    return true;
+    return validMetaData;
 }
 
 template<typename Dtype>
@@ -1052,7 +1092,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
-                                                    const Datum& datum, const Datum* const datumNegative,
+                                                    const Datum* datum, const Datum* const datumNegative,
                                                     std::vector<long double>& distanceAverageNew,
                                                     std::vector<unsigned long long>& distanceAverageNewCounter)
 {
@@ -1071,7 +1111,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
         datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_);
     // If error reading meta data --> Labels to 0 and return
-    if (!validMetaData)
+    if (!validMetaData && datumNegative == nullptr)
     {
         const auto channelOffset = gridY * gridX;
         const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
@@ -1228,6 +1268,20 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Initialize labels to [0, 1] (depending on maskMiss)
     fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
 
+    // Neck-part distance
+    // Mask distance labels to 0
+    auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
+    if (addDistance)
+    {
+        std::fill(maskDistance,
+                  maskDistance + 2*(numberBodyParts-1) * channelOffset,
+                  0.f);
+    }
+
+    // If no people on image (e.g., if pure background image)
+    if (!metaData.filled)
+        return;
+
     // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
     if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
     {
@@ -1300,11 +1354,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 
     // Neck-part distance
-    // Mask labels to 0
-    auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
-    std::fill(maskDistance,
-              maskDistance + 2*(numberBodyParts-1) * channelOffset,
-              0.f);
     if (addDistance)
     {
         // Estimate average distance between keypoints

@@ -288,11 +288,11 @@ namespace caffe {
         }
     }
 
-    bool estimateFlip(const MetaData& metaData, const OPTransformationParameter& param_)
+    bool estimateFlip(const float flipProb)
     {
         // Estimate random flip
         const auto dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        return (dice <= param_.flip_prob());
+        return (dice <= flipProb);
     }
 
     void applyFlip(cv::Mat& imageAugmented, const bool flip, const cv::Mat& image)

@@ -41,13 +41,16 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   uint64_t offset_;
 
   // OpenPose: added
+  bool SkipBackground();
   bool SkipSecond();
   void NextBackground();
   void NextSecond();
   // Secondary lmdb
+  uint64_t offsetBackground;
   uint64_t offsetSecond;
   bool secondDb;
   float secondProbability;
+  float onlyBackgroundProbability;
   shared_ptr<db::DB> dbSecond;
   shared_ptr<db::Cursor> cursorSecond;
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerSecondary;
@@ -64,6 +67,7 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   // Timer
   unsigned long long mOnes;
   unsigned long long mTwos;
+  unsigned long long mBackgrounds;
   int mCounter;
   double mDuration;
   std::vector<long double> mDistanceAverage;

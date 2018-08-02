@@ -22,6 +22,7 @@ template <typename Dtype>
 OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
     offset_(),
+    offsetBackground(), // OpenPose: added
     offsetSecond(), // OpenPose: added
     op_transform_param_(param.op_transform_param()) // OpenPose: added
 {
@@ -31,13 +32,14 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     // OpenPose: added
     mOnes = 0;
     mTwos = 0;
+    mBackgrounds = 0;
     // Set up secondary DB
     if (!param.op_transform_param().source_secondary().empty())
     {
         secondDb = true;
         secondProbability = param.op_transform_param().prob_secondary();
         CHECK_GE(secondProbability, 0.f);
-        CHECK_LE(secondProbability, 1.f);
+        CHECK_LT(secondProbability, 1.f);
         dbSecond.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
         dbSecond->Open(param.op_transform_param().source_secondary(), db::READ);
         cursorSecond.reset(dbSecond->NewCursor());
@@ -51,12 +53,19 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     if (!param.op_transform_param().source_background().empty())
     {
         backgroundDb = true;
+        onlyBackgroundProbability = param.op_transform_param().prob_only_background();
+        CHECK_GE(onlyBackgroundProbability, 0.f);
+        CHECK_LT(onlyBackgroundProbability, 1.f);
         dbBackground.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
         dbBackground->Open(param.op_transform_param().source_background(), db::READ);
         cursorBackground.reset(dbBackground->NewCursor());
     }
     else
+    {
         backgroundDb = false;
+        onlyBackgroundProbability = 0.f;
+    }
+    CHECK_LT(secondProbability+onlyBackgroundProbability, 1.f);
     // Timer
     mDuration = 0;
     mCounter = 0;
@@ -79,9 +88,11 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     datum.ParseFromString(cursor_->value());
 
     // OpenPose: added
-    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
+    mOPDataTransformer.reset(
+        new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
     if (secondDb)
-        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
+        mOPDataTransformerSecondary.reset(
+            new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
     // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
@@ -164,6 +175,17 @@ void OPDataLayer<Dtype>::Next()
 
 // OpenPose: added
 template <typename Dtype>
+bool OPDataLayer<Dtype>::SkipBackground()
+{
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetBackground % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+
+template <typename Dtype>
 bool OPDataLayer<Dtype>::SkipSecond()
 {
     int size = Caffe::solver_count();
@@ -187,6 +209,7 @@ void OPDataLayer<Dtype>::NextBackground()
             cursorBackground->SeekToFirst();
         }
     }
+    offsetBackground++;
 }
 
 template<typename Dtype>
@@ -224,7 +247,9 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     Datum datumBackground;
     // OpenPose: added
     const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-    const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
+    // const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability)); // Original
+    const auto desiredDbIs1 = !secondDb || (dice >= secondProbability+onlyBackgroundProbability);
+    const auto desiredDbIs2 = !secondDb || (dice < secondProbability);
     // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
@@ -245,7 +270,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             datum.ParseFromString(cursor_->value());
         }
         // If 2 DBs & 2nd one must go
-        else
+        else if (desiredDbIs2)
         {
             oPDataTransformerPtr = this->mOPDataTransformerSecondary;
             mTwos++;
@@ -253,9 +278,16 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 NextSecond();
             datum.ParseFromString(cursorSecond->value());
         }
+        // If bkg DB included
+        else
+        {
+            mBackgrounds++;
+            CHECK(backgroundDb);
+        }
         if (backgroundDb)
         {
-            NextBackground();
+            while (SkipBackground())
+                NextBackground();
             datumBackground.ParseFromString(cursorBackground->value());
         }
         // OpenPose: added ended
@@ -265,8 +297,10 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             // OpenPose: added
             // this->transformed_data_.Reshape({1, 3, height, width});
             // top_shape[0] = batch_size;
-            const int width = this->phase_ != TRAIN ? datum.width() : this->layer_param_.op_transform_param().crop_size_x();
-            const int height = this->phase_ != TRAIN ? datum.height() : this->layer_param_.op_transform_param().crop_size_y();
+            const int width = this->phase_ != TRAIN ? datum.width()
+                : this->layer_param_.op_transform_param().crop_size_x();
+            const int height = this->phase_ != TRAIN ? datum.height()
+                : this->layer_param_.op_transform_param().crop_size_y();
             batch->data_.Reshape({batch_size, 3, height, width});
             // OpenPose: added ended
             // OpenPose: commented
@@ -298,14 +332,14 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                                             &(this->transformed_label_),
                                             mDistanceAverage,
                                             mDistanceAverageCounter,
-                                            datum,
+                                            &datum,
                                             &datumBackground);
         else
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
                                             mDistanceAverage,
                                             mDistanceAverageCounter,
-                                            datum);
+                                            &datum);
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
@@ -333,8 +367,10 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     const auto repeatEveryXVisualizations = 2;
     if (mCounter == 20*repeatEveryXVisualizations)
     {
-        std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s\t"
-                  << "Ratio: " << mOnes/float(mOnes+mTwos)
+        std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s"
+                  << "\tRatio1: " << mOnes/float(mOnes+mTwos+mBackgrounds)
+                  << "\tRatio2: " << mTwos/float(mOnes+mTwos+mBackgrounds)
+                  << "\tRatioBkg: " << mBackgrounds/float(mOnes+mTwos+mBackgrounds)
                   << "\nAverage distance: ";
                   // << std::endl;
         mDuration = 0;

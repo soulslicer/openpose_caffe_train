@@ -28,8 +28,7 @@ namespace caffe {
     void applyCrop(MetaData& metaData, const cv::Point2i& cropCenter,
                    const cv::Size& cropSize, const PoseModel poseModel);
     // Flipping
-    bool estimateFlip(const MetaData& metaData,
-                      const OPTransformationParameter& param_);
+    bool estimateFlip(const float flipProb);
     void applyFlip(cv::Mat& imageAugmented, const bool flip, const cv::Mat& image);
     void applyFlip(MetaData& metaData, const bool flip, const int imageWidth,
                    const OPTransformationParameter& param_, const PoseModel poseModel);
