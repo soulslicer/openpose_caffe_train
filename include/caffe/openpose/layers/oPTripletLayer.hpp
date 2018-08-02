@@ -90,6 +90,8 @@ class OPTripletLayer : public BasePrefetchingDataLayer<Dtype> {
 
   int curr_video = -1;
   std::vector<TVideo> videos;
+
+  int debug_mode = 0;
   // OpenPose: added end
 };
 

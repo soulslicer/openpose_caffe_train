@@ -82,6 +82,8 @@ template <typename Dtype>
 void OPTripletLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
 {
+    debug_mode = this->layer_param_.op_transform_param().debug_mode();
+
     // If ID is wanted
     id_available = top.size() - 2;
 
@@ -535,6 +537,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 negative_ids.emplace_back(*select_randomly(reidData_ref->begin(), reidData_ref->end()));
             }
 
+            std::vector<cv::Mat> vizImages;
             for(int j=0; j<triplet_size; j++){
                 int image_id = i*triplet_size + j;
                 cv::Mat backgroundImage = backgroundImages[image_id];
@@ -569,6 +572,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 // Generate Image
                 cv::Mat finalImage; std::vector<cv::Rect> rects;
                 generateImage(backgroundImage, personImages, finalImage, rects);
+                vizImages.emplace_back(finalImage);
 
                 // Convert image to Caffe
                 matToCaffeInt(topData + batch->data_.offset(image_id), finalImage);
@@ -602,6 +606,12 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
             }
 
+            if(debug_mode){
+                cv::imshow("anchor", vizImages[0]);
+                cv::imshow("pos", vizImages[1]);
+                cv::imshow("neg", vizImages[2]);
+                cv::waitKey(2000);
+            }
         }
         // Video Mode
         else{
@@ -837,10 +847,12 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
             }
 
-//            cv::imshow("anchor", vizImages[0]);
-//            cv::imshow("pos", vizImages[1]);
-//            cv::imshow("neg", vizImages[2]);
-//            cv::waitKey(100);
+            if(debug_mode){
+                cv::imshow("anchor", vizImages[0]);
+                cv::imshow("pos", vizImages[1]);
+                cv::imshow("neg", vizImages[2]);
+                cv::waitKey(2000);
+            }
 
 
         }
