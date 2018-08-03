@@ -18,6 +18,8 @@
 #include <boost/thread/thread.hpp>
 
 #include <boost/algorithm/string.hpp>
+#include <thread>
+#include <mutex>
 // OpenPose: added end
 
 namespace caffe {
