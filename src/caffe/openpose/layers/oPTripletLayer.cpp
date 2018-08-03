@@ -483,15 +483,6 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         idData = batch->extra_labels_[0].mutable_cpu_data();
     }
 
-    static std::mutex mutex;
-    static int global_counter = 0;
-    int internal_counter = 0;
-    mutex.lock();
-    global_counter += 1;
-    internal_counter = global_counter;
-    mutex.unlock();
-    std::cout << internal_counter << std::endl;
-
     //std::cout << batch->data_.shape_string() << std::endl; // 9, 3, 368, 368
     //std::cout << batch->label_.shape_string() << std::endl; // 27, 5
 
@@ -632,6 +623,14 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
              */
 
             // SHOULD THE + VIDEO BE DONE INCREMENTALLY?
+            static std::mutex mutex;
+            static int global_counter = 0;
+            int internal_counter = 0;
+            mutex.lock();
+            global_counter += 1;
+            internal_counter = global_counter;
+            mutex.unlock();
+            std::cout << "Internal: "  << internal_counter << std::endl;
 
             // OR IF WE RANDOMIZE MAKE SURE DONT SELECT SAME VID?
             bool intersect_log = false;
