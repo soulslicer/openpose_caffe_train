@@ -1033,7 +1033,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
         // if (metaData.writeNumber < 3)
         // if (metaData.writeNumber < 5)
         // if (metaData.writeNumber < 10)
-        if (metaData.writeNumber < 100)
+        // if (metaData.writeNumber < 100)
         {
             // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
             // 2. Comment the following if statement
@@ -1051,7 +1051,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
                 // if (part == bkgChannel) // Background channel
-                if (part >= bkgChannel) // Bkg channel + even distance
+                // if (part >= bkgChannel) // Bkg channel + even distance
                 // if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
                 // const auto numberPafChannels = getNumberPafChannels(poseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
@@ -1088,6 +1088,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
             }
         }
     }
+std::exit(99);
 }
 
 template<typename Dtype>
