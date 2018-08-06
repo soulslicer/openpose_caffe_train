@@ -276,8 +276,8 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     // Distance average
     const cv::Point2f directionNorm = pointTarget - rootPoint;
     distanceAverageNew += std::sqrt(
-        directionNorm.x*directionNorm.x
-        + directionNorm.y*directionNorm.y)/stride;
+        directionNorm.x*directionNorm.x/dMax.x/dMax.x
+        + directionNorm.y*directionNorm.y/dMax.y/dMax.y)/stride;
     distanceAverageNewCounter++;
     // Fill distance elements
     for (auto gY = 0; gY < gridY; gY++)
