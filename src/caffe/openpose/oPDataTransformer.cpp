@@ -304,12 +304,12 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 // std::cout << entryDValue.x << " " << entryDValue.y << std::endl;
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
-                    // // Fill masks
-                    // maskDistX[xyOffset] = Dtype(1);
-                    // maskDistY[xyOffset] = Dtype(1);
-// TEMP CODE
-(void)maskDistX;
-(void)maskDistY;
+                    // Fill masks
+                    maskDistX[xyOffset] = Dtype(1);
+                    maskDistY[xyOffset] = Dtype(1);
+// // TEMP CODE
+// (void)maskDistX;
+// (void)maskDistY;
                 }
                 else
                 {
@@ -1379,19 +1379,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                               * channelOffset;
         const auto rootIndex = getRootIndex(mPoseModel);
-        // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
-        const cv::Point2f dMax{(float)gridX, (float)gridY};
         for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
         {
             if (rootIndex != partOrigin)
             {
                 cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
-// TEMP CODE
-                // const auto dMaxPart = distanceAverage[partTarget] * dMax;
-// const auto dMaxPart = dMax;
-// const auto dMaxPart = cv::Point2f{1.f, 1.f};
-const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
+                const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
                 // Self
                 if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                     && metaData.jointsSelf.isVisible[rootIndex] <= 1)
