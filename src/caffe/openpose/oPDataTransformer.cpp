@@ -1281,7 +1281,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
     // If no people on image (e.g., if pure background image)
     if (!metaData.filled)
+    {
+        std::fill(transformedLabel,
+                  transformedLabel + getNumberBodyBkgAndPAF(mPoseModel) * channelOffset,
+                  1.f);
         return;
+    }
 
     // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
     if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
