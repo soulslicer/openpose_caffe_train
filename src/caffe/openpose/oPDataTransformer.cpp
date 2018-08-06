@@ -300,8 +300,8 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
-if (entryDValue.x*entryDValue.x + entryDValue.y*entryDValue.y > 0.5)
-std::cout << entryDValue.x << " " << entryDValue.y << std::endl;
+// if (entryDValue.x*entryDValue.x + entryDValue.y*entryDValue.y > 0.5)
+// std::cout << entryDValue.x << " " << entryDValue.y << std::endl;
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // // Fill masks
@@ -1387,7 +1387,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             {
                 cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
-                const auto dMaxPart = distanceAverage[partTarget] * dMax;
+// TEMP CODE
+                // const auto dMaxPart = distanceAverage[partTarget] * dMax;
+const auto dMaxPart = dMax;
                 // Self
                 if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                     && metaData.jointsSelf.isVisible[rootIndex] <= 1)
