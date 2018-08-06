@@ -1390,7 +1390,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 // TEMP CODE
                 // const auto dMaxPart = distanceAverage[partTarget] * dMax;
 // const auto dMaxPart = dMax;
-const auto dMaxPart = cv::Point2f{1.f, 1.f};
+// const auto dMaxPart = cv::Point2f{1.f, 1.f};
+const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
                 // Self
                 if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                     && metaData.jointsSelf.isVisible[rootIndex] <= 1)
