@@ -302,12 +302,12 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 {
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
-                    // // Fill masks
-                    // maskDistX[xyOffset] = Dtype(1);
-                    // maskDistY[xyOffset] = Dtype(1);
-// TEMP CODE
-(void)maskDistX;
-(void)maskDistY;
+                    // Fill masks
+                    maskDistX[xyOffset] = Dtype(1);
+                    maskDistY[xyOffset] = Dtype(1);
+// // TEMP CODE
+// (void)maskDistX;
+// (void)maskDistY;
                 }
                 else
                 {
@@ -1275,13 +1275,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Neck-part distance
     // Mask distance labels to 0
     auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
-// TEMP CODE
-    // if (addDistance)
-    // {
-    //     std::fill(maskDistance,
-    //               maskDistance + 2*(numberBodyParts-1) * channelOffset,
-    //               0.f);
-    // }
+// TEMP CODE COMMENTED
+    if (addDistance)
+    {
+        std::fill(maskDistance,
+                  maskDistance + 2*(numberBodyParts-1) * channelOffset,
+                  0.f);
+    }
 
     // If no people on image (e.g., if pure background image)
     if (!metaData.filled)
