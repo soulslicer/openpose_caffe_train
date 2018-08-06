@@ -302,9 +302,12 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 {
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
-                    // Fill masks
-                    maskDistX[xyOffset] = Dtype(1);
-                    maskDistY[xyOffset] = Dtype(1);
+                    // // Fill masks
+                    // maskDistX[xyOffset] = Dtype(1);
+                    // maskDistY[xyOffset] = Dtype(1);
+// TEMP CODE
+(void)maskDistX;
+(void)maskDistY;
                 }
                 else
                 {
@@ -1134,8 +1137,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, distanceAverageNew, distanceAverageNewCounter);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    // Debugging - Visualize - Write on disk
+    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -1263,6 +1266,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2);
 
     // Labels to 0
+    // 2x to consider mask and channel itself
     std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
 
     // Initialize labels to [0, 1] (depending on maskMiss)
@@ -1271,12 +1275,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Neck-part distance
     // Mask distance labels to 0
     auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
-    if (addDistance)
-    {
-        std::fill(maskDistance,
-                  maskDistance + 2*(numberBodyParts-1) * channelOffset,
-                  0.f);
-    }
+// TEMP CODE
+    // if (addDistance)
+    // {
+    //     std::fill(maskDistance,
+    //               maskDistance + 2*(numberBodyParts-1) * channelOffset,
+    //               0.f);
+    // }
 
     // If no people on image (e.g., if pure background image)
     if (!metaData.filled)
