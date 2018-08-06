@@ -275,9 +275,9 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     const auto pointTargetScaledDown = 1/Dtype(stride)*pointTarget;
     // Distance average
     const cv::Point2f directionNorm = pointTarget - rootPoint;
-    distanceAverageNew += stride*std::sqrt(
-        directionNorm.x*directionNorm.x/dMax.x/dMax.x
-        + directionNorm.y*directionNorm.y/dMax.y/dMax.y);
+    distanceAverageNew += std::sqrt(
+        directionNorm.x*directionNorm.x
+        + directionNorm.y*directionNorm.y)/stride;
     distanceAverageNewCounter++;
     // Fill distance elements
     for (auto gY = 0; gY < gridY; gY++)
@@ -1389,7 +1389,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
 // TEMP CODE
                 // const auto dMaxPart = distanceAverage[partTarget] * dMax;
-const auto dMaxPart = dMax;
+// const auto dMaxPart = dMax;
+const auto dMaxPart = cv::Point2f{1.f, 1.f};
                 // Self
                 if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                     && metaData.jointsSelf.isVisible[rootIndex] <= 1)
