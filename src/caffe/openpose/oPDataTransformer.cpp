@@ -300,6 +300,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
+std::cout << entryDValue.x << " " << entryDValue.y << std::endl;
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // // Fill masks
