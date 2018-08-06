@@ -1030,7 +1030,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
     // Debugging - Visualize - Write on disk
     // if (poseModel == PoseModel::COCO_25E)
     {
-        // if (metaData.writeNumber < 3)
+        if (metaData.writeNumber < 3)
         // if (metaData.writeNumber < 5)
         // if (metaData.writeNumber < 10)
         // if (metaData.writeNumber < 100)
@@ -1051,7 +1051,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
                 // if (part == bkgChannel) // Background channel
-                // if (part >= bkgChannel) // Bkg channel + even distance
+                if (part >= bkgChannel || (part == bkgChannel && metaData.writeNumber < 100)) // Bkg channel + even distance
                 // if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
                 // const auto numberPafChannels = getNumberPafChannels(poseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
@@ -1088,7 +1088,6 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
             }
         }
     }
-std::exit(99);
 }
 
 template<typename Dtype>
@@ -1135,8 +1134,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, distanceAverageNew, distanceAverageNewCounter);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // Debugging - Visualize - Write on disk
-    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    // // Debugging - Visualize - Write on disk
+    // visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -1282,6 +1281,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // If no people on image (e.g., if pure background image)
     if (!metaData.filled)
     {
+        // Mask = 1, i.e., not masked-out (while keeping all labels to 0)
+        // Note: Distance labels masks kept to 0, they are not defined for non-keypoint locations
         std::fill(transformedLabel,
                   transformedLabel + getNumberBodyBkgAndPAF(mPoseModel) * channelOffset,
                   1.f);
