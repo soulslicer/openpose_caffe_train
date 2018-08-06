@@ -302,12 +302,12 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 {
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
-                    // Fill masks
-                    maskDistX[xyOffset] = Dtype(1);
-                    maskDistY[xyOffset] = Dtype(1);
-// // TEMP CODE
-// (void)maskDistX;
-// (void)maskDistY;
+                    // // Fill masks
+                    // maskDistX[xyOffset] = Dtype(1);
+                    // maskDistY[xyOffset] = Dtype(1);
+// TEMP CODE
+(void)maskDistX;
+(void)maskDistY;
                 }
                 else
                 {
