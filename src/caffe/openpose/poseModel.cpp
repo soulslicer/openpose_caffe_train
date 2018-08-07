@@ -306,8 +306,67 @@ namespace caffe {
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19_V2
         },
         std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25
+            // {},{5,6}, {},{},{}, {},{},{}, {}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}    // COCO_25
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{} // COCO_25_17
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_65_42
+            {},{}, {},{},{21}, {},{},{0}, {}, {},{},{}, {},{},{}, {},{},{},{}, {},{},{},{},{},{},                   // Body
+            {1},{2},{3},{4}, {5},{6},{7},{8}, {9},{10},{11},{12}, {13},{14},{15},{16}, {17},{18},{19},{20},         // Left hand
+            {22},{23},{24},{25}, {26},{27},{28},{29}, {30},{31},{32},{33}, {34},{35},{36},{37}, {38},{39},{40},{41} // Right hand
+        },
+        std::vector<std::vector<int>>{                                                                              // CAR_12
+            {0},{1},{2},{3},{4},{5},{6},{7},{9},{10},{11},{12}                                                      // 8 and 13 are always empty
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25E
+            // {},{5,6}, {},{},{}, {},{},{}, {}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22} // COCO_25E
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{} // COCO_25_17E
+        },
+    };
+
+    // Note: Same than LMDB_TO_OPENPOSE_KEYPOINTS unless some keypoint must be masked out
+    // E.g., for foot dataset to avoid overfitting on duplicated body keypoints
+    const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> CHANNELS_TO_MASK{
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}                   // COCO_18
+        },
+        std::vector<std::vector<int>>{
+            {0},{1}, {2},{3},{4},  {5},{6},{7},  {9},{10},{11}, {12},{13},{14},  {15},{16},{17},{18}                // DOME_18
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19
+        },
+        std::vector<std::vector<int>>{
+            {0},{1}, {2},{3},{4},  {5},{6},{7},  {8},  {9},{10},{11},  {12},{13},{14},  {15},{16},{17},{18}         // DOME_19
+        },
+        std::vector<std::vector<int>>{                                                                              // DOME_59
+            {0},{1}, {2},{3},{4},  {5},{6},{7},  {8},  {9},{10},{11},  {12},{13},{14},  {15},{16},{17},{18},        // Body
+            {19},{20},{21},{22}, {23},{24},{25},{26}, {27},{28},{29},{30}, {31},{32},{33},{34}, {35},{36},{37},{38},// Left hand
+            {39},{40},{41},{42}, {43},{44},{45},{46}, {47},{48},{49},{50}, {51},{52},{53},{54}, {55},{56},{57},{58} // Right hand
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_59_17
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3},         // Body
+            {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{},                                        // Left hand
+            {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{}, {},{},{},{}                                         // Right hand
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_59
+            {},{}, {2},{3},{4},  {5},{6},{7},  {},  {9},{10},{11},  {12},{13},{14},  {},{},{},{},                   // Body
+            {19},{20},{21},{22}, {23},{24},{25},{26}, {27},{28},{29},{30}, {31},{32},{33},{34}, {35},{36},{37},{38},// Left hand
+            {39},{40},{41},{42}, {43},{44},{45},{46}, {47},{48},{49},{50}, {51},{52},{53},{54}, {55},{56},{57},{58} // Right hand
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19_b
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19_V2
+        },
+        std::vector<std::vector<int>>{
             // {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25
-            // {},{}, {},{},{}, {},{},{}, {}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}       // COCO_25
             {},{5,6}, {},{},{}, {},{},{}, {}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}    // COCO_25
         },
         std::vector<std::vector<int>>{
@@ -497,6 +556,11 @@ namespace caffe {
         return LMDB_TO_OPENPOSE_KEYPOINTS.at((int)poseModel);
     }
 
+    const std::vector<std::vector<int>>& getMaskedChannels(const PoseModel poseModel)
+    {
+        return CHANNELS_TO_MASK.at((int)poseModel);
+    }
+
     const std::vector<std::array<int,2>>& getSwapLeftRightKeypoints(const PoseModel poseModel)
     {
         return SWAP_LEFT_RIGHT_KEYPOINTS.at(poseModelToIndex(poseModel));
@@ -569,7 +633,8 @@ namespace caffe {
     {
         // Missing body parts
         std::vector<int> missingBodyParts;
-        const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(poseModel);
+        // const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(poseModel);
+        const auto& lmdbToOpenPoseKeypoints = getMaskedChannels(poseModel);
         for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
             if (lmdbToOpenPoseKeypoints[i].empty())
                 missingBodyParts.emplace_back(i);

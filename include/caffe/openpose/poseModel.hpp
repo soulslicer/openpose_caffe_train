@@ -48,6 +48,8 @@ int getNumberBodyBkgAndPAF(const PoseModel poseModel);
 
 const std::vector<std::vector<int>>& getLmdbToOpenPoseKeypoints(const PoseModel poseModel);
 
+const std::vector<std::vector<int>>& getMaskedChannels(const PoseModel poseModel);
+
 const std::vector<std::array<int,2>>& getSwapLeftRightKeypoints(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexA(const PoseModel poseModel);
