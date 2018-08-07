@@ -396,7 +396,8 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
 }
 
 cv::Rect getObjROI(const int stride, const std::vector<cv::Point2f> points,
-                   const std::vector<float>& isVisible, const int gridX, const int gridY)
+                   const std::vector<float>& isVisible, const int gridX, const int gridY,
+                   const float sideRatioX = 0.3f, const float sideRatioY = 0.3f)
 {
     // Get valid bounding box
     auto minX = std::numeric_limits<float>::max();
@@ -436,10 +437,10 @@ cv::Rect getObjROI(const int stride, const std::vector<cv::Point2f> points,
         scaleY = scaleX / 2;
     // Get ROI
     cv::Rect roi{
-        int(std::round(objPosX - scaleX/2 - 0.3*scaleX)),
-        int(std::round(objPosY - scaleY/2 - 0.3*scaleY)),
-        int(std::round(scaleX*1.6)),
-        int(std::round(scaleY*1.6))
+        int(std::round(objPosX - scaleX/2 - sideRatioX*scaleX)),
+        int(std::round(objPosY - scaleY/2 - sideRatioY*scaleY)),
+        int(std::round(scaleX*(1+2*sideRatioX))),
+        int(std::round(scaleY*(1+2*sideRatioY)))
     };
     keepRoiInside(roi, cv::Size{gridX, gridY});
     // Return results
@@ -1290,7 +1291,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto& points = metaData.jointsSelf.points;
         const auto& isVisible = metaData.jointsSelf.isVisible;
         // Get valid ROI bounding box
-        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
+        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
         // Apply to each channel
         if (roi.area() > 0)
         {
@@ -1308,7 +1309,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             const auto& points = otherPerson.points;
             const auto& isVisible = otherPerson.isVisible;
             // Get valid ROI bounding box
-            const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
+            const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
             // Apply to each channel
             if (roi.area() > 0)
             {
