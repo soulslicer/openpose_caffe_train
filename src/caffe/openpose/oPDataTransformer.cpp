@@ -300,16 +300,11 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
-// if (entryDValue.x*entryDValue.x + entryDValue.y*entryDValue.y > 0.5)
-// std::cout << entryDValue.x << " " << entryDValue.y << std::endl;
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // Fill masks
                     maskDistX[xyOffset] = Dtype(1);
                     maskDistY[xyOffset] = Dtype(1);
-// // TEMP CODE
-// (void)maskDistX;
-// (void)maskDistY;
                 }
                 else
                 {
@@ -400,16 +395,14 @@ void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
     }
 }
 
-template <typename Dtype>
-void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f> points,
-                         const std::vector<float>& isVisible, const int stride,
-                         const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
+cv::Rect getObjROI(const int stride, const std::vector<cv::Point2f> points,
+                   const std::vector<float>& isVisible, const int gridX, const int gridY)
 {
     // Get valid bounding box
-    Dtype minX = std::numeric_limits<Dtype>::max();
-    Dtype maxX = std::numeric_limits<Dtype>::lowest();
-    Dtype minY = std::numeric_limits<Dtype>::max();
-    Dtype maxY = std::numeric_limits<Dtype>::lowest();
+    auto minX = std::numeric_limits<float>::max();
+    auto maxX = std::numeric_limits<float>::lowest();
+    auto minY = std::numeric_limits<float>::max();
+    auto maxY = std::numeric_limits<float>::lowest();
     for (auto i = 0 ; i < points.size() ; i++)
     {
         if (isVisible[i] <= 1)
@@ -430,6 +423,7 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     maxX /= stride;
     minY /= stride;
     maxY /= stride;
+    // Objet position and initial scale
     const auto objPosX = (maxX + minX) / 2;
     const auto objPosY = (maxY + minY) / 2;
     auto scaleX = maxX - minX;
@@ -440,8 +434,24 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
         scaleX = scaleY / 2;
     else if (scaleY < scaleX / 2)
         scaleY = scaleX / 2;
+    // Get ROI
+    cv::Rect roi{
+        int(std::round(objPosX - scaleX/2 - 0.3*scaleX)),
+        int(std::round(objPosY - scaleY/2 - 0.3*scaleY)),
+        int(std::round(scaleX*1.6)),
+        int(std::round(scaleY*1.6))
+    };
+    keepRoiInside(roi, cv::Size{gridX, gridY});
+    // Return results
+    return roi;
+}
+
+template <typename Dtype>
+void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f> points,
+                         const std::vector<float>& isVisible, const int stride,
+                         const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel)
+{
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
-    const auto type = getType(Dtype(0));
     std::vector<int> missingBodyPartsBase;
     // Get visible == 3 parts
     for (auto part = 0; part < isVisible.size(); part++)
@@ -452,16 +462,11 @@ void maskOutIfVisibleIs3(Dtype* transformedLabel, const std::vector<cv::Point2f>
     // If missing indexes --> Mask out whole person
     if (!missingIndexes.empty())
     {
-        // Get ROI
-        cv::Rect roi{
-            int(std::round(objPosX - scaleX/2 - 0.3*scaleX)),
-            int(std::round(objPosY - scaleY/2 - 0.3*scaleY)),
-            int(std::round(scaleX*1.6)),
-            int(std::round(scaleY*1.6))
-        };
-        keepRoiInside(roi, cv::Size{gridX, gridY});
+        // Get valid ROI bounding box
+        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
         // Apply ROI
         const auto channelOffset = gridX * gridY;
+        const auto type = getType(Dtype(0));
         if (roi.area() > 0)
         {
             // Apply ROI to all channels with missing indexes
@@ -1280,9 +1285,39 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 // TEMP CODE COMMENTED
     if (addDistance)
     {
-        std::fill(maskDistance,
-                  maskDistance + 2*(numberBodyParts-1) * channelOffset,
-                  0.f);
+        // Option a) Mask all people bounding boxes as 0
+        // Person itself
+        const auto& points = metaData.jointsSelf.points;
+        const auto& isVisible = metaData.jointsSelf.isVisible;
+        // Get valid ROI bounding box
+        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
+        // Apply to each channel
+        const auto type = getType(Dtype(0));
+        for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+        {
+            cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
+            maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+        }
+        // Person others
+        for (const auto& otherPerson : metaData.jointsOthers)
+        {
+            // Person others
+            const auto& points = otherPerson.points;
+            const auto& isVisible = otherPerson.isVisible;
+            // Get valid ROI bounding box
+            const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
+            // Apply to each channel
+            const auto type = getType(Dtype(0));
+            for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+            {
+                cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
+                maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+            }
+        }
+        // // Option b) Mask everything as 0
+        // std::fill(maskDistance,
+        //           maskDistance + 2*(numberBodyParts-1) * channelOffset,
+        //           0.f);
     }
 
     // If no people on image (e.g., if pure background image)
