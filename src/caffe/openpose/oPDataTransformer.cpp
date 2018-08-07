@@ -1144,8 +1144,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, distanceAverageNew, distanceAverageNewCounter);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    // Debugging - Visualize - Write on disk
+    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -1292,11 +1292,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Get valid ROI bounding box
         const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
         // Apply to each channel
-        const auto type = getType(Dtype(0));
-        for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+        if (roi.area() > 0)
         {
-            cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
-            maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+            const auto type = getType(Dtype(0));
+            for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+            {
+                cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
+                maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+            }
         }
         // Person others
         for (const auto& otherPerson : metaData.jointsOthers)
@@ -1307,11 +1310,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             // Get valid ROI bounding box
             const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
             // Apply to each channel
-            const auto type = getType(Dtype(0));
-            for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+            if (roi.area() > 0)
             {
-                cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
-                maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+                const auto type = getType(Dtype(0));
+                for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+                {
+                    cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
+                    maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+                }
             }
         }
         // // Option b) Mask everything as 0
