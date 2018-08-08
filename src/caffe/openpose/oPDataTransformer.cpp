@@ -906,6 +906,20 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
         // backgroundImage augmentation (no scale/rotation)
         const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
         cv::Mat backgroundImageTemp;
+        // Rotation: make it visible
+        if (backgroundImage.cols > finalImageWidth && backgroundImage.rows > finalImageHeight)
+        {
+            const auto xRatio = finalImageWidth / (float) backgroundImage.cols;
+            const auto yRatio = finalImageHeight / (float) backgroundImage.rows;
+            if (xRatio > yRatio)
+                cv::resize(backgroundImage, backgroundImage,
+                           cv::Size{finalImageWidth, (int)std::round(xRatio*backgroundImage.rows)},
+                           0., 0., CV_INTER_CUBIC);
+            else
+                cv::resize(backgroundImage, backgroundImage,
+                           cv::Size{(int)std::round(yRatio*backgroundImage.cols), finalImageHeight},
+                           0., 0., CV_INTER_CUBIC);
+        }
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
         applyFlip(backgroundImageAugmented, 0.5f, backgroundImageTemp);
         // cv::Mats based on Datum

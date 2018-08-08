@@ -349,7 +349,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         else if (desiredDbIs2)
             NextSecond();
         // If bkg DB included
-        else
+        if (backgroundDb)
             NextBackground();
         trans_time += timer.MicroSeconds();
         // OpenPose: added ended
