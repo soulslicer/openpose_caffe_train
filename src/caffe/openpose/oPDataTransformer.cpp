@@ -909,6 +909,11 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
         // Rotation: make it visible
         if (backgroundImage.cols > finalImageWidth && backgroundImage.rows > finalImageHeight)
         {
+std::cout
+<< finalImageWidth << " " << finalImageHeight << "\t"
+<< backgroundImage.cols << " " << backgroundImage.rows << "\t"
+<< xRatio << " " << yRatio << "\t"
+<< std::endl;
             const auto xRatio = finalImageWidth / (float) backgroundImage.cols;
             const auto yRatio = finalImageHeight / (float) backgroundImage.rows;
             if (xRatio > yRatio)
