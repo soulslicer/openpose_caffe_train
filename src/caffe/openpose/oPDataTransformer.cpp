@@ -909,11 +909,6 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
         // Rotation: make it visible
         if (backgroundImage.cols > finalImageWidth && backgroundImage.rows > finalImageHeight)
         {
-std::cout
-<< finalImageWidth << " " << finalImageHeight << "\t"
-<< backgroundImage.cols << " " << backgroundImage.rows << "\t"
-<< xRatio << " " << yRatio << "\t"
-<< std::endl;
             const auto xRatio = finalImageWidth / (float) backgroundImage.cols;
             const auto yRatio = finalImageHeight / (float) backgroundImage.rows;
             if (xRatio > yRatio)
@@ -924,6 +919,11 @@ std::cout
                 cv::resize(backgroundImage, backgroundImage,
                            cv::Size{(int)std::round(yRatio*backgroundImage.cols), finalImageHeight},
                            0., 0., CV_INTER_CUBIC);
+std::cout
+<< finalImageWidth << " " << finalImageHeight << "\t"
+<< backgroundImage.cols << " " << backgroundImage.rows << "\t"
+<< xRatio << " " << yRatio << "\t"
+<< std::endl;
         }
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
         applyFlip(backgroundImageAugmented, 0.5f, backgroundImageTemp);
