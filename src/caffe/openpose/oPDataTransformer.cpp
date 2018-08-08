@@ -784,18 +784,30 @@ cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidt
         // Data augmentation: cropping
         if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
         {
-            const auto xDiff = datumNegativeWidth - finalImageWidth;
-            const auto yDiff = datumNegativeHeight - finalImageHeight;
-            const auto minX = (xDiff <= 0 ? 0 :
-                (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
-            );
-            const auto minY = (xDiff <= 0 ? 0 :
-                (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
-            );
-            cv::Mat backgroundImageTemp;
-            std::swap(backgroundImage, backgroundImageTemp);
-            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
-            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+            // Option a) Rescale down
+            const auto xRatio = finalImageWidth / (float) backgroundImage.cols;
+            const auto yRatio = finalImageHeight / (float) backgroundImage.rows;
+            if (xRatio > yRatio)
+                cv::resize(backgroundImage, backgroundImage,
+                           cv::Size{finalImageWidth, (int)std::round(xRatio*backgroundImage.rows)},
+                           0., 0., CV_INTER_CUBIC);
+            else
+                cv::resize(backgroundImage, backgroundImage,
+                           cv::Size{(int)std::round(yRatio*backgroundImage.cols), finalImageHeight},
+                           0., 0., CV_INTER_CUBIC);
+            // // Option b) Random crop
+            // const auto xDiff = datumNegativeWidth - finalImageWidth;
+            // const auto yDiff = datumNegativeHeight - finalImageHeight;
+            // const auto minX = (xDiff <= 0 ? 0 :
+            //     (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+            // );
+            // const auto minY = (xDiff <= 0 ? 0 :
+            //     (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+            // );
+            // cv::Mat backgroundImageTemp;
+            // std::swap(backgroundImage, backgroundImageTemp);
+            // const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            // applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
         }
         // Resize (if smaller than final crop size)
         // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
@@ -907,29 +919,6 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
         const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
         cv::Mat backgroundImageTemp;
         // Rotation: make it visible
-        if (backgroundImage.cols > finalImageWidth && backgroundImage.rows > finalImageHeight)
-        {
-            const auto xRatio = finalImageWidth / (float) backgroundImage.cols;
-            const auto yRatio = finalImageHeight / (float) backgroundImage.rows;
-            if (xRatio > yRatio)
-                cv::resize(backgroundImage, backgroundImage,
-                           cv::Size{finalImageWidth, (int)std::round(xRatio*backgroundImage.rows)},
-                           0., 0., CV_INTER_CUBIC);
-            else
-                cv::resize(backgroundImage, backgroundImage,
-                           cv::Size{(int)std::round(yRatio*backgroundImage.cols), finalImageHeight},
-                           0., 0., CV_INTER_CUBIC);
-std::cout
-<< finalImageWidth << " " << finalImageHeight << "\t"
-<< backgroundImage.cols << " " << backgroundImage.rows << "\t"
-<< xRatio << " " << yRatio << "\t"
-<< std::endl;
-        }
-else
-std::cout
-<< finalImageWidth << " " << finalImageHeight << "\t"
-<< backgroundImage.cols << " " << backgroundImage.rows << "\t"
-<< std::endl;
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
         applyFlip(backgroundImageAugmented, 0.5f, backgroundImageTemp);
         // cv::Mats based on Datum
