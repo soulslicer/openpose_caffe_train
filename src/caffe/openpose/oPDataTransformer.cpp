@@ -263,10 +263,10 @@ void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int str
 
 template<typename Dtype>
 void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dtype* maskDistY,
-                     cv::Mat& count, const cv::Point2f& rootPoint, const cv::Point2f& pointTarget,
-                     const int stride, const int gridX, const int gridY, const float sigma,
-                     const cv::Point2f& dMax, long double& distanceAverageNew,
-                     unsigned long long& distanceAverageNewCounter)
+                     cv::Mat& count, Dtype& currentDistanceMaxX, Dtype& currentDistanceMaxY,
+                     const cv::Point2f& rootPoint, const cv::Point2f& pointTarget, const int stride,
+                     const int gridX, const int gridY, const float sigma, const cv::Point2f& dMax,
+                     long double& distanceAverageNew, unsigned long long& distanceAverageNewCounter)
 {
     // No distance
     // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
@@ -302,6 +302,11 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 {
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
+                    // Check if new max
+                    if (currentDistanceMaxX < std::abs(entryDistX[xyOffset]))
+                        currentDistanceMaxX = std::abs(entryDistX[xyOffset]);
+                    if (currentDistanceMaxY < std::abs(entryDistY[xyOffset]))
+                        currentDistanceMaxY = std::abs(entryDistY[xyOffset]);
                     // Fill masks
                     maskDistX[xyOffset] = Dtype(1);
                     maskDistY[xyOffset] = Dtype(1);
@@ -314,6 +319,24 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 counter++;
             }
         }
+    }
+}
+
+template<typename Dtype>
+void normalizeDistanceMaps(Dtype* maskDistX, Dtype* maskDistY, const Dtype currentDistanceMaxX,
+                           const Dtype currentDistanceMaxY, const int gridX, const int gridY)
+{
+    // Avoid dividing into 0
+    const auto type = getType(Dtype(0));
+    if (currentDistanceMaxX > 1e-3)
+    {
+        cv::Mat maskMissTemp(gridY, gridX, type, maskDistX);
+        maskMissTemp /= currentDistanceMaxX;
+    }
+    if (currentDistanceMaxY > 1e-3)
+    {
+        cv::Mat maskMissTemp(gridY, gridX, type, maskDistY);
+        maskMissTemp /= currentDistanceMaxY;
     }
 }
 
@@ -1283,7 +1306,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Neck-part distance
     // Mask distance labels to 0
     auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
-// TEMP CODE COMMENTED
     if (addDistance)
     {
         // Option a) Mask all people bounding boxes as 0
@@ -1426,6 +1448,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (rootIndex != partOrigin)
             {
                 cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+                auto currentDistanceMaxX = Dtype(0);
+                auto currentDistanceMaxY = Dtype(0);
                 const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
                 const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
                 // Self
@@ -1439,7 +1463,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                         channelDistance + (2*partTarget+1)*channelOffset,
                         maskDistance + 2*partTarget*channelOffset,
                         maskDistance + (2*partTarget+1)*channelOffset,
-                        count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(), dMaxPart,
+                        count, currentDistanceMaxX, currentDistanceMaxY, rootPoint, centerPoint, stride,
+                        gridX, gridY, param_.sigma(), dMaxPart,
                         distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                     );
                 }
@@ -1456,11 +1481,18 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                             channelDistance + (2*partTarget+1)*channelOffset,
                             maskDistance + 2*partTarget*channelOffset,
                             maskDistance + (2*partTarget+1)*channelOffset,
-                            count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(), dMaxPart,
+                            count, currentDistanceMaxX, currentDistanceMaxY, rootPoint, centerPoint,
+                            stride, gridX, gridY, param_.sigma(), dMaxPart,
                             distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                         );
                     }
                 }
+                // Normalize distance to max = 1
+                normalizeDistanceMaps(
+                    maskDistance + 2*partTarget*channelOffset,
+                    maskDistance + (2*partTarget+1)*channelOffset,
+                    currentDistanceMaxX, currentDistanceMaxY, gridX, gridY
+                );
             }
         }
     }
