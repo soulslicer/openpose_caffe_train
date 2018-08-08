@@ -925,6 +925,11 @@ std::cout
 << xRatio << " " << yRatio << "\t"
 << std::endl;
         }
+else
+std::cout
+<< finalImageWidth << " " << finalImageHeight << "\t"
+<< backgroundImage.cols << " " << backgroundImage.rows << "\t"
+<< std::endl;
         applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
         applyFlip(backgroundImageAugmented, 0.5f, backgroundImageTemp);
         // cv::Mats based on Datum
