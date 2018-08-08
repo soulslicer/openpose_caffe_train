@@ -10,6 +10,7 @@
 
 // OpenPose: added
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -1056,7 +1057,7 @@ void fillTransformedData(Dtype* transformedData, const cv::Mat& imageAugmented,
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 }
 
-int counterAuxiliary = 0;
+std::atomic<int> sCounterAuxiliary{0};
 template<typename Dtype>
 void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, const MetaData& metaData,
                const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
@@ -1065,10 +1066,10 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
     // Debugging - Visualize - Write on disk
     // if (poseModel == PoseModel::COCO_25E)
     {
-        // if (metaData.writeNumber < 3)
-        // if (metaData.writeNumber < 5)
-        // if (metaData.writeNumber < 10)
-        if (metaData.writeNumber < 100)
+        if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
+        // if (metaData.writeNumber < 5 && sCounterAuxiliary < 5)
+        // if (metaData.writeNumber < 10 && sCounterAuxiliary < 10)
+        // if (metaData.writeNumber < 100 && sCounterAuxiliary < 100)
         {
             // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
             // 2. Comment the following if statement
@@ -1080,13 +1081,13 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
             const auto numberBodyParts = getNumberBodyParts(poseModel); // #BP
             const auto numberTotalChannels = getNumberBodyBkgAndPAF(poseModel)
                                            + addDistance * 2 * (numberBodyParts-1);
-            const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
+            // const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
                 // if (part == bkgChannel) // Background channel
-                if (part == bkgChannel || (part >= bkgChannel && metaData.writeNumber < 3)) // Bkg channel + even distance
+                // if (part == bkgChannel || (part >= bkgChannel && metaData.writeNumber < 3)) // Bkg channel + even distance
                 // if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
                 // const auto numberPafChannels = getNumberPafChannels(poseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
@@ -1121,12 +1122,12 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                                 metaData.writeNumber, part);
                     else
                         sprintf(imagename, "visualize/%s_augment_%04d_negative_label_part_%02d.jpg", modelString.c_str(),
-                                counterAuxiliary, part);
+                                sCounterAuxiliary.load(), part);
                     cv::imwrite(imagename, finalImage);
                 }
             }
             if (!metaData.filled)
-                counterAuxiliary++;
+                sCounterAuxiliary++;
         }
     }
 }
