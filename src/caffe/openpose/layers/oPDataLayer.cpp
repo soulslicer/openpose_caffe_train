@@ -199,15 +199,13 @@ bool OPDataLayer<Dtype>::SkipSecond()
 template<typename Dtype>
 void OPDataLayer<Dtype>::NextBackground()
 {
-    if (backgroundDb)
+    assert(backgroundDb);
+    cursorBackground->Next();
+    if (!cursorBackground->valid())
     {
-        cursorBackground->Next();
-        if (!cursorBackground->valid())
-        {
-            LOG_IF(INFO, Caffe::root_solver())
-                    << "Restarting negatives data prefetching from start.";
-            cursorBackground->SeekToFirst();
-        }
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting negatives data prefetching from start.";
+        cursorBackground->SeekToFirst();
     }
     offsetBackground++;
 }
@@ -347,9 +345,12 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // DB 1
         if (desiredDbIs1)
             Next();
-        // DB 2
-        else
+        // If 2 DBs & 2nd one must go
+        else if (desiredDbIs2)
             NextSecond();
+        // If bkg DB included
+        else
+            NextBackground();
         trans_time += timer.MicroSeconds();
         // OpenPose: added ended
         // OpenPose: commented
