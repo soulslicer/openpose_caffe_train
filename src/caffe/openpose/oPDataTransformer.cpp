@@ -1056,6 +1056,7 @@ void fillTransformedData(Dtype* transformedData, const cv::Mat& imageAugmented,
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 }
 
+int counterAuxiliary = 0;
 template<typename Dtype>
 void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, const MetaData& metaData,
                const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
@@ -1115,11 +1116,17 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                     }
                     // Write on disk
                     char imagename [100];
-                    sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
-                            metaData.writeNumber, part);
+                    if (metaData.filled)
+                        sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
+                                metaData.writeNumber, part);
+                    else
+                        sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
+                                counterAuxiliary, part);
                     cv::imwrite(imagename, finalImage);
                 }
             }
+            if (!metaData.filled)
+                counterAuxiliary++;
         }
     }
 }
@@ -1168,8 +1175,8 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, distanceAverageNew, distanceAverageNewCounter);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    // Debugging - Visualize - Write on disk
+    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
