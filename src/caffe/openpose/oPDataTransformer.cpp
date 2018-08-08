@@ -1120,7 +1120,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                         sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
                                 metaData.writeNumber, part);
                     else
-                        sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
+                        sprintf(imagename, "visualize/%s_augment_%04d_negative_label_part_%02d.jpg", modelString.c_str(),
                                 counterAuxiliary, part);
                     cv::imwrite(imagename, finalImage);
                 }
