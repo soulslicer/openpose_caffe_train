@@ -795,19 +795,20 @@ cv::Mat readBackgroundImage(const Datum* datumNegative, const int finalImageWidt
                 cv::resize(backgroundImage, backgroundImage,
                            cv::Size{(int)std::round(yRatio*backgroundImage.cols), finalImageHeight},
                            0., 0., CV_INTER_CUBIC);
-            // // Option b) Random crop
-            // const auto xDiff = datumNegativeWidth - finalImageWidth;
-            // const auto yDiff = datumNegativeHeight - finalImageHeight;
-            // const auto minX = (xDiff <= 0 ? 0 :
-            //     (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
-            // );
-            // const auto minY = (xDiff <= 0 ? 0 :
-            //     (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
-            // );
-            // cv::Mat backgroundImageTemp;
-            // std::swap(backgroundImage, backgroundImageTemp);
-            // const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
-            // applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+            // Option b) Random crop
+            // If resize
+            const auto xDiff = backgroundImage.cols - finalImageWidth;
+            const auto yDiff = backgroundImage.rows - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+            );
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
         }
         // Resize (if smaller than final crop size)
         // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
