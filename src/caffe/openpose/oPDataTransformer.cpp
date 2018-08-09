@@ -301,8 +301,11 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
-                    entryDistX[xyOffset] = Dtype(entryDValue.x);
-                    entryDistY[xyOffset] = Dtype(entryDValue.y);
+// TEMP CODE TO FIND BUGS
+entryDistX[xyOffset] = 0;
+entryDistY[xyOffset] = 0;
+                    // entryDistX[xyOffset] = Dtype(entryDValue.x);
+                    // entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // Check if new max
                     if (currentDistanceMaxX < std::abs(entryDistX[xyOffset]))
                         currentDistanceMaxX = std::abs(entryDistX[xyOffset]);
