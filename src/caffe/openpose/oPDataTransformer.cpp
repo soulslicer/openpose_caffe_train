@@ -1491,19 +1491,24 @@ std::cout << __LINE__ << std::endl;
 std::cout << __LINE__ << std::endl;
             for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
             {
+std::cout << __LINE__ << std::endl;
                 if (rootIndex != partOrigin)
                 {
+std::cout << __LINE__ << std::endl;
                     cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
                     auto currentDistanceMaxX = Dtype(0);
                     auto currentDistanceMaxY = Dtype(0);
                     const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
                     const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
                     // Self
+std::cout << __LINE__ << std::endl;
                     if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                         && metaData.jointsSelf.isVisible[rootIndex] <= 1)
                     {
+std::cout << __LINE__ << std::endl;
                         const auto& centerPoint = metaData.jointsSelf.points[partOrigin];
                         const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
+std::cout << __LINE__ << std::endl;
                         putDistanceMaps(
                             channelDistance + 2*partTarget*channelOffset,
                             channelDistance + (2*partTarget+1)*channelOffset,
@@ -1513,15 +1518,18 @@ std::cout << __LINE__ << std::endl;
                             gridX, gridY, param_.sigma(), dMaxPart,
                             distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                         );
+std::cout << __LINE__ << std::endl;
                     }
                     // For every other person
                     for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
                     {
+std::cout << __LINE__ << std::endl;
                         if (metaData.jointsOthers[otherPerson].isVisible[partOrigin] <= 1
                             && metaData.jointsOthers[otherPerson].isVisible[rootIndex] <= 1)
                         {
                             const auto& centerPoint = metaData.jointsOthers[otherPerson].points[partOrigin];
                             const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
+std::cout << __LINE__ << std::endl;
                             putDistanceMaps(
                                 channelDistance + 2*partTarget*channelOffset,
                                 channelDistance + (2*partTarget+1)*channelOffset,
@@ -1531,14 +1539,18 @@ std::cout << __LINE__ << std::endl;
                                 stride, gridX, gridY, param_.sigma(), dMaxPart,
                                 distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                             );
+std::cout << __LINE__ << std::endl;
                         }
+std::cout << __LINE__ << std::endl;
                     }
                     // Normalize distance to max = 1
+std::cout << __LINE__ << std::endl;
                     normalizeDistanceMaps(
                         maskDistance + 2*partTarget*channelOffset,
                         maskDistance + (2*partTarget+1)*channelOffset,
                         currentDistanceMaxX, currentDistanceMaxY, gridX, gridY
                     );
+std::cout << __LINE__ << std::endl;
                 }
             }
         }
