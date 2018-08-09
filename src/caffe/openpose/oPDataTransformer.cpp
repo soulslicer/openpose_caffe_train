@@ -1303,7 +1303,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                                 std::vector<long double>& distanceAverageNew,
                                                 std::vector<unsigned long long>& distanceAverageNewCounter)
 {
-std::cout << __LINE__ << std::endl;
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
     const auto rezY = (int)imageSize.height;
@@ -1319,22 +1318,18 @@ std::cout << __LINE__ << std::endl;
     // // For old distance
     // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2);
 
-std::cout << __LINE__ << std::endl;
     // Labels to 0
     // 2x to consider mask and channel itself
     std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
 
     // Initialize labels to [0, 1] (depending on maskMiss)
-std::cout << __LINE__ << std::endl;
     fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
 
     // Neck-part distance
-std::cout << __LINE__ << std::endl;
     // Mask distance labels to 0
     auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
     if (addDistance)
     {
-std::cout << __LINE__ << std::endl;
         // Option a) Mask all people bounding boxes as 0
         // Person itself
         const auto& points = metaData.jointsSelf.points;
@@ -1342,7 +1337,6 @@ std::cout << __LINE__ << std::endl;
         // Get valid ROI bounding box
         const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
         // Apply to each channel
-std::cout << __LINE__ << std::endl;
         if (roi.area() > 0)
         {
             const auto type = getType(Dtype(0));
@@ -1353,7 +1347,6 @@ std::cout << __LINE__ << std::endl;
             }
         }
         // Person others
-std::cout << __LINE__ << std::endl;
         for (const auto& otherPerson : metaData.jointsOthers)
         {
             // Person others
@@ -1376,34 +1369,28 @@ std::cout << __LINE__ << std::endl;
         // std::fill(maskDistance,
         //           maskDistance + 2*(numberBodyParts-1) * channelOffset,
         //           0.f);
-std::cout << __LINE__ << std::endl;
     }
 
     // Background channel
     const auto backgroundMaskIndex = numberPafChannels+numberBodyParts;
     auto* transformedLabelBkgMask = &transformedLabel[backgroundMaskIndex*channelOffset];
 
-std::cout << __LINE__ << std::endl;
     // If no people on image (e.g., if pure background image)
     if (!metaData.filled)
     {
-std::cout << __LINE__ << std::endl;
         // Mask = 1, i.e., not masked-out (while keeping all labels to 0)
         // Note: Distance labels masks kept to 0, they are not defined for non-keypoint locations
         std::fill(transformedLabel,
                   transformedLabel + getNumberBodyBkgAndPAF(mPoseModel) * channelOffset,
                   1.f);
-std::cout << __LINE__ << std::endl;
     }
 
     // If image with people
     else
     {
-std::cout << __LINE__ << std::endl;
         // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
         if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
         {
-std::cout << __LINE__ << std::endl;
             // Remove BP/PAF non-labeled channels
             // MPII hands special cases (2/4)
             //     - If left or right hand not labeled --> mask out training of those channels
@@ -1417,29 +1404,24 @@ std::cout << __LINE__ << std::endl;
                           &transformedLabel[index*channelOffset + channelOffset], 0);
             const auto type = getType(Dtype(0));
             // MPII hands special cases (3/4)
-std::cout << __LINE__ << std::endl;
             if (mPoseModel == PoseModel::MPII_65_42)
             {
-std::cout << __LINE__ << std::endl;
                 // MPII hands without body --> Remove wrists masked out to avoid overfitting
                 const auto numberPafChannels = getNumberPafChannels(mPoseModel);
                 for (const auto& index : {4+numberPafChannels, 7+numberPafChannels})
                     std::fill(&transformedLabel[index*channelOffset],
                               &transformedLabel[index*channelOffset + channelOffset], 0);
             }
-std::cout << __LINE__ << std::endl;
             // Background
             const auto backgroundIndex = numberPafChannels + numberBodyParts;
             cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
             // If hands
-std::cout << __LINE__ << std::endl;
             if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
             {
                 maskHands(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
                 for (const auto& jointsOther : metaData.jointsOthers)
                     maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
             }
-std::cout << __LINE__ << std::endl;
             // If foot
             if (mPoseModel == PoseModel::COCO_25_17 || mPoseModel == PoseModel::COCO_25_17E)
             {
@@ -1450,7 +1432,6 @@ std::cout << __LINE__ << std::endl;
         }
 
         // Body parts
-std::cout << __LINE__ << std::endl;
         for (auto part = 0; part < numberBodyParts; part++)
         {
             // Self
@@ -1473,42 +1454,36 @@ std::cout << __LINE__ << std::endl;
                 }
             }
         }
-std::cout << __LINE__ << std::endl;
 
         // Neck-part distance
         if (addDistance)
         {
-std::cout << __LINE__ << std::endl;
             // Estimate average distance between keypoints
             if (distanceAverageNew.empty())
             {
                 distanceAverageNew.resize(numberBodyParts-1, 0.L);
                 distanceAverageNewCounter.resize(numberBodyParts-1, 0ull);
             }
+            if (distanceAverage.empty())
+                throw std::runtime_error{"DISTANCE_AVERAGE not filled in poseModel.cpp, error" + getLine(__LINE__, __FUNCTION__, __FILE__)};
             auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                                   * channelOffset;
             const auto rootIndex = getRootIndex(mPoseModel);
-std::cout << __LINE__ << std::endl;
             for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
             {
-std::cout << __LINE__ << std::endl;
                 if (rootIndex != partOrigin)
                 {
-std::cout << __LINE__ << std::endl;
                     cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
                     auto currentDistanceMaxX = Dtype(0);
                     auto currentDistanceMaxY = Dtype(0);
                     const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
                     const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
                     // Self
-std::cout << __LINE__ << std::endl;
                     if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                         && metaData.jointsSelf.isVisible[rootIndex] <= 1)
                     {
-std::cout << __LINE__ << std::endl;
                         const auto& centerPoint = metaData.jointsSelf.points[partOrigin];
                         const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
-std::cout << __LINE__ << std::endl;
                         putDistanceMaps(
                             channelDistance + 2*partTarget*channelOffset,
                             channelDistance + (2*partTarget+1)*channelOffset,
@@ -1518,18 +1493,15 @@ std::cout << __LINE__ << std::endl;
                             gridX, gridY, param_.sigma(), dMaxPart,
                             distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                         );
-std::cout << __LINE__ << std::endl;
                     }
                     // For every other person
                     for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
                     {
-std::cout << __LINE__ << std::endl;
                         if (metaData.jointsOthers[otherPerson].isVisible[partOrigin] <= 1
                             && metaData.jointsOthers[otherPerson].isVisible[rootIndex] <= 1)
                         {
                             const auto& centerPoint = metaData.jointsOthers[otherPerson].points[partOrigin];
                             const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
-std::cout << __LINE__ << std::endl;
                             putDistanceMaps(
                                 channelDistance + 2*partTarget*channelOffset,
                                 channelDistance + (2*partTarget+1)*channelOffset,
@@ -1539,29 +1511,23 @@ std::cout << __LINE__ << std::endl;
                                 stride, gridX, gridY, param_.sigma(), dMaxPart,
                                 distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
                             );
-std::cout << __LINE__ << std::endl;
                         }
-std::cout << __LINE__ << std::endl;
                     }
                     // Normalize distance to max = 1
-std::cout << __LINE__ << std::endl;
                     normalizeDistanceMaps(
                         maskDistance + 2*partTarget*channelOffset,
                         maskDistance + (2*partTarget+1)*channelOffset,
                         currentDistanceMaxX, currentDistanceMaxY, gridX, gridY
                     );
-std::cout << __LINE__ << std::endl;
                 }
             }
         }
     }
-std::cout << __LINE__ << std::endl;
 
     // Background channel
     // Naive implementation
     const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
     auto* transformedLabelBkg = &transformedLabel[backgroundIndex*channelOffset];
-std::cout << __LINE__ << std::endl;
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -1581,10 +1547,8 @@ std::cout << __LINE__ << std::endl;
         }
     }
 
-std::cout << __LINE__ << std::endl;
     if (metaData.filled)
     {
-std::cout << __LINE__ << std::endl;
         // PAFs
         const auto& labelMapA = getPafIndexA(mPoseModel);
         const auto& labelMapB = getPafIndexB(mPoseModel);
@@ -1647,7 +1611,6 @@ std::cout << __LINE__ << std::endl;
 
         // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
         // Self
-std::cout << __LINE__ << std::endl;
         const auto& joints = metaData.jointsSelf;
         maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible, stride,
                             gridX, gridY, backgroundMaskIndex, mPoseModel);
@@ -1661,11 +1624,9 @@ std::cout << __LINE__ << std::endl;
 
         // MPII hands special cases (4/4)
         // Make background channel as non-masked out region for visible labels (for cases with no all people labeled)
-std::cout << __LINE__ << std::endl;
         if (mPoseModel == PoseModel::MPII_65_42)
         {
             // MPII - If left or right hand not labeled --> mask out training of those channels
-std::cout << __LINE__ << std::endl;
             for (auto part = 0 ; part < 2 ; part++)
             {
                 const auto wristIndex = (part == 0 ? 7:4);

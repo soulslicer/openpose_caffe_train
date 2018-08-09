@@ -490,7 +490,9 @@ namespace caffe {
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
         std::vector<float>{}, // 18 (COCO_18, DOME_18)
-        std::vector<float>{}, // 19 (COCO_19, DOME_19)
+        std::vector<float>{3.99662, 2.83036, 6.70038, 7.98778, 2.83036, 6.6937, 7.98559, 9.03892, // 19 (COCO_19, DOME_19)
+                           9.25788, 13.5094, 18.4561, 9.25499, 13.5129, 18.452,
+                           4.45502, 4.45194, 4.06345, 4.0489},
         std::vector<float>{}, // 59 (DOME_59), COCO_59_17, MPII_59
         std::vector<float>{}, // COCO_19b
         std::vector<float>{}, // COCO_19_V2
