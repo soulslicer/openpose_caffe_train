@@ -1303,6 +1303,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                                 std::vector<long double>& distanceAverageNew,
                                                 std::vector<unsigned long long>& distanceAverageNewCounter)
 {
+std::cout << __LINE__ << std::endl;
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
     const auto rezY = (int)imageSize.height;
@@ -1318,18 +1319,22 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // // For old distance
     // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2);
 
+std::cout << __LINE__ << std::endl;
     // Labels to 0
     // 2x to consider mask and channel itself
     std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
 
     // Initialize labels to [0, 1] (depending on maskMiss)
+std::cout << __LINE__ << std::endl;
     fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
 
     // Neck-part distance
+std::cout << __LINE__ << std::endl;
     // Mask distance labels to 0
     auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
     if (addDistance)
     {
+std::cout << __LINE__ << std::endl;
         // Option a) Mask all people bounding boxes as 0
         // Person itself
         const auto& points = metaData.jointsSelf.points;
@@ -1337,6 +1342,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Get valid ROI bounding box
         const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
         // Apply to each channel
+std::cout << __LINE__ << std::endl;
         if (roi.area() > 0)
         {
             const auto type = getType(Dtype(0));
@@ -1347,6 +1353,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             }
         }
         // Person others
+std::cout << __LINE__ << std::endl;
         for (const auto& otherPerson : metaData.jointsOthers)
         {
             // Person others
@@ -1369,28 +1376,34 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // std::fill(maskDistance,
         //           maskDistance + 2*(numberBodyParts-1) * channelOffset,
         //           0.f);
+std::cout << __LINE__ << std::endl;
     }
 
     // Background channel
     const auto backgroundMaskIndex = numberPafChannels+numberBodyParts;
     auto* transformedLabelBkgMask = &transformedLabel[backgroundMaskIndex*channelOffset];
 
+std::cout << __LINE__ << std::endl;
     // If no people on image (e.g., if pure background image)
     if (!metaData.filled)
     {
+std::cout << __LINE__ << std::endl;
         // Mask = 1, i.e., not masked-out (while keeping all labels to 0)
         // Note: Distance labels masks kept to 0, they are not defined for non-keypoint locations
         std::fill(transformedLabel,
                   transformedLabel + getNumberBodyBkgAndPAF(mPoseModel) * channelOffset,
                   1.f);
+std::cout << __LINE__ << std::endl;
     }
 
     // If image with people
     else
     {
+std::cout << __LINE__ << std::endl;
         // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
         if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel) || mPoseModel == PoseModel::MPII_59)
         {
+std::cout << __LINE__ << std::endl;
             // Remove BP/PAF non-labeled channels
             // MPII hands special cases (2/4)
             //     - If left or right hand not labeled --> mask out training of those channels
@@ -1404,24 +1417,29 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                           &transformedLabel[index*channelOffset + channelOffset], 0);
             const auto type = getType(Dtype(0));
             // MPII hands special cases (3/4)
+std::cout << __LINE__ << std::endl;
             if (mPoseModel == PoseModel::MPII_65_42)
             {
+std::cout << __LINE__ << std::endl;
                 // MPII hands without body --> Remove wrists masked out to avoid overfitting
                 const auto numberPafChannels = getNumberPafChannels(mPoseModel);
                 for (const auto& index : {4+numberPafChannels, 7+numberPafChannels})
                     std::fill(&transformedLabel[index*channelOffset],
                               &transformedLabel[index*channelOffset + channelOffset], 0);
             }
+std::cout << __LINE__ << std::endl;
             // Background
             const auto backgroundIndex = numberPafChannels + numberBodyParts;
             cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
             // If hands
+std::cout << __LINE__ << std::endl;
             if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
             {
                 maskHands(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
                 for (const auto& jointsOther : metaData.jointsOthers)
                     maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
             }
+std::cout << __LINE__ << std::endl;
             // If foot
             if (mPoseModel == PoseModel::COCO_25_17 || mPoseModel == PoseModel::COCO_25_17E)
             {
@@ -1432,6 +1450,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         }
 
         // Body parts
+std::cout << __LINE__ << std::endl;
         for (auto part = 0; part < numberBodyParts; part++)
         {
             // Self
@@ -1454,10 +1473,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
             }
         }
+std::cout << __LINE__ << std::endl;
 
         // Neck-part distance
         if (addDistance)
         {
+std::cout << __LINE__ << std::endl;
             // Estimate average distance between keypoints
             if (distanceAverageNew.empty())
             {
@@ -1467,6 +1488,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                                   * channelOffset;
             const auto rootIndex = getRootIndex(mPoseModel);
+std::cout << __LINE__ << std::endl;
             for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
             {
                 if (rootIndex != partOrigin)
@@ -1521,11 +1543,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             }
         }
     }
+std::cout << __LINE__ << std::endl;
 
     // Background channel
     // Naive implementation
     const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
     auto* transformedLabelBkg = &transformedLabel[backgroundIndex*channelOffset];
+std::cout << __LINE__ << std::endl;
     for (auto gY = 0; gY < gridY; gY++)
     {
         const auto yOffset = gY*gridX;
@@ -1545,8 +1569,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         }
     }
 
+std::cout << __LINE__ << std::endl;
     if (metaData.filled)
     {
+std::cout << __LINE__ << std::endl;
         // PAFs
         const auto& labelMapA = getPafIndexA(mPoseModel);
         const auto& labelMapB = getPafIndexB(mPoseModel);
@@ -1609,6 +1635,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
         // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
         // Self
+std::cout << __LINE__ << std::endl;
         const auto& joints = metaData.jointsSelf;
         maskOutIfVisibleIs3(transformedLabel, joints.points, joints.isVisible, stride,
                             gridX, gridY, backgroundMaskIndex, mPoseModel);
@@ -1622,9 +1649,11 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
         // MPII hands special cases (4/4)
         // Make background channel as non-masked out region for visible labels (for cases with no all people labeled)
+std::cout << __LINE__ << std::endl;
         if (mPoseModel == PoseModel::MPII_65_42)
         {
             // MPII - If left or right hand not labeled --> mask out training of those channels
+std::cout << __LINE__ << std::endl;
             for (auto part = 0 ; part < 2 ; part++)
             {
                 const auto wristIndex = (part == 0 ? 7:4);
