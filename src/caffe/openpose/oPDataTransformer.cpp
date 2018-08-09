@@ -1465,7 +1465,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 distanceAverageNewCounter.resize(numberBodyParts-1, 0ull);
             }
             if (distanceAverage.empty())
-                throw std::runtime_error{"DISTANCE_AVERAGE not filled in poseModel.cpp, error" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+                throw std::runtime_error{"DISTANCE_AVERAGE not filled in poseModel.cpp, error"
+                                         + getLine(__LINE__, __FUNCTION__, __FILE__)};
             auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                                   * channelOffset;
             const auto rootIndex = getRootIndex(mPoseModel);
