@@ -312,9 +312,9 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     if (currentDistanceMaxY < std::abs(entryDistY[xyOffset]))
                         currentDistanceMaxY = std::abs(entryDistY[xyOffset]);
 // // TEMP CODE TO FIND BUGS
-                    // // Fill masks
-                    // maskDistX[xyOffset] = Dtype(1);
-                    // maskDistY[xyOffset] = Dtype(1);
+                    // Fill masks
+                    maskDistX[xyOffset] = Dtype(1);
+                    maskDistY[xyOffset] = Dtype(1);
                 }
                 else
                 {
@@ -322,16 +322,10 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
                 }
                 // Fill masks
-                if (entryDistX[xyOffset] > 1e-6 && entryDistY[xyOffset] > 1e-6)
-                {
+                if (entryDistX[xyOffset] > 1)
                     maskDistX[xyOffset] = Dtype(1)/entryDistX[xyOffset];
+                if (entryDistY[xyOffset] > 1)
                     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
-                }
-                else
-                {
-                    maskDistX[xyOffset] = Dtype(0);
-                    maskDistY[xyOffset] = Dtype(0);
-                }
                 counter++;
             }
         }
