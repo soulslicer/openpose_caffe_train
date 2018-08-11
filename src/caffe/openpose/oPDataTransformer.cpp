@@ -262,6 +262,7 @@ void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int str
     }
 }
 
+#define sgn(x) x==0 ? 0 : x/abs(x)
 template<typename Dtype>
 void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dtype* maskDistY,
                      cv::Mat& count, Dtype& currentDistanceMaxX, Dtype& currentDistanceMaxY,
@@ -324,10 +325,15 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 // if (entryDistY[xyOffset] > 1)
 //     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
                 // Fill masks
-                const auto limit = 10;
-                maskDistX[xyOffset] = std::min(Dtype(limit), Dtype(1)/entryDistX[xyOffset]);
-                maskDistY[xyOffset] = std::min(Dtype(limit), Dtype(1)/entryDistY[xyOffset]);
-                counter++;
+                const auto limit = Dtype(1);
+                const auto absEntryDistX = std::abs(entryDistX[xyOffset]);
+                const auto oneOverAbsEntryDistX = 1/absEntryDistX;
+                if (oneOverAbsEntryDistX < limit)
+                    maskDistX[xyOffset] = 1/entryDistX[xyOffset];
+                const auto absEntryDistY = std::abs(entryDistY[xyOffset]);
+                const auto oneOverAbsEntryDistY = 1/absEntryDistY;
+                if (oneOverAbsEntryDistY < limit)
+                    maskDistY[xyOffset] = 1/entryDistY[xyOffset];
             }
         }
     }
