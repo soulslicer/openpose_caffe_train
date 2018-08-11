@@ -298,7 +298,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 // Fill distance elements
                 const auto xyOffset = yOffset + gX;
                 const cv::Point2f directionAB = pointTargetScaledDown - cv::Point2f{(float)gX, (float)gY};
-                const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
+                const cv::Point2f entryDValue{directionAB.x, directionAB.y};
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
