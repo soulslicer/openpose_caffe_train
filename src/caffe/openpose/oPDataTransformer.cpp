@@ -326,19 +326,19 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 //     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
                 // Fill masks
                 const auto limit = Dtype(20);
-                const auto maskIncrase = Dtype(10);
+                const auto maskBase = Dtype(10);
                 const auto absEntryDistX = std::abs(entryDistX[xyOffset]);
-                const auto oneOverAbsEntryDistX = 1/absEntryDistX;
+                const auto oneOverAbsEntryDistX = maskBase/absEntryDistX;
                 if (oneOverAbsEntryDistX < limit)
-                    maskDistX[xyOffset] = maskIncrase/entryDistX[xyOffset];
+                    maskDistX[xyOffset] = maskBase/entryDistX[xyOffset];
                 else
-                    maskDistY[xyOffset] = maskIncrase;
+                    maskDistY[xyOffset] = maskBase;
                 const auto absEntryDistY = std::abs(entryDistY[xyOffset]);
-                const auto oneOverAbsEntryDistY = 1/absEntryDistY;
+                const auto oneOverAbsEntryDistY = maskBase/absEntryDistY;
                 if (oneOverAbsEntryDistY < limit)
-                    maskDistY[xyOffset] = maskIncrase/entryDistY[xyOffset];
+                    maskDistY[xyOffset] = maskBase/entryDistY[xyOffset];
                 else
-                    maskDistY[xyOffset] = maskIncrase;
+                    maskDistY[xyOffset] = maskBase;
             }
         }
     }
