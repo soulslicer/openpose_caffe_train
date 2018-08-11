@@ -298,7 +298,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 // Fill distance elements
                 const auto xyOffset = yOffset + gX;
                 const cv::Point2f directionAB = pointTargetScaledDown - cv::Point2f{(float)gX, (float)gY};
-                const cv::Point2f entryDValue{directionAB.x, directionAB.y};
+                const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
@@ -325,15 +325,20 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 // if (entryDistY[xyOffset] > 1)
 //     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
                 // Fill masks
-                const auto limit = Dtype(100);
+                const auto limit = Dtype(20);
+                const auto maskIncrase = Dtype(2);
                 const auto absEntryDistX = std::abs(entryDistX[xyOffset]);
                 const auto oneOverAbsEntryDistX = 1/absEntryDistX;
                 if (oneOverAbsEntryDistX < limit)
-                    maskDistX[xyOffset] = 1/entryDistX[xyOffset];
+                    maskDistX[xyOffset] = maskIncrase/entryDistX[xyOffset];
+                else
+                    maskDistY[xyOffset] = maskIncrase;
                 const auto absEntryDistY = std::abs(entryDistY[xyOffset]);
                 const auto oneOverAbsEntryDistY = 1/absEntryDistY;
                 if (oneOverAbsEntryDistY < limit)
-                    maskDistY[xyOffset] = 1/entryDistY[xyOffset];
+                    maskDistY[xyOffset] = maskIncrase/entryDistY[xyOffset];
+                else
+                    maskDistY[xyOffset] = maskIncrase;
             }
         }
     }
