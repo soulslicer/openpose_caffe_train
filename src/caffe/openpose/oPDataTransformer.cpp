@@ -301,9 +301,6 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
-// // TEMP CODE TO FIND BUGS
-// entryDistX[xyOffset] = 0;
-// entryDistY[xyOffset] = 0;
                     // entryDistX[xyOffset] = Dtype(entryDValue.x);
                     // entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // Check if new max
@@ -311,21 +308,25 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                         currentDistanceMaxX = std::abs(entryDistX[xyOffset]);
                     if (currentDistanceMaxY < std::abs(entryDistY[xyOffset]))
                         currentDistanceMaxY = std::abs(entryDistY[xyOffset]);
-// // TEMP CODE TO FIND BUGS
-                    // Fill masks
-                    maskDistX[xyOffset] = Dtype(1);
-                    maskDistY[xyOffset] = Dtype(1);
+// // Fill masks (proving for 70k not to explode)
+// // Fill masks
+// maskDistX[xyOffset] = Dtype(1);
+// maskDistY[xyOffset] = Dtype(1);
                 }
                 else
                 {
                     entryDistX[xyOffset] = (entryDistX[xyOffset]*counter + Dtype(entryDValue.x)) / (counter + 1);
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
                 }
+// // Fill masks (proving for 70k not to explode)
+// if (entryDistX[xyOffset] > 1)
+//     maskDistX[xyOffset] = Dtype(1)/entryDistX[xyOffset];
+// if (entryDistY[xyOffset] > 1)
+//     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
                 // Fill masks
-                if (entryDistX[xyOffset] > 1)
-                    maskDistX[xyOffset] = Dtype(1)/entryDistX[xyOffset];
-                if (entryDistY[xyOffset] > 1)
-                    maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
+                const auto limit = 10;
+                maskDistX[xyOffset] = std::min(Dtype(limit), Dtype(1)/entryDistX[xyOffset]);
+                maskDistY[xyOffset] = std::min(Dtype(limit), Dtype(1)/entryDistY[xyOffset]);
                 counter++;
             }
         }
