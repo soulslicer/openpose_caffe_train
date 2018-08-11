@@ -326,7 +326,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 //     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
                 // Fill masks
                 const auto limit = Dtype(20);
-                const auto maskIncrase = Dtype(2);
+                const auto maskIncrase = Dtype(10);
                 const auto absEntryDistX = std::abs(entryDistX[xyOffset]);
                 const auto oneOverAbsEntryDistX = 1/absEntryDistX;
                 if (oneOverAbsEntryDistX < limit)
