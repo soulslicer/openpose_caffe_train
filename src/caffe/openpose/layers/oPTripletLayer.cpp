@@ -653,7 +653,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             if(!same_vid) neg_vid = getRand(0, videos.size()-1);
 
             // HACK FOR NOW
-            //pos_vid = 1;
+            //pos_vid = 12;
             //neg_vid = 1;
 
             int anch_frame, pos_frame, neg_frame;
@@ -698,16 +698,35 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 // Iterate through each person
                 bool pick_failed = false;
 
+                int within_frame_counter = 0;
                 for(int j=0; j<num_people_image; j++){
+                    within_frame_counter++;
 
                     // Try to select a non-selected person always (if available)
                     // Pick a person ID from the anchor frame
                     std::pair<int, cv::Rect> person_data_anchor;
-                    while(1){
-                        person_data_anchor = *select_randomly(videos[pos_vid].frames[anch_frame].persons.begin(), videos[pos_vid].frames[anch_frame].persons.end());
-                        if(anch_people_chosen_ids.size() == videos[pos_vid].frames[anch_frame].persons.size()) break;
-                        if(vec_contains(anch_people_chosen_ids, person_data_anchor.first)) continue;
-                        else break;
+                    // If we have not tried to choose different ID enough
+                    if(within_frame_counter < 200){
+                        while(1){
+                            person_data_anchor = *select_randomly(videos[pos_vid].frames[anch_frame].persons.begin(), videos[pos_vid].frames[anch_frame].persons.end());
+                            if(anch_people_chosen_ids.size() == videos[pos_vid].frames[anch_frame].persons.size()) break;
+                            if(vec_contains(anch_people_chosen_ids, person_data_anchor.first)) continue;
+                            else break;
+                        }
+                    }
+                    // If we have tried enough
+                    else{
+                        // We couldnt choose anyone
+                        // Make sure at least 2 people in image
+                        if(anch_people_chosen_ids.size() <= 1){
+                            ext_counter += 100;
+                            pick_failed = true;
+                            break;
+                        }
+                        // We randomly select a succesful one again
+                        int possible_id = *select_randomly(anch_people_chosen_ids.begin(), anch_people_chosen_ids.end());
+                        person_data_anchor.first = possible_id;
+                        person_data_anchor.second = videos[pos_vid].frames[anch_frame].persons[possible_id];
                     }
                     int person_data_anchor_id = person_data_anchor.first;
                     cv::Rect person_data_anchor_bbox = person_data_anchor.second;
@@ -718,19 +737,19 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                     bool intersectBad = false;
                     for (auto& kv : videos[pos_vid].frames[anch_frame].persons) {
                         if(kv.first == person_data_anchor_id) continue;
-                        if(intersectionPercentage(person_data_anchor_bbox, kv.second, true) > 0.3) intersectBad = true;
+                        if(intersectionPercentage(person_data_anchor_bbox, kv.second, true) > 0.35) intersectBad = true;
                     }
                     if(intersectBad){
-                        pick_failed = true;
                         if(intersect_log) std::cout << "VID: " << pos_vid << " Frame: " << anch_frame << " PID: " << person_data_anchor_id << " First Intersection Problem" << std::endl;
-                        break;
+                        //pick_failed = true; break;
+                        j-=1; continue;
                     }
 
                     // Check if the person is available in the pos frame
                     if(!videos[pos_vid].frames[pos_frame].persons.count(person_data_anchor_id)){
-                        pick_failed = true;
                         if(intersect_log) std::cout << "VID: " << pos_vid << " Frame: " << pos_frame << " PID: " << person_data_anchor_id << " Unable to find in other frame" << std::endl;
-                        break;
+                        //pick_failed = true; break;
+                        j-=1; continue;
                     }
                     cv::Rect person_data_pos_bbox = videos[pos_vid].frames[pos_frame].persons[person_data_anchor_id];
 
@@ -738,15 +757,27 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                     intersectBad = false;
                     for (auto& kv : videos[pos_vid].frames[pos_frame].persons) {
                         if(kv.first == person_data_anchor_id) continue;
-                        if(intersectionPercentage(person_data_pos_bbox, kv.second, true) > 0.3) intersectBad = true;
+                        if(intersectionPercentage(person_data_pos_bbox, kv.second, true) > 0.35) intersectBad = true;
                     }
                     if(intersectBad){
-                        pick_failed = true;
                         if(intersect_log) std::cout << "VID: " << pos_vid << " Frame: " << pos_frame << " PID: " << person_data_anchor_id << " Second Intersection Problem" << std::endl;
-                        break;
+                        //pick_failed = true; break;
+                        j-=1; continue;
                     }
 
-                    // Add some noise to the bounding box
+                    // Add some noise to the bounding boxes. contact or increase based on size
+                    int anchor_increase_xmax = person_data_anchor_bbox.width/20;
+                    int anchor_increase_ymax = person_data_anchor_bbox.height/20;
+                    int pos_increase_xmax = person_data_pos_bbox.width/20;
+                    int pos_increase_ymax = person_data_pos_bbox.height/20;
+                    person_data_anchor_bbox.x += getRand(0, anchor_increase_xmax);
+                    person_data_anchor_bbox.y += getRand(0, anchor_increase_ymax);
+                    person_data_anchor_bbox.width -= getRand(0, anchor_increase_xmax);
+                    person_data_anchor_bbox.height -= getRand(0, anchor_increase_ymax);
+                    person_data_pos_bbox.x += getRand(0, pos_increase_xmax);
+                    person_data_pos_bbox.y += getRand(0, pos_increase_ymax);
+                    person_data_pos_bbox.width -= getRand(0, pos_increase_xmax);
+                    person_data_pos_bbox.height -= getRand(0, pos_increase_ymax);
 
                     // Try select negative that is not in list if its the same neg vid
                     std::pair<int, cv::Rect> person_data_neg;
@@ -794,7 +825,10 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 }
 
                 // Failed to find anything in this frame
-                if(pick_failed) continue;
+                if(pick_failed){
+                    if(intersect_log) std::cout << "REPICK**" << std::endl;
+                    continue;
+                }
 
                 // Break
                 if(anch_people_chosen_ids.size() == num_people_image) {
@@ -867,7 +901,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 cv::imshow("anchor", vizImages[0]);
                 cv::imshow("pos", vizImages[1]);
                 cv::imshow("neg", vizImages[2]);
-                cv::waitKey(4000);
+                cv::waitKey(2000);
             }
 
 
