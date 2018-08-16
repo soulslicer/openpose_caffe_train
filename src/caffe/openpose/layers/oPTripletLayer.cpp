@@ -633,7 +633,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             global_counter += 1;
             internal_counter = global_counter;
             mutex.unlock();
-            std::cout << "Internal: "  << internal_counter << std::endl;
+            //std::cout << "Internal: "  << internal_counter << std::endl;
 
             // OR IF WE RANDOMIZE MAKE SURE DONT SELECT SAME VID?
             bool intersect_log = false;
