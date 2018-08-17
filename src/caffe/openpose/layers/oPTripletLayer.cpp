@@ -661,6 +661,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             std::vector<int> pos_people_chosen_ids; std::vector<cv::Rect> pos_people_chosen_rects;
             std::vector<int> neg_people_chosen_ids; std::vector<cv::Rect> neg_people_chosen_rects;
             int ext_counter = 0;
+            int skip_add = 0;
             while(1){
                 ext_counter++;
                 if(ext_counter > 800){
@@ -672,7 +673,7 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                     neg_vid = pos_vid;
                     if(!same_vid) neg_vid = getRand(0, videos.size()-1);
                     ext_counter = 0;
-                    total_skips += 1;
+                    skip_add = 1;
                     //std::cout << "Skipping Vid " << prev_pos_vid << std::endl;
                 }
 
@@ -839,6 +840,9 @@ void OPTripletLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                     break;
                 }
             }
+
+            // Skip add
+            total_skips += skip_add;
 
             // OP Convert
             std::vector<cv::Mat> vizImages;
