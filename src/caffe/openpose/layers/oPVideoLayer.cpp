@@ -34,6 +34,7 @@ OPVideoLayer<Dtype>::OPVideoLayer(const LayerParameter& param) :
     // OpenPose: added
     mOnes = 0;
     mTwos = 0;
+    mThrees = 0;
     // Set up secondary DB
     if (!param.op_transform_param().source_secondary().empty())
     {
@@ -49,6 +50,22 @@ OPVideoLayer<Dtype>::OPVideoLayer(const LayerParameter& param) :
     {
         secondDb = false;
         secondProbability = 0.f;
+    }
+    // Set up tertiary DB
+    if (!param.op_transform_param().source_tertiary().empty())
+    {
+        thirdDb = true;
+        thirdProbability = param.op_transform_param().prob_tertiary();
+        CHECK_GE(thirdProbability, 0.f);
+        CHECK_LE(thirdProbability, 1.f);
+        dbThird.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
+        dbThird->Open(param.op_transform_param().source_tertiary(), db::READ);
+        cursorThird.reset(dbThird->NewCursor());
+    }
+    else
+    {
+        thirdDb = false;
+        thirdProbability = 0.f;
     }
     // Set up negatives DB
     if (!param.op_transform_param().source_background().empty())
@@ -99,6 +116,8 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
     if (secondDb)
         mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
+    if (thirdDb)
+        mOPDataTransformerTertiary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_tertiary(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
 
     // Multi Image shape (Data layer is ([frame*batch * 3 * 368 * 38])) - Set Data size
     const int width = this->phase_ != TRAIN ? datum.width() : this->layer_param_.op_transform_param().crop_size_x();
@@ -169,6 +188,19 @@ bool OPVideoLayer<Dtype>::SkipSecond()
     return !keep;
 }
 
+// OpenPose: added
+template <typename Dtype>
+bool OPVideoLayer<Dtype>::SkipThird()
+{
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetThird % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+
+
 template<typename Dtype>
 void OPVideoLayer<Dtype>::NextBackground()
 {
@@ -196,7 +228,43 @@ void OPVideoLayer<Dtype>::NextSecond()
     }
     offsetSecond++;
 }
+
+template<typename Dtype>
+void OPVideoLayer<Dtype>::NextThird()
+{
+    cursorThird->Next();
+    if (!cursorThird->valid())
+    {
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting third data prefetching from start.";
+        cursorThird->SeekToFirst();
+    }
+    offsetThird++;
+}
 // OpenPose: added ended
+
+template<typename Dtype>
+void OPVideoLayer<Dtype>::sample_dbs(bool &desiredDbIs1, bool &desiredDbIs2, bool &desiredDbIs3){
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    desiredDbIs1 = true, desiredDbIs2 = false, desiredDbIs3 = false;
+    if(!thirdDb){
+        float firstProbability = (1-(secondProbability));
+        if(dice <= firstProbability){
+            desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
+        }else{
+            desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
+        }
+    }else{
+        float firstProbability = (1-(secondProbability+thirdProbability));
+        if(dice <= firstProbability){
+            desiredDbIs1 = true; desiredDbIs2 = false; desiredDbIs3 = false;
+        }else if(dice <= (firstProbability + secondProbability)){
+            desiredDbIs1 = false; desiredDbIs2 = true; desiredDbIs3 = false;
+        }else if(dice <= (firstProbability + secondProbability + thirdProbability)){
+            desiredDbIs1 = false; desiredDbIs2 = false; desiredDbIs3 = true;
+        }
+    }
+}
 
 // This function is called on prefetch thread
 template<typename Dtype>
@@ -216,12 +284,17 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     for(int i=0; i<Batch<float>::extra_labels_count; i++)
         batch->extra_labels_[i].mutable_cpu_data();
 
+    // OpenPose: added
+    bool desiredDbIs1 = true, desiredDbIs2 = false, desiredDbIs3 = false;
+    sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
+
     // Sample lmdb for video?
     Datum datum;
     Datum datumBackground;
     for (int item_id = 0; item_id < batch_size; ++item_id) {
-        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-        const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
+        //const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+        //const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
+        //sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
 
         // Read from desired DB - DB1, DB2 or BG
         timer.Start();
@@ -233,13 +306,23 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 Next();
             datum.ParseFromString(cursor_->value());
         }
-        else
+        // 2nd DB
+        else if (desiredDbIs2)
         {
             oPDataTransformerPtr = this->mOPDataTransformerSecondary;
             mTwos++;
             while (SkipSecond())
                 NextSecond();
             datum.ParseFromString(cursorSecond->value());
+        }
+        // 3rd DB
+        else if (desiredDbIs3)
+        {
+            oPDataTransformerPtr = this->mOPDataTransformerTertiary;
+            mThrees++;
+            while (SkipThird())
+                NextThird();
+            datum.ParseFromString(cursorThird->value());
         }
         if (backgroundDb)
         {
@@ -271,16 +354,13 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
                 oPDataTransformerPtr->TransformVideoJSON(item_id, frame_size, vs, &(this->transformed_data_),
                                                 &(this->transformed_label_),
                                                 datum, &datumBackground);
-            else
+            else if (desiredDbIs2 || desiredDbIs3)
                 oPDataTransformerPtr->TransformVideoSF(item_id, frame_size, vs, &(this->transformed_data_),
                                                 &(this->transformed_label_),
                                                 datum, &datumBackground);
 
         }else{
-            exit(-1);
-            oPDataTransformerPtr->TransformVideoJSON(item_id, frame_size, vs, &(this->transformed_data_),
-                                            &(this->transformed_label_),
-                                            datum);
+            throw std::runtime_error("Not implemented");
         }
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
@@ -288,16 +368,18 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Advance to next data
         if (desiredDbIs1)
             Next();
-        else
+        else if (desiredDbIs2)
             NextSecond();
+        else if (desiredDbIs3)
+            NextThird();
         trans_time += timer.MicroSeconds();
     }
 
     // Testing Optional
-//    if(vCounter == 2){
-//    auto oPDataTransformerPtr = this->mOPDataTransformer;
-//    oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
-//    }
+    //if(vCounter == 2){
+    //auto oPDataTransformerPtr = this->mOPDataTransformer;
+    //oPDataTransformerPtr->Test(frame_size, &(this->transformed_data_), &(this->transformed_label_));
+    //}
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
     //std::cout << "Loaded Data" << std::endl;
 
