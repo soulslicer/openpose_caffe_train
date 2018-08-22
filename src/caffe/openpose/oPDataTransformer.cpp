@@ -1360,10 +1360,10 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
         // Create Label for frame
         Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
         if(mStaf){
-            if(mStaf == 1) generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
-            else if(mStaf == 2) generateLabelMapStafWithPaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+            if(mStaf == 1) generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+            else if(mStaf == 2) generateLabelMapStafWithPaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
         }else{
-            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
         }
 //        if(i == 3 &&  metaData.writeNumber == 1){
 //        vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
