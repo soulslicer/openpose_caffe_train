@@ -286,7 +286,7 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     // OpenPose: added
     bool desiredDbIs1 = true, desiredDbIs2 = false, desiredDbIs3 = false;
-    sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
+    //sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
 
     // Sample lmdb for video?
     Datum datum;
@@ -294,7 +294,7 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         //const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
         //const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
-        //sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
+        sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
 
         // Read from desired DB - DB1, DB2 or BG
         timer.Start();
