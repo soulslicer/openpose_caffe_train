@@ -321,21 +321,26 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 // if (entryDistY[xyOffset] > 1)
 //     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
                 // Fill masks
-                const auto limit = Dtype(20);
+                // const auto limit = Dtype(20);
+const auto limit = Dtype(10);
                 // const auto maskBase = Dtype(10);
 const auto maskBase = Dtype(1);
                 const auto absEntryDistX = std::abs(entryDistX[xyOffset]);
                 const auto oneOverAbsEntryDistX = maskBase/absEntryDistX;
                 if (oneOverAbsEntryDistX < limit)
-                    maskDistX[xyOffset] = maskBase/entryDistX[xyOffset];
+                    maskDistX[xyOffset] = oneOverAbsEntryDistX;
+                    // maskDistX[xyOffset] = maskBase/entryDistX[xyOffset];
                 else
-                    maskDistX[xyOffset] = maskBase;
+                    maskDistY[xyOffset] = limit;
+                    // maskDistX[xyOffset] = maskBase;
                 const auto absEntryDistY = std::abs(entryDistY[xyOffset]);
                 const auto oneOverAbsEntryDistY = maskBase/absEntryDistY;
                 if (oneOverAbsEntryDistY < limit)
-                    maskDistY[xyOffset] = maskBase/entryDistY[xyOffset];
+                    maskDistY[xyOffset] = oneOverAbsEntryDistY;
+                    // maskDistY[xyOffset] = maskBase/entryDistY[xyOffset];
                 else
-                    maskDistY[xyOffset] = maskBase;
+                    maskDistY[xyOffset] = limit;
+                    // maskDistY[xyOffset] = maskBase;
                 // Check if new mask max
                 if (currentMaskMaxX < std::abs(maskDistX[xyOffset]))
                     currentMaskMaxX = std::abs(maskDistX[xyOffset]);
@@ -1353,45 +1358,45 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     auto* maskDistance = transformedLabel + (numberPafChannels + numberBodyParts+1) * channelOffset;
     if (addDistance)
     {
-        // Option a) Mask all people bounding boxes as 0
-        // Person itself
-        const auto& points = metaData.jointsSelf.points;
-        const auto& isVisible = metaData.jointsSelf.isVisible;
-        // Get valid ROI bounding box
-        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
-        // Apply to each channel
-        if (roi.area() > 0)
-        {
-            const auto type = getType(Dtype(0));
-            for (auto part = 0; part < 2*(numberBodyParts-1); part++)
-            {
-                cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
-                maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
-            }
-        }
-        // Person others
-        for (const auto& otherPerson : metaData.jointsOthers)
-        {
-            // Person others
-            const auto& points = otherPerson.points;
-            const auto& isVisible = otherPerson.isVisible;
-            // Get valid ROI bounding box
-            const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
-            // Apply to each channel
-            if (roi.area() > 0)
-            {
-                const auto type = getType(Dtype(0));
-                for (auto part = 0; part < 2*(numberBodyParts-1); part++)
-                {
-                    cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
-                    maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
-                }
-            }
-        }
-        // // Option b) Mask everything as 0
-        // std::fill(maskDistance,
-        //           maskDistance + 2*(numberBodyParts-1) * channelOffset,
-        //           0.f);
+        // // Option a) Mask all people bounding boxes as 0
+        // // Person itself
+        // const auto& points = metaData.jointsSelf.points;
+        // const auto& isVisible = metaData.jointsSelf.isVisible;
+        // // Get valid ROI bounding box
+        // const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
+        // // Apply to each channel
+        // if (roi.area() > 0)
+        // {
+        //     const auto type = getType(Dtype(0));
+        //     for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+        //     {
+        //         cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
+        //         maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+        //     }
+        // }
+        // // Person others
+        // for (const auto& otherPerson : metaData.jointsOthers)
+        // {
+        //     // Person others
+        //     const auto& points = otherPerson.points;
+        //     const auto& isVisible = otherPerson.isVisible;
+        //     // Get valid ROI bounding box
+        //     const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, 0.5f, 0.5f);
+        //     // Apply to each channel
+        //     if (roi.area() > 0)
+        //     {
+        //         const auto type = getType(Dtype(0));
+        //         for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+        //         {
+        //             cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
+        //             maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+        //         }
+        //     }
+        // }
+        // Option b) Mask everything as 0
+        std::fill(maskDistance,
+                  maskDistance + 2*(numberBodyParts-1) * channelOffset,
+                  0.f);
     }
 
     // Background channel
