@@ -120,6 +120,7 @@ public:
                    const Datum* datumNegative = nullptr);
     void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
+    int getTotalTaf() const;
 
     cv::Mat parseBackground(const Datum* background);
 
@@ -159,6 +160,8 @@ protected:
     void generateLabelMapStaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void generateLabelMapStafWithPaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                          const MetaData& metaData, const cv::Mat& img, const int stride) const;
+    void generateLabelMapStafWithPafAndTaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
                          const float sigma) const;
