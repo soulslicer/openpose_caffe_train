@@ -68,6 +68,7 @@ protected:
 public:
     void Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                    std::vector<long double>& distanceAverageNew,
+                   std::vector<long double>& distanceSigmaNew,
                    std::vector<unsigned long long>& distanceAverageNewCounter,
                    const Datum* datum, const Datum* const datumNegative = nullptr);
     int getNumberChannels() const;
@@ -93,13 +94,16 @@ protected:
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum* datum,
                               const Datum* const datumNegative,
-                              std::vector<long double>& distanceAverage,
-                              std::vector<unsigned long long>& distanceAverageCounter);
+                              std::vector<long double>& distanceAverageNew,
+                              std::vector<long double>& distanceSigmaNew,
+                              std::vector<unsigned long long>& distanceCounterNew);
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData,
                           const std::vector<float>& distanceAverage,
+                          const std::vector<float>& distanceSigma,
                           std::vector<long double>& distanceAverageNew,
-                          std::vector<unsigned long long>& distanceAverageNewCounter);
+                          std::vector<long double>& distanceSigmaNew,
+                          std::vector<unsigned long long>& distanceCounterNew);
     // // For Distance
     // void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* entryD, Dtype* entryDMask, cv::Mat& count,
     //                    const cv::Point2f& centerA, const cv::Point2f& centerB, const int stride, const int gridX,

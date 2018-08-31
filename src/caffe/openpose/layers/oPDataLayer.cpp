@@ -330,6 +330,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
                                             mDistanceAverage,
+                                            mDistanceSigma,
                                             mDistanceAverageCounter,
                                             (desiredDbIsBkg ? nullptr : &datum),
                                             &datumBackground);
@@ -337,6 +338,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             oPDataTransformerPtr->Transform(&(this->transformed_data_),
                                             &(this->transformed_label_),
                                             mDistanceAverage,
+                                            mDistanceSigma,
                                             mDistanceAverageCounter,
                                             (desiredDbIsBkg ? nullptr : &datum));
         const auto end = std::chrono::high_resolution_clock::now();
@@ -366,13 +368,14 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
     // Timer (every 20 iterations x batch size)
     mCounter++;
-    const auto repeatEveryXVisualizations = 2;
+    const auto repeatEveryXVisualizations = 4;
     if (mCounter == 20*repeatEveryXVisualizations)
     {
         std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s"
                   << "\tRatio1: " << mOnes/float(mOnes+mTwos+mBackgrounds)
                   << "\tRatio2: " << mTwos/float(mOnes+mTwos+mBackgrounds)
                   << "\tRatioBkg: " << mBackgrounds/float(mOnes+mTwos+mBackgrounds)
+                  << "\nAverage counter (0): " << mDistanceAverageCounter[0]
                   << "\nAverage distance: ";
                   // << std::endl;
         mDuration = 0;
@@ -380,11 +383,22 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Update average
         auto distanceAverage = mDistanceAverage;
         for (auto i = 0 ; i < distanceAverage.size() ; i++)
-            distanceAverage[i] /= mDistanceAverageCounter[i];
+            distanceAverage[i] /= mDistanceAverageCounter[i/2];
         // Print average
         for (auto& distance : distanceAverage)
             std::cout << distance << " ";
-        std::cout << std::endl;
+        // Update sigma
+        std::cout << "\nSigma distance: ";
+        auto sigmaAverage = mDistanceSigma;
+        // The -1 is irrelevant when mDistanceAverageCounter is high, but the reasoning is as follows:
+        // Given that we are doing an approximation, in counter == 1, we simply use currentValue = mean.
+        // Thus, the 1st sigma is 0. We simply remove it from the average by substracting 1 to the denominator N
+        for (auto i = 0 ; i < sigmaAverage.size() ; i++)
+            sigmaAverage[i] = std::sqrt(sigmaAverage[i]/(mDistanceAverageCounter[i/2]-1));
+        // Print sigma
+        for (auto& sigma : sigmaAverage)
+            std::cout << sigma << " ";
+        std::cout << "\n" << std::endl;
     }
     timer.Stop();
     batch_timer.Stop();

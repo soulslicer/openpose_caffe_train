@@ -71,6 +71,7 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   int mCounter;
   double mDuration;
   std::vector<long double> mDistanceAverage;
+  std::vector<long double> mDistanceSigma;
   std::vector<unsigned long long> mDistanceAverageCounter;
   // OpenPose: added end
 };

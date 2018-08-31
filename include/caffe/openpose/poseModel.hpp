@@ -58,6 +58,8 @@ const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
 const std::vector<float>& getDistanceAverage(const PoseModel poseModel);
 
+const std::vector<float>& getDistanceSigma(const PoseModel poseModel);
+
 unsigned int getRootIndex(const PoseModel poseModel);
 
 std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,

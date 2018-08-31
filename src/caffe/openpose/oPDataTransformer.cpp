@@ -267,8 +267,9 @@ template<typename Dtype>
 void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dtype* maskDistY,
                      cv::Mat& count, Dtype& currentMaskMaxX, Dtype& currentMaskMaxY,
                      const cv::Point2f& rootPoint, const cv::Point2f& pointTarget, const int stride,
-                     const int gridX, const int gridY, const float sigma, const cv::Point2f& dMax,
-                     long double& distanceAverageNew, unsigned long long& distanceAverageNewCounter)
+                     const int gridX, const int gridY, const float sigma, const float* averageUsed,
+                     const float* sigmaUsed, long double* distanceAverageNew,
+                     long double* distanceSigmaNew, unsigned long long& distanceCounterNew)
 {
     // No distance
     // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
@@ -276,11 +277,21 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
     const auto multiplier = 2.0 * sigma * sigma;
     const auto pointTargetScaledDown = 1/Dtype(stride)*pointTarget;
     // Distance average
+    // Counter
+    distanceCounterNew++;
+    // Average & sigma
     const cv::Point2f directionNorm = pointTarget - rootPoint;
-    distanceAverageNew += std::sqrt(
-        directionNorm.x*directionNorm.x/dMax.x/dMax.x
-        + directionNorm.y*directionNorm.y/dMax.y/dMax.y)/stride;
-    distanceAverageNewCounter++;
+    const cv::Point2f valueNewPoint{(directionNorm.x/stride-averageUsed[0])/sigmaUsed[0],
+                                    (directionNorm.y/stride-averageUsed[1])/sigmaUsed[1]};
+    for (auto i = 0 ; i < 2 ; i++)
+    {
+        const auto valueNew = (i == 0 ? valueNewPoint.x : valueNewPoint.y);
+        // Average
+        distanceAverageNew[i] += valueNew;
+        // Sigma
+        const auto sigmaNew = (distanceAverageNew[i]/distanceCounterNew - valueNew);
+        distanceSigmaNew[i] += sigmaNew*sigmaNew;
+    }
     // Fill distance elements
     for (auto gY = 0; gY < gridY; gY++)
     {
@@ -299,7 +310,8 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 const auto xyOffset = yOffset + gX;
                 const cv::Point2f directionAB = pointTargetScaledDown - cv::Point2f{(float)gX, (float)gY};
 // const cv::Point2f entryDValue{directionAB.x, directionAB.y};
-                const cv::Point2f entryDValue{directionAB.x/dMax.x, directionAB.y/dMax.y};
+                const cv::Point2f entryDValue{(directionAB.x-averageUsed[0])/sigmaUsed[0],
+                                              (directionAB.y-averageUsed[1])/sigmaUsed[1]};
                 auto& counter = count.at<uchar>(gY, gX);
                 if (counter == 0)
                 {
@@ -348,24 +360,6 @@ const auto maskBase = Dtype(1);
                     currentMaskMaxY = std::abs(maskDistY[xyOffset]);
             }
         }
-    }
-}
-
-template<typename Dtype>
-void normalizeDistanceMaps(Dtype* maskDistX, Dtype* maskDistY, const Dtype currentMaskMaxX,
-                           const Dtype currentMaskMaxY, const int gridX, const int gridY)
-{
-    // Avoid dividing into 0
-    const auto type = getType(Dtype(0));
-    if (currentMaskMaxX > 1e-3)
-    {
-        cv::Mat maskMissTemp(gridY, gridX, type, maskDistX);
-        maskMissTemp /= currentMaskMaxX;
-    }
-    if (currentMaskMaxY > 1e-3)
-    {
-        cv::Mat maskMissTemp(gridY, gridX, type, maskDistY);
-        maskMissTemp /= currentMaskMaxY;
     }
 }
 
@@ -589,7 +583,8 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
 template<typename Dtype>
 void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                                          std::vector<long double>& distanceAverageNew,
-                                         std::vector<unsigned long long>& distanceAverageNewCounter,
+                                         std::vector<long double>& distanceSigmaNew,
+                                         std::vector<unsigned long long>& distanceCounterNew,
                                          const Datum* datum,
                                          const Datum* const datumNegative)
 {
@@ -611,7 +606,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
     CPUTimer timer;
     timer.Start();
     generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative,
-                         distanceAverageNew, distanceAverageNewCounter);
+                         distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
 
@@ -1178,7 +1173,8 @@ template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
                                                     const Datum* datum, const Datum* const datumNegative,
                                                     std::vector<long double>& distanceAverageNew,
-                                                    std::vector<unsigned long long>& distanceAverageNewCounter)
+                                                    std::vector<long double>& distanceSigmaNew,
+                                                    std::vector<unsigned long long>& distanceCounterNew)
 {
     // Parameters
     const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
@@ -1214,8 +1210,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // Generate and copy label
     const auto& distanceAverage = getDistanceAverage(mPoseModel);
+    const auto& sigmaAverage = getDistanceSigma(mPoseModel);
     generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData,
-                     distanceAverage, distanceAverageNew, distanceAverageNewCounter);
+                     distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
@@ -1328,8 +1325,10 @@ template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize,
                                                 const cv::Mat& maskMiss, const MetaData& metaData,
                                                 const std::vector<float>& distanceAverage,
+                                                const std::vector<float>& distanceSigma,
                                                 std::vector<long double>& distanceAverageNew,
-                                                std::vector<unsigned long long>& distanceAverageNewCounter)
+                                                std::vector<long double>& distanceSigmaNew,
+                                                std::vector<unsigned long long>& distanceCounterNew)
 {
     // Label size = image size / stride
     const auto rezX = (int)imageSize.width;
@@ -1489,11 +1488,12 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             // Estimate average distance between keypoints
             if (distanceAverageNew.empty())
             {
-                distanceAverageNew.resize(numberBodyParts-1, 0.L);
-                distanceAverageNewCounter.resize(numberBodyParts-1, 0ull);
+                distanceAverageNew.resize(2*(numberBodyParts-1), 0.L);
+                distanceSigmaNew.resize(2*(numberBodyParts-1), 0.L);
+                distanceCounterNew.resize(numberBodyParts-1, 0ull);
             }
-            if (distanceAverage.empty())
-                throw std::runtime_error{"DISTANCE_AVERAGE not filled in poseModel.cpp, error"
+            if (distanceAverage.empty() || distanceSigma.empty())
+                throw std::runtime_error{"DISTANCE_AVERAGE or SIGMA_AVERAGE not filled in poseModel.cpp, error"
                                          + getLine(__LINE__, __FUNCTION__, __FILE__)};
             auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                                   * channelOffset;
@@ -1506,7 +1506,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     auto currentMaskMaxX = Dtype(0);
                     auto currentMaskMaxY = Dtype(0);
                     const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
-                    const auto dMaxPart = cv::Point2f{distanceAverage[partTarget], distanceAverage[partTarget]};
                     // Self
                     if (metaData.jointsSelf.isVisible[partOrigin] <= 1
                         && metaData.jointsSelf.isVisible[rootIndex] <= 1)
@@ -1519,8 +1518,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                             maskDistance + 2*partTarget*channelOffset,
                             maskDistance + (2*partTarget+1)*channelOffset,
                             count, currentMaskMaxX, currentMaskMaxY, rootPoint, centerPoint, stride,
-                            gridX, gridY, param_.sigma(), dMaxPart,
-                            distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
+                            gridX, gridY, param_.sigma(),
+                            &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
+                            &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
+                            distanceCounterNew[partTarget]
                         );
                     }
                     // For every other person
@@ -1537,17 +1538,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                 maskDistance + 2*partTarget*channelOffset,
                                 maskDistance + (2*partTarget+1)*channelOffset,
                                 count, currentMaskMaxX, currentMaskMaxY, rootPoint, centerPoint,
-                                stride, gridX, gridY, param_.sigma(), dMaxPart,
-                                distanceAverageNew[partTarget], distanceAverageNewCounter[partTarget]
+                                stride, gridX, gridY, param_.sigma(),
+                                &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
+                                &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
+                                distanceCounterNew[partTarget]
                             );
                         }
                     }
-                    // // Normalize distance to max = 1
-                    // normalizeDistanceMaps(
-                    //     maskDistance + 2*partTarget*channelOffset,
-                    //     maskDistance + (2*partTarget+1)*channelOffset,
-                    //     currentMaskMaxX, currentMaskMaxY, gridX, gridY
-                    // );
                 }
             }
         }
