@@ -334,13 +334,13 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
     int i=0;
     for(cv::Point2f p : metaData.jointsSelf.points){
         if(metaData.jointsSelf.isVisible[i] <= 1){
-        cv::circle(imageAugCloned, p, 3, cv::Scalar(25,255,255),CV_FILLED);
+        cv::circle(imageAugCloned, p, 3, cv::Scalar(255,0,0),CV_FILLED);
         cv::putText(imageAugCloned, std::to_string(i), p, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1);
         }
         if(metaData.jointsSelfPrev.points.size()){
             if(metaData.jointsSelfPrev.isVisible[i] <= 1){
                 const cv::Point& px = metaData.jointsSelfPrev.points[i];
-                cv::circle(imageAugCloned, px, 3, cv::Scalar(25,25,255),CV_FILLED);
+                cv::circle(imageAugCloned, px, 3, cv::Scalar(0,255,0),CV_FILLED);
                 if(metaData.jointsSelf.isVisible[i] <= 1){
                     cv::line(imageAugCloned, px, metaData.jointsSelf.points[i], cv::Scalar(25,25,255));
                 }
@@ -353,7 +353,7 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
         int i=0;
         for(cv::Point2f p : j.points){
             if(j.isVisible[i] <= 1){
-            cv::circle(imageAugCloned, p, 3, cv::Scalar(25,255,255),CV_FILLED);
+            cv::circle(imageAugCloned, p, 3, cv::Scalar(255,0,0),CV_FILLED);
             cv::putText(imageAugCloned, std::to_string(i), p, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1);
             }
             i++;
@@ -362,7 +362,7 @@ void vizDebug(const cv::Mat& imageAugmented, const MetaData& metaData, const Dty
         i=0;
         if(metaData.jointsOthersPrev.size()){
             for(cv::Point2f p : metaData.jointsOthersPrev[pid].points){
-                cv::circle(imageAugCloned, p, 3, cv::Scalar(25,25,255),CV_FILLED);
+                cv::circle(imageAugCloned, p, 3, cv::Scalar(0,255,0),CV_FILLED);
                 if(metaData.jointsOthers[pid].points.size()){
                     if(metaData.jointsOthers[pid].isVisible[i] <= 1 && metaData.jointsOthersPrev[pid].isVisible[i] <= 1)
                         cv::line(imageAugCloned, p, metaData.jointsOthers[pid].points[i], cv::Scalar(25,25,255));
@@ -716,6 +716,9 @@ template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                                                   const Datum& datum, const Datum* datumNegative)
 {
+    static int quick_counter = 0;
+    quick_counter += 1;
+
     // Secuirty checks
     const int datumChannels = datum.channels();
     const int imageNum = transformedData->num();
@@ -765,7 +768,10 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
 
     // Sample for step frames
     int step = 1;
-    if(!skip.size()) step = getRand(1,2);
+    if(param_.extra_motion())
+        if(!skip.size()) step = getRand(1,3);
+    else
+        if(!skip.size()) step = getRand(1,2);
 
     // Sample the start frame (We can timestep too) NOT DONE!!! Try to do cache also
     int startIndex = getRand(0,datum.channels()-(frames*step)-1);
@@ -799,6 +805,9 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         vs.jsons.emplace_back(jsonVideoData[i]);
     }
     //cout << "Loaded Images" << endl;
+
+    //cv::imshow("win", vs.images.back());
+    //cv::waitKey(15);
 
     if(rev){
         std::reverse(vs.images.begin(), vs.images.end());
@@ -1028,7 +1037,7 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
         }else{
             generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
         }
-//        if(i == 2 && vid == 1){
+//        if(i == 3 && quick_counter == 6){
 //        vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
 //        exit(-1);
 //        }
@@ -1110,8 +1119,8 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
             maskLabel.convertTo(maskLabel, CV_8UC1);
             cv::cvtColor(hmLabel, hmLabel, cv::COLOR_GRAY2BGR);
             cv::cvtColor(maskLabel, maskLabel, cv::COLOR_GRAY2BGR);
-            testImg = testImg*0.4 + hmLabel*0.6;
-            testImg = testImg*0.5 + maskLabel*0.5;
+            //testImg = testImg*0.4 + hmLabel*0.6;
+            //testImg = testImg*0.5 + maskLabel*0.5;
             //testImg = maskLabel;
 
             // 0,1,2,3,4
@@ -1288,6 +1297,15 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     endAug.rotation = getRotRand(param_);
     endAug.pointOffset = estimatePO(metaData, param_);
 
+    // Add more
+    int extraOffset = getRand(-100, 100);
+    int extraRot = getRand(-10,10);
+    if(param_.extra_motion()){
+        endAug.pointOffset.width += extraOffset;
+        endAug.pointOffset.height += extraOffset;
+        endAug.rotation += extraRot;
+    }
+
     std::vector<AugmentSelection> augVec(frames);
     MetaData metaDataPrev;
     for(int i=0; i<frames; i++){
@@ -1364,7 +1382,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
         }else{
             generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
         }
-//        if(i == 1 &&  metaData.writeNumber == 0){
+//        if(i == 3 &&  metaData.writeNumber == 10){
 //        vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
 //        exit(-1);
 //        }
