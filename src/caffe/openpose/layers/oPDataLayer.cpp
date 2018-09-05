@@ -369,7 +369,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // Timer (every 20 iterations x batch size)
     mCounter++;
     const auto repeatEveryXVisualizations = 4;
-    if (mCounter == 20*repeatEveryXVisualizations)
+    if (mCounter == 20*repeatEveryXVisualizations && mDistanceAverageCounter.size() > 0)
     {
         std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s"
                   << "\tRatio1: " << mOnes/float(mOnes+mTwos+mBackgrounds)
