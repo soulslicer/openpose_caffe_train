@@ -265,13 +265,12 @@ void putGaussianMaps(Dtype* entry, const cv::Point2f& centerPoint, const int str
 #define sgn(x) x==0 ? 0 : x/abs(x)
 template<typename Dtype>
 void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dtype* maskDistY,
-                     cv::Mat& count, Dtype& currentMaskMaxX, Dtype& currentMaskMaxY,
+                     cv::Mat& count,
                      const cv::Point2f& rootPoint, const cv::Point2f& pointTarget, const int stride,
                      const int gridX, const int gridY, const float sigma, const float* averageUsed,
                      const float* sigmaUsed, long double* distanceAverageNew,
                      long double* distanceSigmaNew, unsigned long long& distanceCounterNew)
 {
-    // No distance
     // LOG(INFO) << "putDistanceMaps here we start for " << rootPoint.x << " " << rootPoint.y;
     const Dtype start = stride/2.f - 0.5f; //0 if stride = 1, 0.5 if stride = 2, 1.5 if stride = 4, ...
     const auto multiplier = 2.0 * sigma * sigma;
@@ -309,7 +308,7 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 // Fill distance elements
                 const auto xyOffset = yOffset + gX;
                 const cv::Point2f directionAB = pointTargetScaledDown - cv::Point2f{(float)gX, (float)gY};
-// const cv::Point2f entryDValue{directionAB.x, directionAB.y};
+                // const cv::Point2f entryDValue{directionAB.x, directionAB.y};
                 const cv::Point2f entryDValue{(directionAB.x-averageUsed[0])/sigmaUsed[0],
                                               (directionAB.y-averageUsed[1])/sigmaUsed[1]};
                 auto& counter = count.at<uchar>(gY, gX);
@@ -317,47 +316,26 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 {
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
-// // Fill masks (proving for 70k not to explode)
-// // Fill masks
-// maskDistX[xyOffset] = Dtype(1);
-// maskDistY[xyOffset] = Dtype(1);
+                    // Fill masks, it might solve the long-distance ones to be much less accurate
+                    maskDistX[xyOffset] = Dtype(1);
+                    maskDistY[xyOffset] = Dtype(1);
                 }
                 else
                 {
                     entryDistX[xyOffset] = (entryDistX[xyOffset]*counter + Dtype(entryDValue.x)) / (counter + 1);
                     entryDistY[xyOffset] = (entryDistY[xyOffset]*counter + Dtype(entryDValue.y)) / (counter + 1);
                 }
-// // Fill masks (proving for 70k not to explode)
-// if (entryDistX[xyOffset] > 1)
-//     maskDistX[xyOffset] = Dtype(1)/entryDistX[xyOffset];
-// if (entryDistY[xyOffset] > 1)
-//     maskDistY[xyOffset] = Dtype(1)/entryDistY[xyOffset];
-                // Fill masks
-                // const auto limit = Dtype(20);
-const auto limit = Dtype(10);
-                // const auto maskBase = Dtype(10);
-const auto maskBase = Dtype(1);
-                const auto absEntryDistX = std::abs(entryDistX[xyOffset]);
-                const auto oneOverAbsEntryDistX = maskBase/absEntryDistX;
-                if (oneOverAbsEntryDistX < limit)
-                    maskDistX[xyOffset] = oneOverAbsEntryDistX;
-                    // maskDistX[xyOffset] = maskBase/entryDistX[xyOffset];
-                else
-                    maskDistY[xyOffset] = limit;
-                    // maskDistX[xyOffset] = maskBase;
-                const auto absEntryDistY = std::abs(entryDistY[xyOffset]);
-                const auto oneOverAbsEntryDistY = maskBase/absEntryDistY;
-                if (oneOverAbsEntryDistY < limit)
-                    maskDistY[xyOffset] = oneOverAbsEntryDistY;
-                    // maskDistY[xyOffset] = maskBase/entryDistY[xyOffset];
-                else
-                    maskDistY[xyOffset] = limit;
-                    // maskDistY[xyOffset] = maskBase;
-                // Check if new mask max
-                if (currentMaskMaxX < std::abs(maskDistX[xyOffset]))
-                    currentMaskMaxX = std::abs(maskDistX[xyOffset]);
-                if (currentMaskMaxY < std::abs(maskDistY[xyOffset]))
-                    currentMaskMaxY = std::abs(maskDistY[xyOffset]);
+                // // Used so far, but it might provoke short distances to be good, while making long distances much
+                // // worse. However the other one might harm the close ones
+                // // Fill masks
+                // const auto limit = Dtype(10); // Tried 20 in old code
+                // const auto maskBase = Dtype(1); // Tried 10 in old code
+                // // X
+                // const auto oneOverAbsEntryDistX = maskBase/std::abs(entryDistX[xyOffset]);
+                // maskDistX[xyOffset] = std::min(limit, oneOverAbsEntryDistX);
+                // // Y
+                // const auto oneOverAbsEntryDistY = maskBase/std::abs(entryDistY[xyOffset]);
+                // maskDistY[xyOffset] = std::min(limit, oneOverAbsEntryDistY);
             }
         }
     }
@@ -615,8 +593,8 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
 {
     // If distance
     if (param_.add_distance())
-        return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + 2*(getNumberBodyParts(mPoseModel)-1));
-        // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getNumberPafChannels(mPoseModel)/2);
+        return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getDistanceAverage(mPoseModel).size()); // For any
+        // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + 2*(getNumberBodyParts(mPoseModel)-1)); // Neck-star distance
     // If no distance
     else
         return 2 * getNumberBodyBkgAndPAF(mPoseModel);
@@ -1488,65 +1466,110 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             // Estimate average distance between keypoints
             if (distanceAverageNew.empty())
             {
-                distanceAverageNew.resize(2*(numberBodyParts-1), 0.L);
-                distanceSigmaNew.resize(2*(numberBodyParts-1), 0.L);
-                distanceCounterNew.resize(numberBodyParts-1, 0ull);
+                distanceAverageNew.resize(distanceAverage.size(), 0.L);
+                distanceSigmaNew.resize(distanceSigma.size(), 0.L);
+                distanceCounterNew.resize(distanceAverage.size()/2, 0ull);
             }
-            if (distanceAverage.empty() || distanceSigma.empty())
+            if (distanceAverage.size() != distanceAverageNew.size() || distanceSigma.size() != distanceSigmaNew.size())
                 throw std::runtime_error{"DISTANCE_AVERAGE or SIGMA_AVERAGE not filled in poseModel.cpp, error"
                                          + getLine(__LINE__, __FUNCTION__, __FILE__)};
             auto* channelDistance = transformedLabel + (numberTotalChannels + numberPafChannels + numberBodyParts+1)
                                   * channelOffset;
-            const auto rootIndex = getRootIndex(mPoseModel);
-            for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
+            // Multi-star version
+            for (auto partTarget = 0; partTarget < numberBodyParts; partTarget++)
             {
-                if (rootIndex != partOrigin)
+                cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+                for (auto rootPart = 0; rootPart < numberBodyParts; rootPart++)
                 {
-                    cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
-                    auto currentMaskMaxX = Dtype(0);
-                    auto currentMaskMaxY = Dtype(0);
-                    const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
-                    // Self
-                    if (metaData.jointsSelf.isVisible[partOrigin] <= 1
-                        && metaData.jointsSelf.isVisible[rootIndex] <= 1)
+                    if (rootPart != partTarget)
                     {
-                        const auto& centerPoint = metaData.jointsSelf.points[partOrigin];
-                        const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
-                        putDistanceMaps(
-                            channelDistance + 2*partTarget*channelOffset,
-                            channelDistance + (2*partTarget+1)*channelOffset,
-                            maskDistance + 2*partTarget*channelOffset,
-                            maskDistance + (2*partTarget+1)*channelOffset,
-                            count, currentMaskMaxX, currentMaskMaxY, rootPoint, centerPoint, stride,
-                            gridX, gridY, param_.sigma(),
-                            &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
-                            &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
-                            distanceCounterNew[partTarget]
-                        );
-                    }
-                    // For every other person
-                    for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
-                    {
-                        if (metaData.jointsOthers[otherPerson].isVisible[partOrigin] <= 1
-                            && metaData.jointsOthers[otherPerson].isVisible[rootIndex] <= 1)
+                        // Self
+                        if (metaData.jointsSelf.isVisible[rootPart] <= 1
+                            && metaData.jointsSelf.isVisible[partTarget] <= 1)
                         {
-                            const auto& centerPoint = metaData.jointsOthers[otherPerson].points[partOrigin];
-                            const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
+                            const auto& rootPoint = metaData.jointsSelf.points[rootPart];
+                            const auto& targetPoint = metaData.jointsSelf.points[partTarget];
                             putDistanceMaps(
                                 channelDistance + 2*partTarget*channelOffset,
                                 channelDistance + (2*partTarget+1)*channelOffset,
                                 maskDistance + 2*partTarget*channelOffset,
                                 maskDistance + (2*partTarget+1)*channelOffset,
-                                count, currentMaskMaxX, currentMaskMaxY, rootPoint, centerPoint,
-                                stride, gridX, gridY, param_.sigma(),
+                                count, rootPoint, targetPoint, stride, gridX, gridY, param_.sigma(),
                                 &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
                                 &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
                                 distanceCounterNew[partTarget]
                             );
                         }
+                        // For every other person
+                        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+                        {
+                            if (metaData.jointsOthers[otherPerson].isVisible[rootPart] <= 1
+                                && metaData.jointsOthers[otherPerson].isVisible[partTarget] <= 1)
+                            {
+                                const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootPart];
+                                const auto& targetPoint = metaData.jointsOthers[otherPerson].points[partTarget];
+                                putDistanceMaps(
+                                    channelDistance + 2*partTarget*channelOffset,
+                                    channelDistance + (2*partTarget+1)*channelOffset,
+                                    maskDistance + 2*partTarget*channelOffset,
+                                    maskDistance + (2*partTarget+1)*channelOffset,
+                                    count, rootPoint, targetPoint, stride, gridX, gridY, param_.sigma(),
+                                    &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
+                                    &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
+                                    distanceCounterNew[partTarget]
+                                );
+                            }
+                        }
                     }
                 }
             }
+            // // Neck-star version
+            // const auto rootIndex = getRootIndex(mPoseModel);
+            // for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
+            // {
+            //     if (rootIndex != partOrigin)
+            //     {
+            //         cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+            //         const auto partTarget = (partOrigin > rootIndex ? partOrigin-1 : partOrigin);
+            //         // Self
+            //         if (metaData.jointsSelf.isVisible[partOrigin] <= 1
+            //             && metaData.jointsSelf.isVisible[rootIndex] <= 1)
+            //         {
+            //             const auto& rootPoint = metaData.jointsSelf.points[rootIndex];
+            //             const auto& centerPoint = metaData.jointsSelf.points[partOrigin];
+            //             putDistanceMaps(
+            //                 channelDistance + 2*partTarget*channelOffset,
+            //                 channelDistance + (2*partTarget+1)*channelOffset,
+            //                 maskDistance + 2*partTarget*channelOffset,
+            //                 maskDistance + (2*partTarget+1)*channelOffset,
+            //                 count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(),
+            //                 &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
+            //                 &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
+            //                 distanceCounterNew[partTarget]
+            //             );
+            //         }
+            //         // For every other person
+            //         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+            //         {
+            //             if (metaData.jointsOthers[otherPerson].isVisible[partOrigin] <= 1
+            //                 && metaData.jointsOthers[otherPerson].isVisible[rootIndex] <= 1)
+            //             {
+            //                 const auto& rootPoint = metaData.jointsOthers[otherPerson].points[rootIndex];
+            //                 const auto& centerPoint = metaData.jointsOthers[otherPerson].points[partOrigin];
+            //                 putDistanceMaps(
+            //                     channelDistance + 2*partTarget*channelOffset,
+            //                     channelDistance + (2*partTarget+1)*channelOffset,
+            //                     maskDistance + 2*partTarget*channelOffset,
+            //                     maskDistance + (2*partTarget+1)*channelOffset,
+            //                     count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(),
+            //                     &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
+            //                     &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
+            //                     distanceCounterNew[partTarget]
+            //                 );
+            //             }
+            //         }
+            //     }
+            // }
         }
     }
 
