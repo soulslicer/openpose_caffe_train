@@ -317,8 +317,10 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     entryDistX[xyOffset] = Dtype(entryDValue.x);
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // Fill masks, it might solve the long-distance ones to be much less accurate
-                    maskDistX[xyOffset] = Dtype(1);
-                    maskDistY[xyOffset] = Dtype(1);
+                    const auto maskBase = Dtype(0.333);
+// const auto maskBase = Dtype(1);
+                    maskDistX[xyOffset] = maskBase;
+                    maskDistY[xyOffset] = maskBase;
                 }
                 else
                 {
@@ -1095,15 +1097,15 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
             const auto channelOffset = gridY * gridX;
             const auto numberBodyParts = getNumberBodyParts(poseModel); // #BP
             const auto numberTotalChannels = getNumberBodyBkgAndPAF(poseModel)
-                                           + addDistance * 2 * (numberBodyParts-1);
+                                           + addDistance * getDistanceAverage(poseModel).size();
             // const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                // if (part == bkgChannel) // Background channel
-                // if (part == bkgChannel || (part >= bkgChannel && metaData.writeNumber < 3)) // Bkg channel + even distance
-                // if (part == bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
+                // if (part==bkgChannel) // Background channel
+                // if (part==bkgChannel || (part >= bkgChannel && metaData.writeNumber < 3)) // Bkg channel + even dist
+                // if (part==bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
                 // const auto numberPafChannels = getNumberPafChannels(poseModel); // 2 x #PAF
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
@@ -1133,11 +1135,11 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                     // Write on disk
                     char imagename [100];
                     if (metaData.filled)
-                        sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg", modelString.c_str(),
-                                metaData.writeNumber, part);
+                        sprintf(imagename, "visualize/%s_augment_%04d_label_part_%02d.jpg",
+                                modelString.c_str(), metaData.writeNumber, part);
                     else
-                        sprintf(imagename, "visualize/%s_augment_%04d_negative_label_part_%02d.jpg", modelString.c_str(),
-                                sCounterAuxiliary.load(), part);
+                        sprintf(imagename, "visualize/%s_augment_%04d_negative_label_part_%02d.jpg",
+                                modelString.c_str(), sCounterAuxiliary.load(), part);
                     cv::imwrite(imagename, finalImage);
                 }
             }
@@ -1172,9 +1174,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     if (!validMetaData && datumNegative == nullptr)
     {
         const auto channelOffset = gridY * gridX;
-        const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
         const auto addDistance = param_.add_distance();
-        const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + addDistance * 2 * (numberBodyParts-1);
+        const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
+                                       + addDistance * getDistanceAverage(mPoseModel).size();
         std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
         return;
     }
@@ -1319,7 +1321,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
     // numberBodyParts + numberPafChannels + 1
     const auto addDistance = param_.add_distance();
-    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + addDistance * 2 * (numberBodyParts-1);
+    const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
+                                   + addDistance * getDistanceAverage(mPoseModel).size();
     // // For old distance
     // const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel) + (numberPafChannels / 2);
 
@@ -1345,7 +1348,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // if (roi.area() > 0)
         // {
         //     const auto type = getType(Dtype(0));
-        //     for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+        //     for (auto part = 0; part < getDistanceAverage(mPoseModel).size(); part++)
         //     {
         //         cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
         //         maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
@@ -1363,7 +1366,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         //     if (roi.area() > 0)
         //     {
         //         const auto type = getType(Dtype(0));
-        //         for (auto part = 0; part < 2*(numberBodyParts-1); part++)
+        //         for (auto part = 0; part < getDistanceAverage(mPoseModel).size(); part++)
         //         {
         //             cv::Mat maskMissTemp(gridY, gridX, type, &maskDistance[part*channelOffset]);
         //             maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
@@ -1372,7 +1375,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // }
         // Option b) Mask everything as 0
         std::fill(maskDistance,
-                  maskDistance + 2*(numberBodyParts-1) * channelOffset,
+                  maskDistance + getDistanceAverage(mPoseModel).size() * channelOffset,
                   0.f);
     }
 
@@ -1603,7 +1606,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         const auto& labelMapB = getPafIndexB(mPoseModel);
         const auto threshold = 1;
         // const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
-        // const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
+        // const auto diagonalProportion = (
+        //     mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
         for (auto i = 0 ; i < labelMapA.size() ; i++)
         {
             cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
