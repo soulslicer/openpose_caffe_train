@@ -318,7 +318,6 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                     entryDistY[xyOffset] = Dtype(entryDValue.y);
                     // Fill masks, it might solve the long-distance ones to be much less accurate
                     const auto maskBase = Dtype(0.333);
-// const auto maskBase = Dtype(1);
                     maskDistX[xyOffset] = maskBase;
                     maskDistY[xyOffset] = maskBase;
                 }
@@ -330,14 +329,23 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
                 // // Used so far, but it might provoke short distances to be good, while making long distances much
                 // // worse. However the other one might harm the close ones
                 // // Fill masks
-                // const auto limit = Dtype(10); // Tried 20 in old code
-                // const auto maskBase = Dtype(1); // Tried 10 in old code
+                // const auto limit = Dtype(10); // Tried 10 in old code
+                // const auto maskBase = Dtype(0.2);
                 // // X
                 // const auto oneOverAbsEntryDistX = maskBase/std::abs(entryDistX[xyOffset]);
                 // maskDistX[xyOffset] = std::min(limit, oneOverAbsEntryDistX);
                 // // Y
                 // const auto oneOverAbsEntryDistY = maskBase/std::abs(entryDistY[xyOffset]);
                 // maskDistY[xyOffset] = std::min(limit, oneOverAbsEntryDistY);
+
+                // Avoid NaN - Clip masks
+                const auto limit = Dtype(3); // 2 works, 5 explodes
+                // X
+                if (entryDistX[xyOffset] > limit)
+                    maskDistX[xyOffset] = limit/std::abs(entryDistX[xyOffset]);
+                // Y
+                if (entryDistY[xyOffset] > limit)
+                    maskDistY[xyOffset] = limit/std::abs(entryDistY[xyOffset]);
             }
         }
     }
