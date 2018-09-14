@@ -1460,6 +1460,12 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
             int totalPaf = (getNumberBodyParts(mPoseModel) + 1) * 2;
             int totalHeat = (getNumberBodyParts(mPoseModel) + 1);
             totalChannels = (totalPaf + totalStaf + totalHeat + getTotalTaf()) * 2;
+        }else if(mStaf == 4){
+            int totalHeat = (getNumberBodyParts(mPoseModel) + 1);
+            int totalPaf = (getNumberBodyParts(mPoseModel) + 1) * 2;
+            totalPaf += 4;
+            totalPaf *= 3;
+            return (totalHeat+totalPaf)*2;
         }
     }else
         totalChannels = 2 * getNumberBodyBkgAndPAF(mPoseModel);
@@ -1883,9 +1889,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
             generateLabelMapStaf(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented, stride);
         else if(mStaf == 2){
             generateLabelMapStafWithPaf(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented, stride);
+        }else if(mStaf == 4){
+            generateLabelMapStafNew(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, imageAugmented, stride);
         }
 
-//        if (metaData.writeNumber == 3 && mPoseModel == PoseModel::COCO_21){
+//        if (metaData.writeNumber == 0 && mPoseModel == PoseModel::MPII_21){
 //            vizDebug(imageAugmented, metaData, transformedLabel, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
 //            exit(-1);
 //        }
@@ -2038,6 +2046,338 @@ void drawPoints(cv::Mat& clone, const MetaData& metaData){
             i++;
         }
     }
+}
+
+template<typename Dtype>
+void OPDataTransformer<Dtype>::generateLabelMapStafNew(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                                                const MetaData& metaData, const cv::Mat& img, const int stride, bool tracking) const
+{
+    // Label size = image size / stride
+    const auto rezX = (int)imageSize.width;
+    const auto rezY = (int)imageSize.height;
+    const auto gridX = rezX / stride;
+    const auto gridY = rezY / stride;
+    const auto channelOffset = gridY * gridX;
+    const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
+    const int totalHm = (getNumberBodyParts(mPoseModel) + 1);
+    const int numberTotalChannels = getNumberChannels() / 2;
+    const int backgroundMaskIndex = numberTotalChannels - 1;
+    const int backgroundIndex = getNumberChannels() - 1;
+    const int totalPafAlone = ((getNumberBodyParts(mPoseModel) + 1) * 2) + 4;
+    const int totalStaf = totalPafAlone * 3;
+
+    // Labels to 0
+    std::fill(transformedLabel, transformedLabel + getNumberChannels() * gridY * gridX, 0.f);
+
+    // Initialize labels to [0, 1] (depending on maskMiss)
+    fillMaskChannels(transformedLabel, gridX, gridY, numberTotalChannels, channelOffset, maskMiss);
+
+    // Masking out channels - For COCO_YY_ZZ models (ZZ < YY)
+    std::vector<int> missingChannels;
+    std::vector<int> missingSID;
+    if (numberBodyParts > getNumberBodyPartsLmdb(mPoseModel))
+    {
+        // PAFS and TAF
+        const auto missingPAFChannels = getMissingChannels(mPoseModel, std::vector<float>{}, false);
+        for(const auto& index : missingPAFChannels){
+            missingChannels.emplace_back(index);
+            missingChannels.emplace_back(index + totalPafAlone);
+            missingChannels.emplace_back(index + (totalPafAlone*2));
+        }
+        // HM
+        const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(mPoseModel);
+        for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++){
+            if (lmdbToOpenPoseKeypoints[i].empty()){
+                missingChannels.emplace_back(i + totalStaf);
+            }
+        }
+
+        for (const auto& index : missingChannels){
+            std::fill(&transformedLabel[index*channelOffset],
+                    &transformedLabel[index*channelOffset + channelOffset], 0);
+        }
+
+        // Background
+        const auto type = getType(Dtype(0));
+        cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundMaskIndex*channelOffset]);
+
+        // Change BG for COCO
+        if(mPoseModel == PoseModel::COCO_21){
+            cv::Mat clone = img.clone();
+            maskFaceCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            maskRealNeckCOCO(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            for(auto jointOther : metaData.jointsOthers){
+                maskRealNeckCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
+                maskFaceCOCO(maskMissTemp, jointOther.isVisible, jointOther.points, clone);
+            }
+        }
+
+        // Change BG for MPII
+        if(mPoseModel == PoseModel::MPII_21){
+            cv::Mat clone = img.clone();
+            maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, clone);
+            for(auto jointOther : metaData.jointsOthers){
+                maskFaceMPII(maskMissTemp, metaData.jointsSelf.isVisible, jointOther.points, clone);
+            }
+        }
+    }
+
+    // PAF
+    //Dtype* pafPtr = transformedLabel + (numberTotalChannels * channelOffset);
+    const auto& labelMapA = getPafIndexA(mPoseModel);
+    const auto& labelMapB = getPafIndexB(mPoseModel);
+    const auto threshold = 1;
+    const auto diagonal = sqrt(gridX*gridX + gridY*gridY);
+    const auto diagonalProportion = (mCurrentEpoch > 0 ? 1.f : metaData.writeNumber/(float)metaData.totalWriteNumber);
+    for (auto i = 0 ; i < labelMapA.size() ; i++)
+    {
+        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        // Self
+        const auto& joints = metaData.jointsSelf;
+        if(joints.isVisible.size()){
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
+                              transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                              transformedLabel + 2*i*channelOffset,
+                              transformedLabel + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                        stride, gridX, gridY, param_.sigma(), threshold,
+                        diagonal, diagonalProportion);
+            }
+        }
+
+        // For every other person
+        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+        {
+            const auto& joints = metaData.jointsOthers[otherPerson];
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(transformedLabel + (numberTotalChannels + 2*i)*channelOffset,
+                              transformedLabel + (numberTotalChannels + 2*i + 1)*channelOffset,
+                              transformedLabel + 2*i*channelOffset,
+                              transformedLabel + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                        stride, gridX, gridY, param_.sigma(), threshold,
+                        diagonal, diagonalProportion);
+            }
+        }
+    }
+
+
+
+    // Body parts
+    Dtype* hmPtr = transformedLabel + (numberTotalChannels * channelOffset) + (totalStaf * channelOffset);
+    for (auto part = 0; part < numberBodyParts; part++)
+    {
+        // Self
+        if(metaData.jointsSelf.isVisible.size()){
+            if (metaData.jointsSelf.isVisible[part] <= 1)
+            {
+                const auto& centerPoint = metaData.jointsSelf.points[part];
+                putGaussianMaps(hmPtr + (part)*channelOffset,
+                                centerPoint, stride, gridX, gridY, param_.sigma());
+            }
+        }
+        // For every other person
+        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+        {
+            if (metaData.jointsOthers[otherPerson].isVisible[part] <= 1)
+            {
+                const auto& centerPoint = metaData.jointsOthers[otherPerson].points[part];
+                putGaussianMaps(hmPtr + (part)*channelOffset,
+                                centerPoint, stride, gridX, gridY, param_.sigma());
+            }
+        }
+    }
+
+    // Background channel
+    // Naive implementation
+    for (auto gY = 0; gY < gridY; gY++)
+    {
+        const auto yOffset = gY*gridX;
+        for (auto gX = 0; gX < gridX; gX++)
+        {
+            const auto xyOffset = yOffset + gX;
+            Dtype maximum = 0.;
+            for (auto part = (numberTotalChannels) + (totalStaf) ; part < backgroundIndex ; part++)
+            {
+                const auto index = part * channelOffset + xyOffset;
+                maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
+            }
+            transformedLabel[backgroundIndex*channelOffset + xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
+        }
+    }
+
+    // TAF
+    Dtype* tafPtr = transformedLabel + (numberTotalChannels * channelOffset) + (totalPafAlone * channelOffset);
+    Dtype* tafMaskAPtr = transformedLabel + (totalPafAlone * channelOffset);
+    for (auto i = 0 ; i < labelMapA.size() ; i++)
+    {
+        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        // Self
+        const auto& joints = metaData.jointsSelf;
+        const auto& jointsPrev = metaData.jointsSelfPrev;
+        if(joints.isVisible.size() && jointsPrev.isVisible.size()){
+            if (joints.isVisible[labelMapA[i]] <= 1 && jointsPrev.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(tafPtr + (2*i)*channelOffset,
+                              tafPtr + (2*i + 1)*channelOffset,
+                              tafMaskAPtr + 2*i*channelOffset,
+                              tafMaskAPtr + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, jointsPrev.points[labelMapB[i]], joints.points[labelMapA[i]],
+                        stride, gridX, gridY, param_.sigma(), threshold,
+                        diagonal, diagonalProportion);
+            }
+        }else if(joints.isVisible.size() && !tracking){
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(tafPtr + (2*i)*channelOffset,
+                              tafPtr + (2*i + 1)*channelOffset,
+                              tafMaskAPtr + 2*i*channelOffset,
+                              tafMaskAPtr + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, joints.points[labelMapB[i]], joints.points[labelMapA[i]],
+                        stride, gridX, gridY, param_.sigma(), threshold,
+                        diagonal, diagonalProportion);
+            }
+        }
+
+        // For every other person
+        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+        {
+            const auto& joints = metaData.jointsOthers[otherPerson];
+
+            if(tracking){
+                if(!metaData.jointsOthersPrev.size()) continue;
+                const auto& jointsPrev = metaData.jointsOthersPrev[otherPerson];
+                if(joints.isVisible.size() && jointsPrev.isVisible.size()){
+                    if (joints.isVisible[labelMapA[i]] <= 1 && jointsPrev.isVisible[labelMapB[i]] <= 1)
+                    {
+                        putVectorMaps(tafPtr + (2*i)*channelOffset,
+                                      tafPtr + (2*i + 1)*channelOffset,
+                                      tafMaskAPtr + 2*i*channelOffset,
+                                      tafMaskAPtr + (2*i + 1)*channelOffset,
+                                      // // For Distance
+                                      // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      count, jointsPrev.points[labelMapB[i]], joints.points[labelMapA[i]],
+                                stride, gridX, gridY, param_.sigma(), threshold,
+                                diagonal, diagonalProportion);
+                    }
+                }
+            }else{
+                if(joints.isVisible.size()){
+                    if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+                    {
+                        putVectorMaps(tafPtr + (2*i)*channelOffset,
+                                      tafPtr + (2*i + 1)*channelOffset,
+                                      tafMaskAPtr + 2*i*channelOffset,
+                                      tafMaskAPtr + (2*i + 1)*channelOffset,
+                                      // // For Distance
+                                      // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      count, joints.points[labelMapB[i]], joints.points[labelMapA[i]],
+                                stride, gridX, gridY, param_.sigma(), threshold,
+                                diagonal, diagonalProportion);
+                    }
+                }
+            }
+        }
+    }
+
+    Dtype* tafBPtr = transformedLabel + (numberTotalChannels * channelOffset) + (totalPafAlone * 2 * channelOffset);
+    Dtype* tafMaskBPtr = transformedLabel + (totalPafAlone * 2 * channelOffset);
+    for (auto i = 0 ; i < labelMapA.size() ; i++)
+    {
+        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        // Self
+        const auto& joints = metaData.jointsSelf;
+        const auto& jointsPrev = metaData.jointsSelfPrev;
+        if(joints.isVisible.size() && jointsPrev.isVisible.size()){
+            if (jointsPrev.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(tafBPtr + (2*i)*channelOffset,
+                              tafBPtr + (2*i + 1)*channelOffset,
+                              tafMaskBPtr + 2*i*channelOffset,
+                              tafMaskBPtr + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, jointsPrev.points[labelMapA[i]], joints.points[labelMapB[i]],
+                        stride, gridX, gridY, param_.sigma(), threshold,
+                        diagonal, diagonalProportion);
+            }
+        }else if(joints.isVisible.size() && !tracking){
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMaps(tafBPtr + (2*i)*channelOffset,
+                              tafBPtr + (2*i + 1)*channelOffset,
+                              tafMaskBPtr + 2*i*channelOffset,
+                              tafMaskBPtr + (2*i + 1)*channelOffset,
+                              // // For Distance
+                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                        stride, gridX, gridY, param_.sigma(), threshold,
+                        diagonal, diagonalProportion);
+            }
+        }
+
+        // For every other person
+        for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+        {
+            const auto& joints = metaData.jointsOthers[otherPerson];
+            if(tracking){
+                if(!metaData.jointsOthersPrev.size()) continue;
+                const auto& jointsPrev = metaData.jointsOthersPrev[otherPerson];
+                if(joints.isVisible.size() && jointsPrev.isVisible.size()){
+                    if (jointsPrev.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+                    {
+                        putVectorMaps(tafBPtr + (2*i)*channelOffset,
+                                      tafBPtr + (2*i + 1)*channelOffset,
+                                      tafMaskBPtr + 2*i*channelOffset,
+                                      tafMaskBPtr + (2*i + 1)*channelOffset,
+                                      // // For Distance
+                                      // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      count, jointsPrev.points[labelMapA[i]], joints.points[labelMapB[i]],
+                                stride, gridX, gridY, param_.sigma(), threshold,
+                                diagonal, diagonalProportion);
+                    }
+                }
+            }else{
+                if(joints.isVisible.size()){
+                    if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+                    {
+                        putVectorMaps(tafBPtr + (2*i)*channelOffset,
+                                      tafBPtr + (2*i + 1)*channelOffset,
+                                      tafMaskBPtr + 2*i*channelOffset,
+                                      tafMaskBPtr + (2*i + 1)*channelOffset,
+                                      // // For Distance
+                                      // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                      count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                                stride, gridX, gridY, param_.sigma(), threshold,
+                                diagonal, diagonalProportion);
+                    }
+                }
+            }
+        }
+    }
+
+
 }
 
 template<typename Dtype>

@@ -161,6 +161,8 @@ protected:
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void generateLabelMapStafWithPaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
+    void generateLabelMapStafNew(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
+                          const MetaData& metaData, const cv::Mat& img, const int stride, bool tracking=false) const;
     void generateLabelMapStafWithPafAndTaf(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
                           const MetaData& metaData, const cv::Mat& img, const int stride) const;
     void putGaussianMaps(Dtype* entry, const cv::Point2f& center, const int stride, const int gridX, const int gridY,
