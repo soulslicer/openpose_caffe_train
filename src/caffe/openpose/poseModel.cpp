@@ -97,7 +97,7 @@ namespace caffe {
 //     {17, "LEar"},
 //     {18, "Background"},
 // };
-// OPENPOSE_BODY_PARTS_19(b) OPENPOSE_BODY_PARTS_25 {
+// OPENPOSE_BODY_PARTS_25, OPENPOSE_BODY_PARTS_19(b) {
 //     {0,  "Nose"},
 //     {1,  "Neck"},
 //     {2,  "RShoulder"},

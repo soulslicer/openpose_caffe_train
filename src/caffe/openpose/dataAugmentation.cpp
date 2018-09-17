@@ -36,31 +36,70 @@ namespace caffe {
     }
 
     // Public functions
-    void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const PoseModel poseModel)
+    void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const float scaleMultiplier,
+                         const PoseModel poseModel)
     {
-        // Estimate random scale
+        // Estimate random dice
         const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
         if (dice < param_.center_swap_prob())
         {
-            // const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-            if (poseModel == PoseModel::DOME_59)
+            const auto& isVisible = metaData.jointsSelf.isVisible;
+            const auto& points = metaData.jointsSelf.points;
+            // Only applied for big scaling factors
+            if (getNumberBodyParts(poseModel) == 25 && scaleMultiplier > 1.3f)
             {
-                const auto& isVisible = metaData.jointsSelf.isVisible;
-                const auto& points = metaData.jointsSelf.points;
+                // New center?
+                const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+                if (dice2 > 0.5) // 50% of not changing center
+                {
+                    // Center = Neck // 40% of using neck as center
+                    if (dice2 < 0.90)
+                    {
+                        if (isVisible[1] <= 1)
+                            metaData.objPos = points[1];
+                    }
+                    // Center = Mid-hands // 5% of mid-hands
+                    else if (dice2 < 0.95)
+                    {
+                        if (isVisible[4] <= 1 && isVisible[7] <= 1)
+                            metaData.objPos = (points[4] + points[7]) * 0.5f;
+                        else if (isVisible[4] <= 1)
+                            metaData.objPos = points[4];
+                        else if (isVisible[7] <= 1)
+                            metaData.objPos = points[7];
+                    }
+                    // Center = Knees // 5% of mid-knees
+                    else
+                    {
+                        if (isVisible[10] <= 1 && isVisible[13] <= 1)
+                            metaData.objPos = (points[10] + points[13]) * 0.5f;
+                        else if (isVisible[10] <= 1)
+                            metaData.objPos = points[10];
+                        else if (isVisible[13] <= 1)
+                            metaData.objPos = points[13];
+                    }
+                }
+            }
+            else if (poseModel == PoseModel::DOME_59)
+            {
                 if (isVisible[4] <= 1 && isVisible[7] <= 1)
                     metaData.objPos = (points[4] + points[7]) * 0.5f;
                 else if (isVisible[4] <= 1)
                     metaData.objPos = points[4];
                 else if (isVisible[7] <= 1)
                     metaData.objPos = points[7];
+                std::cout << "Warning: This might not be what I wanna do, maybe I wanna do the previous one."
+                          << std::endl;
             }
             else
-                throw std::runtime_error{"Only implemented for DOME_59"
+            {
+                throw std::runtime_error{"Only implemented for DOME_59 and *_25 models."
                                          + getLine(__LINE__, __FUNCTION__, __FILE__)};
+            }
         }
     }
 
-    float estimateScale(const MetaData& metaData, const OPTransformationParameter& param_)
+    std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_)
     {
         // Estimate random scale
         const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
@@ -76,7 +115,7 @@ namespace caffe {
             scaleMultiplier = (param_.scale_max() - param_.scale_min()) * dice2 + param_.scale_min();
         }
         const float scaleAbs = param_.target_dist()/metaData.scaleSelf;
-        return scaleAbs * scaleMultiplier;
+        return std::make_pair(scaleAbs * scaleMultiplier, scaleMultiplier);
     }
 
     // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image)

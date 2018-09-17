@@ -941,11 +941,13 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             cv::Mat maskBackgroundImage = (datumNegative != nullptr
                 ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{0}) : cv::Mat());
             cv::Mat maskBackgroundImageAugmented;
-            // Swap center?
-            swapCenterPoint(metaData, param_, poseModel);
             // Augmentation (scale, rotation, cropping, and flipping)
             // Order does matter, otherwise code will fail doing augmentation
-            augmentSelection.scale = estimateScale(metaData, param_);
+            float scaleMultiplier;
+            std::tie(augmentSelection.scale, scaleMultiplier) = estimateScale(metaData, param_);
+            // Swap center?
+            swapCenterPoint(metaData, param_, scaleMultiplier, poseModel);
+            // Apply scale
             applyScale(metaData, augmentSelection.scale, poseModel);
             augmentSelection.RotAndFinalSize = estimateRotation(
                 metaData,
@@ -1091,10 +1093,10 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
     // Debugging - Visualize - Write on disk
     // if (poseModel == PoseModel::COCO_25E)
     {
-        if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
+        // if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
         // if (metaData.writeNumber < 5 && sCounterAuxiliary < 5)
         // if (metaData.writeNumber < 10 && sCounterAuxiliary < 10)
-        // if (metaData.writeNumber < 100 && sCounterAuxiliary < 100)
+        if (metaData.writeNumber < 100 && sCounterAuxiliary < 100)
         {
             // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
             // 2. Comment the following if statement
@@ -1103,15 +1105,15 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
             const auto gridX = rezX / stride;
             const auto gridY = rezY / stride;
             const auto channelOffset = gridY * gridX;
-            const auto numberBodyParts = getNumberBodyParts(poseModel); // #BP
             const auto numberTotalChannels = getNumberBodyBkgAndPAF(poseModel)
                                            + addDistance * getDistanceAverage(poseModel).size();
-            // const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
+            const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
+            (void)bkgChannel; // In case I do not use it inside the for loop
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                // if (part==bkgChannel) // Background channel
+                if (part==bkgChannel) // Background channel
                 // if (part==bkgChannel || (part >= bkgChannel && metaData.writeNumber < 3)) // Bkg channel + even dist
                 // if (part==bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
                 // const auto numberPafChannels = getNumberPafChannels(poseModel); // 2 x #PAF
