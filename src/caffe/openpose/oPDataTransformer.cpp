@@ -1034,14 +1034,15 @@ void OPDataTransformer<Dtype>::TransformVideoJSON(int vid, int frames, VSeq& vs,
             if(mStaf == 1) generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
             else if(mStaf == 2) generateLabelMapStafWithPaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
             else if(mStaf == 3) generateLabelMapStafWithPafAndTaf(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
+            else if(mStaf == 4) generateLabelMapStafNew(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride, true);
         }else{
             generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, imgAug, stride);
         }
-//        if(i == 3 && quick_counter == 6){
+//        if(i == 3 && quick_counter == 2){
 //        vizDebug(imgAug, metaData, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
 //        exit(-1);
 //        }
-//        imgAugPrev = imgAug.clone();
+        imgAugPrev = imgAug.clone();
 
         // Convert image to Caffe Format
         Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
@@ -1379,6 +1380,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
             if(mStaf == 1) generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
             else if(mStaf == 2) generateLabelMapStafWithPaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
             else if(mStaf == 3) generateLabelMapStafWithPafAndTaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+            else if(mStaf == 4) generateLabelMapStafNew(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride, true);
         }else{
             generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
         }
