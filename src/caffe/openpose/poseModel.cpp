@@ -493,7 +493,7 @@ namespace caffe {
             8,   2, 3, 4,   5, 6, 7,   9, 10, 11,   12, 13, 14,   0, 15, 17, 16, 18,   19,20,21, 22,23,24,
             // Redundant ones
             // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
-                   17, 18,          9, 7,             4, 7,        11, 14,       7,      14,        9, 12,       23, 20},
+                   17, 18,          9, 12,            4, 7,        11, 14,       7,      14,        9, 12,       23, 20},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
