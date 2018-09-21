@@ -10,9 +10,10 @@
 
 namespace caffe {
     // Swap center point
-    void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const PoseModel poseModel);
+    void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const float scale,
+                         const PoseModel poseModel);
     // Scale
-    float estimateScale(const MetaData& metaData, const OPTransformationParameter& param_);
+    std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_);
     // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image);
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel);
     // Rotation
