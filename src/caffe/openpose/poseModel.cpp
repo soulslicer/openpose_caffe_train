@@ -467,8 +467,12 @@ namespace caffe {
                          7,25,26,27, 7,29,30,31, 7,33,34,35, 7,37,38,39, 7,41,42,43, // Left hand
                          4,45,46,47, 4,49,50,51, 4,53,54,55, 4,57,58,59, 4,61,62,63},// Right hand
         std::vector<int>{4, 4,4,0,4,8, 5,5,1,5,9},                                                                  // CAR_12
-        std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,     1, 5, 6,     1, 0,  0,  15, 16, 14,19,14, 11,22,11,    // 25 (COCO_25E, COCO_25_17E)
-                         2, 5,     2, 5,   2, 5,   9, 12,   4,   11,   4, 7,    11, 14},
+        std::vector<int>{                                                                                           // 25 (COCO_25E, COCO_25_17E)
+            // Minimum spanning tree
+            1,   1, 2, 3,   1, 5, 6,   8, 9,  10,    8, 12, 13,   1,  0, 15,  0, 16,   14,19,14, 11,22,11,
+            // Redundant ones
+            // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
+                   2, 5,            2, 5,             2, 5,         9, 12,       4,      11,        4, 7,        11, 14},
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
@@ -484,8 +488,12 @@ namespace caffe {
                          25,26,27,28, 29,30,31,32, 33,34,35,36, 37,38,39,40, 41,42,43,44, // Left hand
                          45,46,47,48, 49,50,51,52, 53,54,55,56, 57,58,59,60, 61,62,63,64},// Right hand
         std::vector<int>{5, 6,0,2,8,10, 7,1,3,9,11},                                                                // CAR_12
-        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4,     5, 6, 7,     0, 15, 16, 17, 18, 19,20,21, 22,23,24,    // 25 (COCO_25E, COCO_25_17E)
-                         17, 18,   9, 7,   4, 7,   9, 14,   7,   14,   9, 12,   20, 23},
+        std::vector<int>{                                                                                           // 25 (COCO_25E, COCO_25_17E)
+            // Minimum spanning tree
+            8,   2, 3, 4,   5, 6, 7,   9, 10, 11,   12, 13, 14,   0, 15, 17, 16, 18,   19,20,21, 22,23,24,
+            // Redundant ones
+            // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
+                   17, 18,          9, 7,             4, 7,        11, 14,       7,      14,        9, 12,       23, 20},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
