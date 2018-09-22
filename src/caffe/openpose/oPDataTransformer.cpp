@@ -1298,6 +1298,8 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     endAug.rotation = getRotRand(param_);
     endAug.pointOffset = estimatePO(metaData, param_);
 
+    bool to_flip = estimateFlip(metaData, param_);
+
     // Add more
     int extraOffset = getRand(-100, 100);
     int extraRot = getRand(-10,10);
@@ -1322,7 +1324,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
         const cv::Mat& mask = maskMiss;
         AugmentSelection augmentSelection;
         // Augment here
-        cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;
+        cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;        
         augmentSelection.scale = scale;
         applyScale(metaDataCopy, augmentSelection.scale, mPoseModel);
         augmentSelection.RotAndFinalSize = estimateRotation(
@@ -1332,11 +1334,13 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
                     rotation);
         applyRotation(metaDataCopy, augmentSelection.RotAndFinalSize.first, mPoseModel);
 
+        //augmentSelection.cropCenter = estimateCrop(metaDataCopy, param_);
         augmentSelection.cropCenter = addPO(metaDataCopy, ci);
         //augmentSelection.cropCenter = ci;
         applyCrop(metaDataCopy, augmentSelection.cropCenter, finalCropSize, mPoseModel);
         //if(i==0) augmentSelection.flip = estimateFlip(metaData, param_);
-        //applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+        augmentSelection.flip = to_flip;
+        applyFlip(metaDataCopy, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
         applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
                              augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
         applyAllAugmentation(maskAug, augmentSelection.RotAndFinalSize.first,
@@ -1384,7 +1388,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
         }else{
             generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
         }
-//        if(i == 3 &&  metaData.writeNumber == 10){
+//        if(i == 3 &&  metaData.writeNumber == 1){
 //        vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
 //        exit(-1);
 //        }
