@@ -117,7 +117,7 @@ public:
     void TransformVideoJSON(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum* datumNegative = nullptr);
     void TransformVideoSF(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
-                   const Datum* datumNegative = nullptr);
+                   const Datum* datumNegative = nullptr, bool motion = true);
     void Test(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
     int getNumberChannels() const;
     int getTotalTaf() const;

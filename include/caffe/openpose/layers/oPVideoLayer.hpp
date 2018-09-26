@@ -46,9 +46,13 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   // OpenPose: added
   bool SkipSecond();
   bool SkipThird();
+  bool SkipA();
+  bool SkipB();
   void NextBackground();
   void NextSecond();
   void NextThird();
+  void NextA();
+  void NextB();
   // Secondary lmdb
   uint64_t offsetSecond;
   bool secondDb;
@@ -63,6 +67,20 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   shared_ptr<db::DB> dbThird;
   shared_ptr<db::Cursor> cursorThird;
   shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerTertiary;
+  // A lmdb
+  uint64_t offsetA;
+  bool ADb;
+  float AProbability;
+  shared_ptr<db::DB> dbA;
+  shared_ptr<db::Cursor> cursorA;
+  shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerA;
+  // B lmdb
+  uint64_t offsetB;
+  bool BDb;
+  float BProbability;
+  shared_ptr<db::DB> dbB;
+  shared_ptr<db::Cursor> cursorB;
+  shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerB;
   // Background lmdb
   bool backgroundDb;
   shared_ptr<db::DB> dbBackground;
@@ -77,12 +95,15 @@ class OPVideoLayer : public BasePrefetchingDataLayer<Dtype> {
   unsigned long long mOnes;
   unsigned long long mTwos;
   unsigned long long mThrees;
+  unsigned long long mAs;
+  unsigned long long mBs;
   int mCounter;
   int vCounter = 0;
   double mDuration;
 
   int frame_size = 6;
   void sample_dbs(bool& desiredDbIs1, bool& desiredDbIs2, bool& desiredDbIs3);
+  void sample_ab(bool& desiredDbA, bool& desiredDbB);
   // OpenPose: added end
 };
 

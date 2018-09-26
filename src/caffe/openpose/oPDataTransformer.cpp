@@ -1083,7 +1083,7 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
             //int labelFrame = 2 * getNumberBodyBkgAndPAF(mPoseModel) - 1;
 
             int labelFrame = 174 + (2*5);
-            int hmLabelFrame = 110 + 5;
+            int hmLabelFrame = 331;
             int maskLabelFrame = 132 + (2*5);
 
             // Need a way to visalize paf?
@@ -1118,9 +1118,10 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
             maskLabel*=255;
             hmLabel.convertTo(hmLabel, CV_8UC1);
             maskLabel.convertTo(maskLabel, CV_8UC1);
+            hmLabel = 255-hmLabel;
             cv::cvtColor(hmLabel, hmLabel, cv::COLOR_GRAY2BGR);
             cv::cvtColor(maskLabel, maskLabel, cv::COLOR_GRAY2BGR);
-            //testImg = testImg*0.4 + hmLabel*0.6;
+            testImg = testImg*0.6 + hmLabel*0.4;
             //testImg = testImg*0.5 + maskLabel*0.5;
             //testImg = maskLabel;
 
@@ -1203,7 +1204,7 @@ cv::Mat  OPDataTransformer<Dtype>::parseBackground(const Datum *datumNegative){
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
-                                                  const Datum& datum, const Datum* datumNegative)
+                                                  const Datum& datum, const Datum* datumNegative, bool motion)
 {
     // Parameters
     const std::string& data = datum.data();
@@ -1303,7 +1304,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     // Add more
     int extraOffset = getRand(-100, 100);
     int extraRot = getRand(-10,10);
-    if(param_.extra_motion()){
+    if(param_.extra_motion() && !motion){
         endAug.pointOffset.width += extraOffset;
         endAug.pointOffset.height += extraOffset;
         endAug.rotation += extraRot;
@@ -1312,10 +1313,19 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     std::vector<AugmentSelection> augVec(frames);
     MetaData metaDataPrev;
     for(int i=0; i<frames; i++){
-        float scale = startAug.scale + (((endAug.scale - startAug.scale) / frames))*i;
-        float rotation = startAug.rotation + (((endAug.rotation - startAug.rotation) / frames))*i;
-        cv::Size ci = cv::Size(startAug.pointOffset.width + (((endAug.pointOffset.width - startAug.pointOffset.width) / frames))*i,
-                                     startAug.pointOffset.height + (((endAug.pointOffset.height - startAug.pointOffset.height) / frames))*i);
+        float scale;
+        float rotation;
+        cv::Size ci;
+        if(motion){
+            scale = startAug.scale + (((endAug.scale - startAug.scale) / frames))*i;
+            rotation = startAug.rotation + (((endAug.rotation - startAug.rotation) / frames))*i;
+            ci = cv::Size(startAug.pointOffset.width + (((endAug.pointOffset.width - startAug.pointOffset.width) / frames))*i,
+                                         startAug.pointOffset.height + (((endAug.pointOffset.height - startAug.pointOffset.height) / frames))*i);
+        }else{
+            scale = startAug.scale;
+            rotation = startAug.rotation;
+            ci = cv::Size(startAug.pointOffset.width,startAug.pointOffset.height);
+        }
 
         MetaData metaDataCopy = metaData;
 

@@ -536,6 +536,13 @@ message OPTransformationParameter {
 
   optional uint32 extra_motion = 39 [default = 0];
 
+  optional string source_a = 40 [default = ""];
+  optional string model_a = 41 [default = ""];
+  optional float prob_a = 42 [default = 0];
+  optional string source_b = 43 [default = ""];
+  optional string model_b = 44 [default = ""];
+  optional float prob_b = 45 [default = 0];
+
   // // CLAHE
   // optional float clahe_tile_size = 34 [default = 8.0];
   // optional float clahe_clip_limit = 35 [default = 4.0];
