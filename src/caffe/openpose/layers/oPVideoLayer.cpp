@@ -397,10 +397,11 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         //const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
         //const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability));
-        if(video_or_image <= 0.5)
+        if(video_or_image >= this->layer_param_.op_transform_param().video_or_image()){
             sample_dbs(desiredDbIs1, desiredDbIs2, desiredDbIs3);
-        else
-            sample_ab(desiredDbIsA, desiredDbIsB);
+        }else{
+            if(item_id == 0) sample_ab(desiredDbIsA, desiredDbIsB);
+        }
 
         // Read from desired DB - DB1, DB2 or BG
         timer.Start();

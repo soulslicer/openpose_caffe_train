@@ -543,6 +543,8 @@ message OPTransformationParameter {
   optional string model_b = 44 [default = ""];
   optional float prob_b = 45 [default = 0];
 
+  optional float video_or_image = 46 [default = 0.5];
+
   // // CLAHE
   // optional float clahe_tile_size = 34 [default = 8.0];
   // optional float clahe_clip_limit = 35 [default = 4.0];
