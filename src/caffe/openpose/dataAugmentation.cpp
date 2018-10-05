@@ -46,37 +46,40 @@ namespace caffe {
             const auto& isVisible = metaData.jointsSelf.isVisible;
             const auto& points = metaData.jointsSelf.points;
             // Only applied for big scaling factors
-            if (getNumberBodyParts(poseModel) == 25 && scaleMultiplier > 1.3f)
+            if (getNumberBodyParts(poseModel) == 25)
             {
-                // New center?
-                const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-                if (dice2 > 0.5) // 50% of not changing center
+                if (scaleMultiplier > 1.3f)
                 {
-                    // Center = Neck // 40% of using neck as center
-                    if (dice2 < 0.90)
+                    // New center?
+                    const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+                    if (dice2 > 0.5) // 50% of not changing center
                     {
-                        if (isVisible[1] <= 1)
-                            metaData.objPos = points[1];
-                    }
-                    // Center = Mid-hands // 5% of mid-hands
-                    else if (dice2 < 0.95)
-                    {
-                        if (isVisible[4] <= 1 && isVisible[7] <= 1)
-                            metaData.objPos = (points[4] + points[7]) * 0.5f;
-                        else if (isVisible[4] <= 1)
-                            metaData.objPos = points[4];
-                        else if (isVisible[7] <= 1)
-                            metaData.objPos = points[7];
-                    }
-                    // Center = Knees // 5% of mid-knees
-                    else
-                    {
-                        if (isVisible[10] <= 1 && isVisible[13] <= 1)
-                            metaData.objPos = (points[10] + points[13]) * 0.5f;
-                        else if (isVisible[10] <= 1)
-                            metaData.objPos = points[10];
-                        else if (isVisible[13] <= 1)
-                            metaData.objPos = points[13];
+                        // Center = Neck // 40% of using neck as center
+                        if (dice2 < 0.90)
+                        {
+                            if (isVisible[1] <= 1)
+                                metaData.objPos = points[1];
+                        }
+                        // Center = Mid-hands // 5% of mid-hands
+                        else if (dice2 < 0.95)
+                        {
+                            if (isVisible[4] <= 1 && isVisible[7] <= 1)
+                                metaData.objPos = (points[4] + points[7]) * 0.5f;
+                            else if (isVisible[4] <= 1)
+                                metaData.objPos = points[4];
+                            else if (isVisible[7] <= 1)
+                                metaData.objPos = points[7];
+                        }
+                        // Center = Knees // 5% of mid-knees
+                        else
+                        {
+                            if (isVisible[10] <= 1 && isVisible[13] <= 1)
+                                metaData.objPos = (points[10] + points[13]) * 0.5f;
+                            else if (isVisible[10] <= 1)
+                                metaData.objPos = points[10];
+                            else if (isVisible[13] <= 1)
+                                metaData.objPos = points[13];
+                        }
                     }
                 }
             }
