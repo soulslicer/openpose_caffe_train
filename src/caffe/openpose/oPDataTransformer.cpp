@@ -1121,7 +1121,7 @@ void OPDataTransformer<Dtype>::Test(int frames, Blob<Dtype> *transformedData, Bl
             hmLabel = 255-hmLabel;
             cv::cvtColor(hmLabel, hmLabel, cv::COLOR_GRAY2BGR);
             cv::cvtColor(maskLabel, maskLabel, cv::COLOR_GRAY2BGR);
-            testImg = testImg*0.6 + hmLabel*0.4;
+            testImg = testImg*0.6 + hmLabel*0.2 + maskLabel*0.2;
             //testImg = testImg*0.5 + maskLabel*0.5;
             //testImg = maskLabel;
 
