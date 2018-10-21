@@ -1304,7 +1304,7 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, VSeq& vs, B
     // Add more
     int extraOffset = getRand(-100, 100);
     int extraRot = getRand(-10,10);
-    if(param_.extra_motion() && !motion){
+    if(param_.extra_motion()){
         endAug.pointOffset.width += extraOffset;
         endAug.pointOffset.height += extraOffset;
         endAug.rotation += extraRot;
