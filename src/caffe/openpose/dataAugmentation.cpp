@@ -46,7 +46,7 @@ namespace caffe {
             const auto& isVisible = metaData.jointsSelf.isVisible;
             const auto& points = metaData.jointsSelf.points;
             // Only applied for big scaling factors
-            if (getNumberBodyParts(poseModel) == 25)
+            if (getNumberBodyParts(poseModel) == 23 || getNumberBodyParts(poseModel) == 25)
             {
                 if (scaleMultiplier > 1.3f)
                 {

@@ -1247,11 +1247,11 @@ void maskHands(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std
 }
 
 void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
-              const float stride, const float ratio)
+              const float stride, const float ratio, const int kneeIndexBase)
 {
     for (auto part = 0 ; part < 2 ; part++)
     {
-        const auto kneeIndex = 10+part*3;
+        const auto kneeIndex = kneeIndexBase+part*3;
         const auto ankleIndex = kneeIndex+1;
         if (isVisible.at(kneeIndex) != 2 && isVisible.at(ankleIndex) != 2)
         {
@@ -1441,11 +1441,14 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
             }
             // If foot
-            if (mPoseModel == PoseModel::COCO_25_17 || mPoseModel == PoseModel::COCO_25_17E)
+            if (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
+                || mPoseModel == PoseModel::COCO_25_17E)
             {
-                maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f);
+                const auto kneeIndexBase = (mPoseModel == PoseModel::COCO_23_17 ? 8 : 10);
+                maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
+                         kneeIndexBase);
                 for (const auto& jointsOther : metaData.jointsOthers)
-                    maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.8f);
+                    maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.8f, kneeIndexBase);
             }
         }
 
