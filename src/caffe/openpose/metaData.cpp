@@ -194,7 +194,7 @@ namespace caffe {
                           << "; metaData.annotationListIndex: " << metaData.annotationListIndex
                           << "; metaData.writeNumber: " << metaData.writeNumber
                           << "; metaData.totalWriteNumber: " << metaData.totalWriteNumber
-                          << "; metaData.epoch: " << metaData.epoch << "\n"
+                          << "; metaData.epoch: " << metaData.epoch
                           << "; isVisible: " << isVisible << "\n"
                           // << "Data:\n" << data;
                           << "----------------------\n";

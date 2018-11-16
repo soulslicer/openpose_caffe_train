@@ -881,9 +881,15 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             const auto initImageHeight = (int)image.rows;
             maskMiss = readMaskMiss(poseCategory, initImageHeight, initImageWidth, datumArea, data);
         }
+        else
+            LOG(INFO) << "Invalid metaData at" + getLine(__LINE__, __FUNCTION__, __FILE__);
     }
     else
+    {
         metaData.filled = false;
+        validMetaData = false;
+        LOG(INFO) << "datum == nullptr at" + getLine(__LINE__, __FUNCTION__, __FILE__);
+    }
 
     // Parameters
     const auto finalImageWidth = (int)param_.crop_size_x();
@@ -1181,13 +1187,15 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
         datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_);
     // If error reading meta data --> Labels to 0 and return
-    if (!validMetaData && datumNegative == nullptr)
+    if (!validMetaData || datumNegative == nullptr)
     {
+        LOG(INFO) << "Invalid meta data, returning empty at" + getLine(__LINE__, __FUNCTION__, __FILE__);
         const auto channelOffset = gridY * gridX;
         const auto addDistance = param_.add_distance();
         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
                                        + addDistance * getDistanceAverage(mPoseModel).size();
         std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
+        LOG(INFO) << "Returned at" + getLine(__LINE__, __FUNCTION__, __FILE__);
         return;
     }
 
