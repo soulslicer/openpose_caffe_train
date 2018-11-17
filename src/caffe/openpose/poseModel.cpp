@@ -300,6 +300,8 @@ namespace caffe {
             return 8;
         else if (poseModel == PoseModel::CAR_22)
             return 10;
+        else if (poseModel == PoseModel::COCO_19E)
+            return 11;
         else if (numberBodyParts == 18)
             return 0;
         else if (numberBodyParts == 19)
@@ -323,9 +325,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -392,6 +394,9 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{                                                                              // CAR_22
             {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21}//,{22}
+        },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19E
         },
     };
 
@@ -463,6 +468,9 @@ namespace caffe {
         std::vector<std::vector<int>>{                                                                              // CAR_22
             {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21}//,{22}
         },
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19E
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -474,6 +482,8 @@ namespace caffe {
             return std::make_pair(PoseModel::COCO_19, PoseCategory::COCO);
         else if (poseModeString == "COCO_19b")
             return std::make_pair(PoseModel::COCO_19b, PoseCategory::COCO);
+        else if (poseModeString == "COCO_19E")
+            return std::make_pair(PoseModel::COCO_19E, PoseCategory::COCO);
         else if (poseModeString == "COCO_19_V2")
             return std::make_pair(PoseModel::COCO_19_V2, PoseCategory::COCO);
         else if (poseModeString == "COCO_23")
@@ -537,6 +547,7 @@ namespace caffe {
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},{19,22},{20,23},{21,24}}, // 25E (COCO_25E, COCO_25_17E)
         std::vector<std::array<int,2>>{{4,1},{5,2},{6,3},{10,7},{11,8}, {12,9}, {14,13},{16,15},{17,20},{18,21},{19,22}}, // 23 (COCO_23, COCO_23_17)
         std::vector<std::array<int,2>>{{0,2},{1,3},{4,5},{6,7},{10,11},{12,13},{14,15},{16,17},{20,21}},            // CAR_22
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19E
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
@@ -567,6 +578,12 @@ namespace caffe {
         std::vector<int>{                                                                                           // CAR_22
         //   Wheels    Lights       Top      Tailpipe    Front     Mirrors     Back      Vertical   Back-light replacement
             0,1,3,2, 6,7,16,17, 12,13,14,15, /*1,3,*/ 6,7,6,7,6,7,  12,13, 16,17,16,17,  0,3,6,16,         6,7,3,20},
+        std::vector<int>{                                                                                           // COCO_19E
+            // Minimum spanning tree
+            1,   1, 2, 3,   1, 5, 6,   8, 9,  10,    8, 12, 13,   1,  0, 15,  0, 16,   //14,19,14, 11,22,11,
+            // Redundant ones
+            // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
+                   2, 5,            2, 5,             2, 5,         9, 12,       4,      11,        4, 7,        },//11, 14},
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
@@ -597,6 +614,12 @@ namespace caffe {
         std::vector<int>{                                                                                           // CAR_22
         //   Wheels    Lights       Top      Tailpipe    Front     Mirrors     Back      Vertical   Back-light replacement
             1,3,2,0, 7,16,17,6, 13,14,15,12,/*23,23,*/8,8,9,9,4,5,  11,10, 18,18,19,19, 7,17,12,14,      21,20,21,14},
+        std::vector<int>{                                                                                           // COCO_19E
+            // Minimum spanning tree
+            8,   2, 3, 4,   5, 6, 7,   9, 10, 11,   12, 13, 14,   0, 15, 17, 16, 18,   //19,20,21, 22,23,24,
+            // Redundant ones
+            // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
+                   17, 18,          9, 12,            4, 7,        11, 14,       7,      14,        9, 12,       },//23, 20},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -667,6 +690,7 @@ namespace caffe {
         std::vector<float>{},
         std::vector<float>{},
         std::vector<float>{}, // CAR_22
+        std::vector<float>{}, // BODY_19E
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -737,6 +761,7 @@ namespace caffe {
         std::vector<float>{},
         std::vector<float>{},
         std::vector<float>{}, // CAR_22
+        std::vector<float>{}, // BODY_19E
     };
 
     const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
@@ -751,6 +776,7 @@ namespace caffe {
         1u,     // 25 (COCO_25E, COCO_25_17E)
         1u,     // 23 (COCO_23, COCO_23_17)
         1u,     // CAR_22
+        1u,     // BODY_19E
     };
 
 

@@ -24,9 +24,10 @@ enum class PoseModel : unsigned short
     CAR_12,
     COCO_25E,
     COCO_25_17E,
-    COCO_23,
+    COCO_23,    // 15
     COCO_23_17,
     CAR_22,
+    COCO_19E,
     Size,
 };
 enum class PoseCategory : unsigned short
