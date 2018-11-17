@@ -491,21 +491,20 @@ message OPTransformationParameter {
   // Label generation
   optional float sigma = 21 [default = 7.0];
   // Model information
-  optional string model = 22 [default = "COCO"];
-  optional string media_directory = 23 [default = ""];
-  optional string source_background = 24 [default = ""];
-  optional string source_secondary = 25 [default = ""];
-  optional string model_secondary = 26 [default = ""];
-  optional float prob_secondary = 27 [default = 0.0];
-  optional float prob_only_background = 28 [default = 0.0];
+  optional string models = 22 [default = "COCO"];
+  optional string sources = 23 [default = ""];
+  optional string probabilities = 24 [default = "1"];
+  optional string source_background = 25 [default = ""];
+  optional float prob_only_background = 26 [default = 0.0];
+  optional string media_directory = 27 [default = ""]; // Specify images folder
   // 0 for x/256 - 0.5 (VGG); 1 for x-channel average (ResNet); 2 for 1-channel * scale (DenseNet)
-  optional uint32 normalization = 29 [default = 0];
+  optional uint32 normalization = 28 [default = 0];
   // Force the decoded image to have 1 color channels.
-  optional bool add_distance = 30 [default = false];
+  optional bool add_distance = 29 [default = false];
   // // CLAHE
-  // optional float clahe_tile_size = 31 [default = 8.0];
-  // optional float clahe_clip_limit = 32 [default = 4.0];
-  // optional bool do_clahe = 33 [default = false];
+  // optional float clahe_tile_size = 30 [default = 8.0];
+  // optional float clahe_clip_limit = 31 [default = 4.0];
+  // optional bool do_clahe = 32 [default = false];
 }
 // OpenPose: end new parameter
 

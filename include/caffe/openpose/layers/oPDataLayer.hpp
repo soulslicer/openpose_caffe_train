@@ -32,29 +32,26 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual inline int MaxTopBlobs() const { return 2; }
 
  protected:
-  void Next();
-  bool Skip();
+  // void Next(); // OpenPose: commented for more generic
+  // bool Skip(); // OpenPose: commented for more generic
+  void Next(const int index = 0); // OpenPose: added
+  bool Skip(const int index = 0); // OpenPose: added
+  void NextBackground(); // OpenPose: added
+  bool SkipBackground(); // OpenPose: added
+
   virtual void load_batch(Batch<Dtype>* batch);
 
-  shared_ptr<db::DB> db_;
-  shared_ptr<db::Cursor> cursor_;
-  uint64_t offset_;
-
+  // shared_ptr<db::DB> db_; // OpenPose: commented for more generic mDbs
+  // shared_ptr<db::Cursor> cursor_; // OpenPose: commented for more generic mCursors
+  // uint64_t offset_; // OpenPose: commented for more generic mOffsets
   // OpenPose: added
-  bool SkipBackground();
-  bool SkipSecond();
-  void NextBackground();
-  void NextSecond();
-  // Secondary lmdb
-  uint64_t offsetBackground;
-  uint64_t offsetSecond;
-  float secondProbability;
-  float onlyBackgroundProbability;
-  shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformerSecondary;
-  bool secondDb;
-  shared_ptr<db::DB> dbSecond;
-  shared_ptr<db::Cursor> cursorSecond;
+  std::vector<shared_ptr<db::DB>> mDbs;
+  std::vector<shared_ptr<db::Cursor>> mCursors;
+  std::vector<uint64_t> mOffsets;
+
   // Background lmdb
+  uint64_t offsetBackground;
+  float onlyBackgroundProbability;
   bool backgroundDb;
   shared_ptr<db::DB> dbBackground;
   shared_ptr<db::Cursor> cursorBackground;
@@ -63,16 +60,19 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   // Data augmentation parameters
   OPTransformationParameter op_transform_param_;
   // Data augmentation class
-  shared_ptr<OPDataTransformer<Dtype> > mOPDataTransformer;
+  std::vector<shared_ptr<OPDataTransformer<Dtype>>> mOPDataTransformers;
   // Timer
-  unsigned long long mOnes;
-  unsigned long long mTwos;
-  unsigned long long mBackgrounds;
+  std::vector<unsigned long long> mCounterTimer;
+  unsigned long long mCounterTimerBkg;
   int mCounter;
   double mDuration;
   std::vector<long double> mDistanceAverage;
   std::vector<long double> mDistanceSigma;
   std::vector<unsigned long long> mDistanceAverageCounter;
+  // Generic for `n` datasets
+  std::vector<std::string> mSources;
+  std::vector<std::string> mModels;
+  std::vector<float> mProbabilities;
   // OpenPose: added end
 };
 

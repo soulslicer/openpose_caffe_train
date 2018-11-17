@@ -424,9 +424,9 @@ namespace caffe {
         }
         // Bigger than image
         if (roi.width + roi.x >= imageSize.width)
-            roi.width = imageSize.width - 1 - roi.x;
+            roi.width = imageSize.width - roi.x;
         if (roi.height + roi.y >= imageSize.height)
-            roi.height = imageSize.height - 1 - roi.y;
+            roi.height = imageSize.height - roi.y;
         // Width/height negative
         roi.width = std::max(0, roi.width);
         roi.height = std::max(0, roi.height);

@@ -244,6 +244,32 @@ namespace caffe {
 //     {11, "BLTop"},
 //     {12, "Background"},
 // };
+// CAR_22_PARTS {
+//     {0,  "FLWheel"},
+//     {1,  "BLWheel"},
+//     {2,  "FRWheel"},
+//     {3,  "BRWheel"},
+//     {4,  "FRFogLight"},
+//     {5,  "FLFogLight"},
+//     {6,  "FRLight"},
+//     {7,  "FLLight"},
+//     {8,  "Grilles"},
+//     {9,  "FBumper"},
+//     {10, "LMirror"},
+//     {11, "RMirror"},
+//     {12, "FRTop"},
+//     {13, "FLTop"},
+//     {14, "BLTop"},
+//     {15, "BRTop"},
+//     {16, "BLLight"},
+//     {17, "BRLight"},
+//     {18, "Trunk"},
+//     {19, "BBumper"},
+//     {20, "BLCorner"},
+//     {21, "BRCorner"},
+//     {22, "Tailpipe"},
+//     {23, "Background"},
+// };
 // // Hand legend:
 // //     - Thumb:
 // //         - Carpometacarpal Joints (CMC)
@@ -272,6 +298,8 @@ namespace caffe {
             return 7;
         else if (poseModel == PoseModel::COCO_25E || poseModel == PoseModel::COCO_25_17E)
             return 8;
+        else if (poseModel == PoseModel::CAR_22)
+            return 10;
         else if (numberBodyParts == 18)
             return 0;
         else if (numberBodyParts == 19)
@@ -295,9 +323,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -361,6 +389,9 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{
             {0}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{}      // COCO_23_17
+        },
+        std::vector<std::vector<int>>{                                                                              // CAR_22
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21}//,{22}
         },
     };
 
@@ -429,6 +460,9 @@ namespace caffe {
         std::vector<std::vector<int>>{
             {0}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{}      // COCO_23_17
         },
+        std::vector<std::vector<int>>{                                                                              // CAR_22
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{19},{20},{21}//,{22}
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -468,8 +502,11 @@ namespace caffe {
             return std::make_pair(PoseModel::MPII_59, PoseCategory::MPII);
         else if (poseModeString == "MPII_65_42")
             return std::make_pair(PoseModel::MPII_65_42, PoseCategory::MPII);
+        // Car
         else if (poseModeString == "CAR_12")
             return std::make_pair(PoseModel::CAR_12, PoseCategory::CAR);
+        else if (poseModeString == "CAR_22")
+            return std::make_pair(PoseModel::CAR_22, PoseCategory::CAR);
         // Unknown
         throw std::runtime_error{"String (" + poseModeString
                                  + ") does not correspond to any model (COCO_18, DOME_18, ...)"
@@ -499,6 +536,7 @@ namespace caffe {
         std::vector<std::array<int,2>>{{0,1},{2,3},{4,5},{6,7},{8,9},{10,11}},                                      // CAR_12
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},{19,22},{20,23},{21,24}}, // 25E (COCO_25E, COCO_25_17E)
         std::vector<std::array<int,2>>{{4,1},{5,2},{6,3},{10,7},{11,8}, {12,9}, {14,13},{16,15},{17,20},{18,21},{19,22}}, // 23 (COCO_23, COCO_23_17)
+        std::vector<std::array<int,2>>{{0,2},{1,3},{4,5},{6,7},{10,11},{12,13},{14,15},{16,17},{20,21}},            // CAR_22
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
@@ -526,6 +564,9 @@ namespace caffe {
             // Redundant ones
             // Ears-shoulders,   ears, hips,    shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    1, 4,           15, 7,             1, 4,         7, 10,       3,       9,        3, 6,         9, 12},
+        std::vector<int>{                                                                                           // CAR_22
+        //   Wheels    Lights       Top      Tailpipe    Front     Mirrors     Back      Vertical   Back-light replacement
+            0,1,3,2, 6,7,16,17, 12,13,14,15, /*1,3,*/ 6,7,6,7,6,7,  12,13, 16,17,16,17,  0,3,6,16,         6,7,3,20},
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
@@ -553,6 +594,9 @@ namespace caffe {
             // Redundant ones
             // Ears-shoulders,   ears, hips,    shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    15, 16,         16, 10,            3, 6,         9, 12,       6,      12,        7, 10,       21, 18},
+        std::vector<int>{                                                                                           // CAR_22
+        //   Wheels    Lights       Top      Tailpipe    Front     Mirrors     Back      Vertical   Back-light replacement
+            1,3,2,0, 7,16,17,6, 13,14,15,12,/*23,23,*/8,8,9,9,4,5,  11,10, 18,18,19,19, 7,17,12,14,      21,20,21,14},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -622,6 +666,7 @@ namespace caffe {
         //                    0.f,0.f,0.f,   0.f,0.f,0.f},
         std::vector<float>{},
         std::vector<float>{},
+        std::vector<float>{}, // CAR_22
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -691,6 +736,7 @@ namespace caffe {
         //                    1.f,1.f,1.f,   1.f,1.f,1.f},
         std::vector<float>{},
         std::vector<float>{},
+        std::vector<float>{}, // CAR_22
     };
 
     const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
@@ -704,6 +750,7 @@ namespace caffe {
         1u,     // CAR_12
         1u,     // 25 (COCO_25E, COCO_25_17E)
         1u,     // 23 (COCO_23, COCO_23_17)
+        1u,     // CAR_22
     };
 
 
@@ -777,17 +824,19 @@ namespace caffe {
     }
 
     std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
-                                        const std::vector<float>& isVisible)
+                                        const std::vector<float>& isVisible, const float minVisibleToBlock)
     {
         auto missingBodyParts = missingBodyPartsBase;
         // If masking also non visible points
-        if (!isVisible.empty())
-        {
+        if (isVisible.empty())
+            throw std::runtime_error{"Field isVisible cannot be empty" + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        // if (!isVisible.empty())
+        // {
             for (auto i = 0u ; i < isVisible.size() ; i++)
-                if (isVisible[i] >= 2.f)
+                if (isVisible[i] >= minVisibleToBlock)
                     missingBodyParts.emplace_back(i);
             std::sort(missingBodyParts.begin(), missingBodyParts.end());
-        }
+        // }
         // Missing PAF channels
         std::vector<int> missingChannels;
         if (!missingBodyParts.empty())
@@ -819,7 +868,8 @@ namespace caffe {
         return missingChannels;
     }
 
-    std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible)
+    std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
+                                        const float minVisibleToBlock)
     {
         // Missing body parts
         std::vector<int> missingBodyParts;
@@ -828,6 +878,6 @@ namespace caffe {
         for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
             if (lmdbToOpenPoseKeypoints[i].empty())
                 missingBodyParts.emplace_back(i);
-        return getIndexesForParts(poseModel, missingBodyParts, isVisible);
+        return getIndexesForParts(poseModel, missingBodyParts, isVisible, minVisibleToBlock);
     }
 }  // namespace caffe

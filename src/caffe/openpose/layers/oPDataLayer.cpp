@@ -11,6 +11,7 @@
 // OpenPose: added
 #include <chrono>
 #include <stdexcept>
+#include <thread>
 #include "caffe/util/io.hpp" // DecodeDatum, DecodeDatumNative
 #include "caffe/openpose/getLine.hpp"
 #include "caffe/openpose/layers/oPDataLayer.hpp"
@@ -18,37 +19,79 @@
 
 namespace caffe {
 
+// OpenPose: added
+const std::string DELIMITER = ";";
+std::vector<std::string> split(const std::string& stringToSplit, const std::string& delimiter)
+{
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> splittedString;
+
+    while ((pos_end = stringToSplit.find(delimiter, pos_start)) != std::string::npos)
+    {
+        token = stringToSplit.substr(pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        splittedString.emplace_back(token);
+    }
+    splittedString.emplace_back(stringToSplit.substr(pos_start));
+
+    return splittedString;
+}
+template <typename Dtype>
+void split(std::vector<Dtype>& splitedText, const std::string& stringToSplit, const std::string& delimiter)
+{
+    splitedText.clear();
+    const auto stringSplit = split(stringToSplit, delimiter);
+    for (const auto& string : stringSplit)
+        splitedText.emplace_back(std::stod(string));
+}
+// OpenPose: added end
+
 template <typename Dtype>
 OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
-    offset_(),
+    // offset_(), // OpenPose: commented
     offsetBackground(), // OpenPose: added
-    offsetSecond(), // OpenPose: added
+    // offsetSecond(), // OpenPose: added
     op_transform_param_(param.op_transform_param()) // OpenPose: added
 {
-    db_.reset(db::GetDB(param.data_param().backend()));
-    db_->Open(param.data_param().source(), db::READ);
-    cursor_.reset(db_->NewCursor());
+    // OpenPose: commented
+    // db_.reset(db::GetDB(param.data_param().backend()));
+    // db_->Open(param.data_param().source(), db::READ);
+    // cursor_.reset(db_->NewCursor());
+    // OpenPose: commented end
     // OpenPose: added
-    mOnes = 0;
-    mTwos = 0;
-    mBackgrounds = 0;
-    // Set up secondary DB
-    if (!param.op_transform_param().source_secondary().empty())
+    // Set mSources, mModels, and mProbabilites
+    mSources = split(param.op_transform_param().sources(), DELIMITER);
+    mModels = split(param.op_transform_param().models(), DELIMITER);
+    split(mProbabilities, param.op_transform_param().probabilities(), DELIMITER);
+    // If only 1 model specified --> repeat for each source
+    if (mModels.size() == 1 && mSources.size() > 1)
+        mModels.resize(mSources.size(), mModels[0]);
+    // Sanity checks
+    for (const auto& probability : mProbabilities)
+        if (probability < 0 || probability > 1)
+            throw std::runtime_error{"Some probabilities is not in the range [0,1]"
+                                     + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    if (mSources.size() != mProbabilities.size())
+        throw std::runtime_error{"Error: mSources.size() != mProbabilities.size()"
+                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    if (mSources.size() != mModels.size())
+        throw std::runtime_error{"Error: mSources.size() != mModels.size()"
+                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
+    // Initialize cursor and DB
+    mDbs.resize(mSources.size());
+    mCursors.resize(mSources.size());
+    for (auto i = 0u ; i < mCursors.size() ; i++)
     {
-        secondDb = true;
-        secondProbability = param.op_transform_param().prob_secondary();
-        CHECK_GE(secondProbability, 0.f);
-        CHECK_LT(secondProbability, 1.f);
-        dbSecond.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
-        dbSecond->Open(param.op_transform_param().source_secondary(), db::READ);
-        cursorSecond.reset(dbSecond->NewCursor());
+        mDbs[i].reset(db::GetDB(param.data_param().backend()));
+        mDbs[i]->Open(mSources[i], db::READ);
+        mCursors[i].reset(mDbs[i]->NewCursor()); // OpenPose: commented
     }
-    else
-    {
-        secondDb = false;
-        secondProbability = 0.f;
-    }
+    // Initialize other variables
+    mCounterTimer.resize(mSources.size(), 0);
+    mCounterTimerBkg = 0;
+    mOffsets.resize(mSources.size(), 0);
     // Set up negatives DB
     if (!param.op_transform_param().source_background().empty())
     {
@@ -65,7 +108,11 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
         backgroundDb = false;
         onlyBackgroundProbability = 0.f;
     }
-    CHECK_LT(secondProbability+onlyBackgroundProbability, 1.f);
+    // Sanity checks
+    const auto totalProbabilities = std::accumulate(mProbabilities.begin(), mProbabilities.end(), 0.f);
+    if (std::abs(totalProbabilities + onlyBackgroundProbability - 1.f) > 1e-6)
+        throw std::runtime_error{"Probabilities sum up something different to 100%"
+                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
     // Timer
     mDuration = 0;
     mCounter = 0;
@@ -85,14 +132,14 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const int batch_size = this->layer_param_.data_param().batch_size();
     // Read a data point, and use it to initialize the top blob.
     Datum datum;
-    datum.ParseFromString(cursor_->value());
+    // datum.ParseFromString(cursor_->value()); // OpenPose: commented
+    datum.ParseFromString(mCursors[0]->value()); // OpenPose: added
 
     // OpenPose: added
-    mOPDataTransformer.reset(
-        new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model()));
-    if (secondDb)
-        mOPDataTransformerSecondary.reset(
-            new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary()));
+    mOPDataTransformers.resize(mSources.size());
+    for (auto i = 0u ; i < mOPDataTransformers.size() ; i++)
+        mOPDataTransformers[i].reset(
+            new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, mModels[i]));
     // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
@@ -112,7 +159,7 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     if (this->output_labels_)
     {
         const int stride = this->layer_param_.op_transform_param().stride();
-        const int numberChannels = this->mOPDataTransformer->getNumberChannels();
+        const int numberChannels = this->mOPDataTransformers[0]->getNumberChannels();
         std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
@@ -149,48 +196,55 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     // OpenPose: end
 }
 
-template <typename Dtype>
-bool OPDataLayer<Dtype>::Skip()
-{
-    int size = Caffe::solver_count();
-    int rank = Caffe::solver_rank();
-    bool keep = (offset_ % size) == rank ||
-                  // In test mode, only rank 0 runs, so avoid skipping
-                  this->layer_param_.phase() == TEST;
-    return !keep;
-}
+// OpenPose: commented
+// template <typename Dtype>
+// bool OPDataLayer<Dtype>::Skip()
+// {
+//     int size = Caffe::solver_count();
+//     int rank = Caffe::solver_rank();
+//     bool keep = (mOffsets[0] % size) == rank || // OpenPose: added
+//     // bool keep = (offset_ % size) == rank || // OpenPose: commented
+//                   // In test mode, only rank 0 runs, so avoid skipping
+//                   this->layer_param_.phase() == TEST;
+//     return !keep;
+// }
 
-template<typename Dtype>
-void OPDataLayer<Dtype>::Next()
-{
-    cursor_->Next();
-    if (!cursor_->valid())
-    {
-        LOG_IF(INFO, Caffe::root_solver())
-                << "Restarting data prefetching from start.";
-        cursor_->SeekToFirst();
-    }
-    offset_++;
-}
+// template<typename Dtype>
+// void OPDataLayer<Dtype>::Next()
+// {
+//     cursor_->Next();
+//     if (!cursor_->valid())
+//     {
+//         LOG_IF(INFO, Caffe::root_solver())
+//                 << "Restarting data prefetching from start.";
+//         cursor_->SeekToFirst();
+//     }
+//     mOffsets[0]++; // OpenPose: added
+//     // offset_++; // OpenPose: commented
+// }
+// OpenPose: commented end
 
 // OpenPose: added
-template <typename Dtype>
-bool OPDataLayer<Dtype>::SkipBackground()
+template<typename Dtype>
+void OPDataLayer<Dtype>::Next(const int index)
 {
-    int size = Caffe::solver_count();
-    int rank = Caffe::solver_rank();
-    bool keep = (offsetBackground % size) == rank ||
-                  // In test mode, only rank 0 runs, so avoid skipping
-                  this->layer_param_.phase() == TEST;
-    return !keep;
+    auto& cursor = mCursors.at(index);
+    cursor->Next();
+    if (!cursor->valid())
+    {
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting second data prefetching from start.";
+        cursor->SeekToFirst();
+    }
+    mOffsets[index]++;
 }
 
 template <typename Dtype>
-bool OPDataLayer<Dtype>::SkipSecond()
+bool OPDataLayer<Dtype>::Skip(const int index)
 {
     int size = Caffe::solver_count();
     int rank = Caffe::solver_rank();
-    bool keep = (offsetSecond % size) == rank ||
+    bool keep = (mOffsets[index] % size) == rank ||
                   // In test mode, only rank 0 runs, so avoid skipping
                   this->layer_param_.phase() == TEST;
     return !keep;
@@ -210,17 +264,31 @@ void OPDataLayer<Dtype>::NextBackground()
     offsetBackground++;
 }
 
-template<typename Dtype>
-void OPDataLayer<Dtype>::NextSecond()
+template <typename Dtype>
+bool OPDataLayer<Dtype>::SkipBackground()
 {
-    cursorSecond->Next();
-    if (!cursorSecond->valid())
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetBackground % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+
+template <typename Dtype>
+int getRandomIndex(const std::vector<Dtype>& probabilities, const Dtype onlyBackgroundProbability)
+{
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    auto accumulated = Dtype(0);
+    for (auto i = 0u ; i < probabilities.size() ; i++)
     {
-        LOG_IF(INFO, Caffe::root_solver())
-                << "Restarting second data prefetching from start.";
-        cursorSecond->SeekToFirst();
+        accumulated += probabilities[i];
+        // Choose i
+        if (dice < accumulated)
+            return i;
     }
-    offsetSecond++;
+    // Choose background
+    return -1;
 }
 // OpenPose: added ended
 
@@ -243,12 +311,9 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 
     Datum datum;
     Datum datumBackground;
-    // OpenPose: added
-    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
-    // const auto desiredDbIs1 = !secondDb || (dice <= (1-secondProbability)); // Original
-    const auto desiredDbIs1 = !secondDb || (dice >= secondProbability+onlyBackgroundProbability);
-    const auto desiredDbIs2 = !secondDb || (dice < secondProbability);
-    const auto desiredDbIsBkg = !desiredDbIs1 && !desiredDbIs2;
+    // OpenPose: added - Batch within
+    const auto randomIndex = getRandomIndex(mProbabilities, onlyBackgroundProbability);
+    const auto desiredDbIsBkg = randomIndex == -1;
     // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
@@ -259,28 +324,20 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // datum.ParseFromString(cursor_->value());
         // OpenPose: commended ended
         // OpenPose: added
-        // If only main DB or if 2 DBs but 1st must go
-        auto oPDataTransformerPtr = this->mOPDataTransformer;
-        if (desiredDbIs1)
+        auto oPDataTransformerPtr = this->mOPDataTransformers[std::max(0, randomIndex)]; // If bkg --> Use 0
+        // If chosen dataset i
+        if (!desiredDbIsBkg) // i.e., if randomIndex >= 0
         {
-            mOnes++;
-            while (Skip())
-                Next();
-            datum.ParseFromString(cursor_->value());
+            mCounterTimer[randomIndex]++;
+            while (Skip(randomIndex))
+                Next(randomIndex);
+            // datum.ParseFromString(cursor_->value());
+            datum.ParseFromString(mCursors[randomIndex]->value());
         }
-        // If 2 DBs & 2nd one must go
-        else if (desiredDbIs2)
-        {
-            oPDataTransformerPtr = this->mOPDataTransformerSecondary;
-            mTwos++;
-            while (SkipSecond())
-                NextSecond();
-            datum.ParseFromString(cursorSecond->value());
-        }
-        // If bkg DB included
+        // If chosen only-bkg
         else
         {
-            mBackgrounds++;
+            mCounterTimerBkg++;
             CHECK(backgroundDb);
         }
         if (backgroundDb)
@@ -344,12 +401,9 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
-        // DB 1
-        if (desiredDbIs1)
-            Next();
-        // If 2 DBs & 2nd one must go
-        else if (desiredDbIs2)
-            NextSecond();
+        // DB i
+        if (!desiredDbIsBkg) // i.e., if randomIndex >= 0
+            Next(randomIndex);
         // If bkg DB included
         if (backgroundDb)
             NextBackground();
@@ -369,35 +423,43 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // Timer (every 20 iterations x batch size)
     mCounter++;
     const auto repeatEveryXVisualizations = 4;
-    if (mCounter == 20*repeatEveryXVisualizations && mDistanceAverageCounter.size() > 0)
+    if (mCounter == 20*repeatEveryXVisualizations)
     {
-        std::cout << "Time: " << mDuration/repeatEveryXVisualizations * 1e-9 << "s"
-                  << "\tRatio1: " << mOnes/float(mOnes+mTwos+mBackgrounds)
-                  << "\tRatio2: " << mTwos/float(mOnes+mTwos+mBackgrounds)
-                  << "\tRatioBkg: " << mBackgrounds/float(mOnes+mTwos+mBackgrounds)
-                  << "\nAverage counter (0): " << mDistanceAverageCounter[0]
-                  << "\nAverage distance: ";
-                  // << std::endl;
-        mDuration = 0;
-        mCounter = 0;
-        // Update average
-        auto distanceAverage = mDistanceAverage;
-        for (auto i = 0 ; i < distanceAverage.size() ; i++)
-            distanceAverage[i] /= mDistanceAverageCounter[i/2];
-        // Print average
-        for (auto& distance : distanceAverage)
-            std::cout << distance << " ";
-        // Update sigma
-        std::cout << "\nSigma distance: ";
-        auto sigmaAverage = mDistanceSigma;
-        // The -1 is irrelevant when mDistanceAverageCounter is high, but the reasoning is as follows:
-        // Given that we are doing an approximation, in counter == 1, we simply use currentValue = mean.
-        // Thus, the 1st sigma is 0. We simply remove it from the average by substracting 1 to the denominator N
-        for (auto i = 0 ; i < sigmaAverage.size() ; i++)
-            sigmaAverage[i] = std::sqrt(sigmaAverage[i]/(mDistanceAverageCounter[i/2]-1));
-        // Print sigma
-        for (auto& sigma : sigmaAverage)
-            std::cout << sigma << " ";
+        std::string text = "Time: " + std::to_string(mDuration/repeatEveryXVisualizations * 1e-9) + "s";
+        const auto accumulatedCounters = float(
+            std::accumulate(mCounterTimer.begin(), mCounterTimer.end(), mCounterTimerBkg));
+        for (auto i = 0u ; i < mCounterTimer.size() ; i++)
+        {
+            text += "\tRatio" + std::to_string(i) + ": ";
+            text += std::to_string(mCounterTimer.at(i)/accumulatedCounters);
+        }
+        text += "\tRatioBkg: " + std::to_string(mCounterTimerBkg/accumulatedCounters);
+        std::cout << text; // << std::endl;
+        if (mDistanceAverageCounter.size() > 0)
+        {
+            std::cout << "\nAverage counter (0): " + std::to_string(mDistanceAverageCounter[0]);
+            std::cout << "\nAverage distance: ";
+            mDuration = 0;
+            mCounter = 0;
+            // Update average
+            auto distanceAverage = mDistanceAverage;
+            for (auto i = 0 ; i < distanceAverage.size() ; i++)
+                distanceAverage[i] /= mDistanceAverageCounter[i/2];
+            // Print average
+            for (auto& distance : distanceAverage)
+                std::cout << distance << " ";
+            // Update sigma
+            std::cout << "\nSigma distance: ";
+            auto sigmaAverage = mDistanceSigma;
+            // The -1 is irrelevant when mDistanceAverageCounter is high, but the reasoning is as follows:
+            // Given that we are doing an approximation, in counter == 1, we simply use currentValue = mean.
+            // Thus, the 1st sigma is 0. We simply remove it from the average by substracting 1 to the denominator N
+            for (auto i = 0 ; i < sigmaAverage.size() ; i++)
+                sigmaAverage[i] = std::sqrt(sigmaAverage[i]/(mDistanceAverageCounter[i/2]-1));
+            // Print sigma
+            for (auto& sigma : sigmaAverage)
+                std::cout << sigma << " ";
+        }
         std::cout << "\n" << std::endl;
     }
     timer.Stop();

@@ -26,6 +26,7 @@ enum class PoseModel : unsigned short
     COCO_25_17E,
     COCO_23,
     COCO_23_17,
+    CAR_22,
     Size,
 };
 enum class PoseCategory : unsigned short
@@ -65,9 +66,10 @@ const std::vector<float>& getDistanceSigma(const PoseModel poseModel);
 unsigned int getRootIndex(const PoseModel poseModel);
 
 std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
-                                    const std::vector<float>& isVisible = {});
+                                    const std::vector<float>& isVisible, const float minVisibleToBlock = 4.f);
 
-std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible = {});
+std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
+                                    const float minVisibleToBlock = 4.f);
 
 }  // namespace caffe
 

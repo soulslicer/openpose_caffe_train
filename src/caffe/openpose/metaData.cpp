@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread> // std::this_thread::sleep_for
 #include <caffe/openpose/getLine.hpp>
 #include <caffe/openpose/metaData.hpp>
 #include <glog/logging.h>
@@ -63,6 +64,7 @@ namespace caffe {
                     bool thereAre0s = false;
                     bool thereAre1s = false;
                     bool thereAre2s = false;
+                    bool thereAre4s = false;
                     for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
                     {
                         if (jointsOld.isVisible[lmdbToOurModelIndex] == 0)
@@ -71,10 +73,18 @@ namespace caffe {
                             thereAre1s = true;
                         else if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
                             thereAre2s = true;
+                        else if (jointsOld.isVisible[lmdbToOurModelIndex] == 4)
+                            thereAre4s = true;
+                        // Debugging-only
+                        else
+                            LOG(INFO) << "Unexpected jointsOld.isVisible[lmdbToOurModelIndex].";
                     }
                     // Set final visibility flag
+                    // If point not annotated on LMDB file --> isVisible == 4
+                    if (thereAre4s)
+                        joints.isVisible[i] = 4;
                     // If some not labeled and some labeled --> isVisible == 3
-                    if (thereAre2s && (thereAre0s || thereAre1s))
+                    else if (thereAre2s && (thereAre0s || thereAre1s))
                         joints.isVisible[i] = 3;
                     // If non labeled --> isVisible == 2
                     else if (thereAre2s)
@@ -89,8 +99,11 @@ namespace caffe {
                 {
                     for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
                     {
+                        // If point not annotated on LMDB file --> isVisible == 4
+                        if (jointsOld.isVisible[lmdbToOurModelIndex] == 4)
+                            joints.isVisible[i] = 4;
                         // If any of them is 2 --> 2 (not in the image or unlabeled)
-                        if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
+                        else if (jointsOld.isVisible[lmdbToOurModelIndex] == 2)
                         {
                             // Keypoint to keypoint correspondence
                             if (lmdbToOurModel[i].size() < 2)
@@ -180,7 +193,8 @@ namespace caffe {
                 jointPoint -= cv::Point2f{1.f,1.f};
             // isVisible flag
             const auto isVisible = decodeNumber<Dtype>(&data[7*offsetPerLine+4*part]);
-            if (datasetString != metaData.datasetString || isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
+            // if (datasetString != metaData.datasetString || isVisible > 2 || std::isnan(isVisible) || std::isnan(isVisible))
+            if (datasetString != metaData.datasetString || isVisible > 4 || std::isnan(isVisible) || std::isnan(isVisible))
             {
                 // LOG(INFO) << "CHECK_LE(isVisible, 2) failed!!!!!\n"
                 //           << "datasetString: " << metaData.datasetString;
