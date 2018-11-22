@@ -867,7 +867,6 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
         CHECK(data.size() > 0);
 
         // Read meta data (LMDB channel 3)
-        bool validMetaData;
         // DOME
         if (poseCategory == PoseCategory::DOME)
             validMetaData = readMetaData<Dtype>(metaData, currentEpoch, datasetString, data.c_str(), datumWidth,
@@ -889,13 +888,13 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             maskMiss = readMaskMiss(poseCategory, initImageHeight, initImageWidth, datumArea, data);
         }
         else
-            LOG(INFO) << "Invalid metaData at" + getLine(__LINE__, __FUNCTION__, __FILE__);
+            LOG(INFO) << "Invalid metaData" + getLine(__LINE__, __FUNCTION__, __FILE__);
     }
     else
     {
         metaData.filled = false;
         validMetaData = false;
-        LOG(INFO) << "datum == nullptr at" + getLine(__LINE__, __FUNCTION__, __FILE__);
+        LOG(INFO) << "datum == nullptr" + getLine(__LINE__, __FUNCTION__, __FILE__);
     }
 
     // Parameters
@@ -1200,13 +1199,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // If error reading meta data --> Labels to 0 and return
     if (!validMetaData || datumNegative == nullptr)
     {
-        LOG(INFO) << "Invalid meta data, returning empty at" + getLine(__LINE__, __FUNCTION__, __FILE__);
         const auto channelOffset = gridY * gridX;
         const auto addDistance = param_.add_distance();
         const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
                                        + addDistance * getDistanceAverage(mPoseModel).size();
         std::fill(transformedLabel, transformedLabel + 2*numberTotalChannels * channelOffset, 0.f);
-        LOG(INFO) << "Returned at" + getLine(__LINE__, __FUNCTION__, __FILE__);
+        LOG(INFO) << "Invalid meta data, returned empty" + getLine(__LINE__, __FUNCTION__, __FILE__);
         return;
     }
 
@@ -1491,7 +1489,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
                                 gridX, gridY, backgroundMaskIndex, mPoseModel, 4);
         }
-
 
         // Body parts
         for (auto part = 0; part < numberBodyParts; part++)
