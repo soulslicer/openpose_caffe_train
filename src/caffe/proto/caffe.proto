@@ -422,7 +422,7 @@ message LayerParameter {
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
   // OpenPose: new layer
-  optional OPTransformationParameter op_transform_param = 148;
+  optional OPTransformationParameter op_transform_param = 149;
   // OpenPose: end new layer
 }
 
