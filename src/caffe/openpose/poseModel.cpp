@@ -73,8 +73,29 @@ namespace caffe {
 //     {17-21, "Background"},
 //     {17, "LBigToe"},
 //     {18, "LSmallToe"},
-//     {19, "RBigToe"},
-//     {20, "RSmallToe"},
+//     {19, "LHeel"},
+//     {20, "RBigToe"},
+//     {21, "RSmallToe"},
+//     {22, "RHeel"},
+// };
+// MPII_BODY_PARTS { // http://human-pose.mpi-inf.mpg.de/#download
+//     {0,  "RAnkle"},
+//     {1,  "RKnee"},
+//     {2,  "RHip"},
+//     {3,  "LHip"},
+//     {4,  "LKnee"},
+//     {5,  "LAnkle"},
+//     {6,  "MHip"}, // Pelvis in MPII website
+//     {7,  "Neck"}, // Thorax in MPII website
+//     {8,  "UpperNeck"},
+//     {9,  "HeadTop"},
+//     {10, "RWrist"},
+//     {11, "RElbow"},
+//     {12, "RShoulder"},
+//     {13, "LShoulder"},
+//     {14, "LElbow"},
+//     {15, "LWrist"},
+//     {16, "Background"},
 // };
 // OPENPOSE_BODY_PARTS_18 {
 //     {0,  "Nose"},
@@ -150,6 +171,34 @@ namespace caffe {
 //     {23, "RSmallToe"},
 //     {24, "RHeel"},
 //     {19/25, "Background"},
+// };
+// OPENPOSE_BODY_PARTS_25B {
+//     {0,  "Nose"},
+//     {1,  "LEye"},
+//     {2,  "REye"},
+//     {3,  "LEar"},
+//     {4,  "REar"},
+//     {5,  "LShoulder"},
+//     {6,  "RShoulder"},
+//     {7,  "LElbow"},
+//     {8,  "RElbow"},
+//     {9,  "LWrist"},
+//     {10, "RWrist"},
+//     {11, "LHip"},
+//     {12, "RHip"},
+//     {13, "LKnee"},
+//     {14, "RKnee"},
+//     {15, "LAnkle"},
+//     {16, "RAnkle"},
+//     {17, "UpperNeck"},
+//     {18, "HeadTop"},
+//     {19, "LBigToe"},
+//     {20, "LSmallToe"},
+//     {21, "LHeel"},
+//     {22, "RBigToe"},
+//     {23, "RSmallToe"},
+//     {24, "RHeel"},
+//     {25, "Background"},
 // };
 // OPENPOSE_BODY_PARTS_59 {
 //     // Body
@@ -302,6 +351,10 @@ namespace caffe {
             return 10;
         else if (poseModel == PoseModel::COCO_19E)
             return 11;
+        else if (poseModel == PoseModel::COCO_25B_23 || poseModel == PoseModel::COCO_25B_17)
+            return 12;
+        else if (numberBodyParts == 16)
+            return 13;
         else if (numberBodyParts == 18)
             return 0;
         else if (numberBodyParts == 19)
@@ -325,9 +378,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -380,14 +433,12 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25E
-            // {},{5,6}, {},{},{}, {},{},{}, {}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22} // COCO_25E
         },
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{} // COCO_25_17E
         },
         std::vector<std::vector<int>>{
-            {0}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25E
-            // {}, {},{},{}, {},{},{}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}           // COCO_23
+            {0}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_23
         },
         std::vector<std::vector<int>>{
             {0}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{}      // COCO_23_17
@@ -397,6 +448,15 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19E
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_25B_23
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{},{},{17},{18},{19},{20},{21},{22}
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_25B_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{},{},{},{},{},{},{},{}
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_25B_16
+            {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
         },
     };
 
@@ -437,7 +497,6 @@ namespace caffe {
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19_V2
         },
         std::vector<std::vector<int>>{
-            // {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25
             {},{5,6}, {},{},{}, {},{},{}, {11,12}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}// COCO_25
         },
         std::vector<std::vector<int>>{
@@ -452,14 +511,12 @@ namespace caffe {
             {0},{1},{2},{3},{4},{5},{6},{7},{9},{10},{11},{12}                                                      // 8 and 13 are always empty
         },
         std::vector<std::vector<int>>{
-            // {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25E
             {},{5,6}, {},{},{}, {},{},{}, {11,12}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}// COCO_25E
         },
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{},{},{},{},{} // COCO_25_17E
         },
         std::vector<std::vector<int>>{
-            // {0}, {6},{8},{10}, {5},{7},{9}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {17},{18},{19},{20},{21},{22} // COCO_25E
             {}, {},{},{}, {},{},{}, {},{},{16}, {},{},{15}, {},{},{},{}, {17},{18},{19},{20},{21},{22}              // COCO_23
         },
         std::vector<std::vector<int>>{
@@ -470,6 +527,15 @@ namespace caffe {
         },
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19E
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_25B_23
+            { },{ },{ },{ },{ },{ },{ },{ },{ },{ },{  },{  },{  },{  },{  },{15},{16},{},{},{17},{18},{19},{20},{21},{22}
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_25B_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{},{},{},{},{},{},{},{}
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_25B_16
+            {},{},{},{},{},{13},{12},{  },{  },{  },{  },{ },{ },{ },{ },{ },{ },{8},{9},{},{},{},{},{},{}
         },
     };
 
@@ -500,6 +566,10 @@ namespace caffe {
             return std::make_pair(PoseModel::COCO_25_17E, PoseCategory::COCO);
         else if (poseModeString == "COCO_59_17")
             return std::make_pair(PoseModel::COCO_59_17, PoseCategory::COCO);
+        else if (poseModeString == "COCO_25B_17")
+            return std::make_pair(PoseModel::COCO_25B_17, PoseCategory::COCO);
+        else if (poseModeString == "COCO_25B_23")
+            return std::make_pair(PoseModel::COCO_25B_23, PoseCategory::COCO);
         // Dome
         else if (poseModeString == "DOME_18")
             return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
@@ -508,6 +578,8 @@ namespace caffe {
         else if (poseModeString == "DOME_59")
             return std::make_pair(PoseModel::DOME_59, PoseCategory::DOME);
         // MPII
+        else if (poseModeString == "MPII_25B_16")
+            return std::make_pair(PoseModel::MPII_25B_16, PoseCategory::MPII);
         else if (poseModeString == "MPII_59")
             return std::make_pair(PoseModel::MPII_59, PoseCategory::MPII);
         else if (poseModeString == "MPII_65_42")
@@ -548,6 +620,8 @@ namespace caffe {
         std::vector<std::array<int,2>>{{4,1},{5,2},{6,3},{10,7},{11,8}, {12,9}, {14,13},{16,15},{17,20},{18,21},{19,22}}, // 23 (COCO_23, COCO_23_17)
         std::vector<std::array<int,2>>{{0,2},{1,3},{4,5},{6,7},{10,11},{12,13},{14,15},{16,17},{20,21}},            // CAR_22
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19E
+        std::vector<std::array<int,2>>{{1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}},// COCO_25B (COCO_25B_23, COCO_25B_17)
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // MPII_25B_16
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
@@ -584,6 +658,8 @@ namespace caffe {
             // Redundant ones
             // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    2, 5,            2, 5,             2, 5,         9, 12,       4,      11,        4, 7,        },//11, 14},
+        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_25B (COCO_25B_23, COCO_25B_17)
+        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // MPII_25B_16
     };
 
     const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
@@ -620,6 +696,8 @@ namespace caffe {
             // Redundant ones
             // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    17, 18,          9, 12,            4, 7,        11, 14,       7,      14,        9, 12,       },//23, 20},
+        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_25B (COCO_25B_23, COCO_25B_17)
+        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // MPII_25B_16
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -691,6 +769,7 @@ namespace caffe {
         std::vector<float>{},
         std::vector<float>{}, // CAR_22
         std::vector<float>{}, // BODY_19E
+        std::vector<float>{}, // MPII_25B_16
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -762,6 +841,8 @@ namespace caffe {
         std::vector<float>{},
         std::vector<float>{}, // CAR_22
         std::vector<float>{}, // BODY_19E
+        std::vector<float>{}, // COCO_25B (COCO_25B_23, COCO_25B_17)
+        std::vector<float>{}, // MPII_25B_16
     };
 
     const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
@@ -777,6 +858,8 @@ namespace caffe {
         1u,     // 23 (COCO_23, COCO_23_17)
         1u,     // CAR_22
         1u,     // BODY_19E
+        1u,     // COCO_25B (COCO_25B_23, COCO_25B_17)
+        1u,     // MPII_25B_16
     };
 
 

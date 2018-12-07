@@ -28,6 +28,9 @@ enum class PoseModel : unsigned short
     COCO_23_17,
     CAR_22,
     COCO_19E,
+    COCO_25B_23,
+    COCO_25B_17, // 20
+    MPII_25B_16,
     Size,
 };
 enum class PoseCategory : unsigned short
