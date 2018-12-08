@@ -43,6 +43,8 @@ enum class PoseCategory : unsigned short
 
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString);
 
+bool addBkgChannel(const PoseModel poseModel);
+
 int getNumberBodyParts(const PoseModel poseModel);
 
 int getNumberBodyPartsLmdb(const PoseModel poseModel);

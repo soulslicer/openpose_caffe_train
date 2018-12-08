@@ -336,6 +336,7 @@ namespace caffe {
 
 
     // Auxiliary functions
+    const auto NUMBER_MODELS = 13; // How many are the same
     int poseModelToIndex(const PoseModel poseModel)
     {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
@@ -351,10 +352,8 @@ namespace caffe {
             return 10;
         else if (poseModel == PoseModel::COCO_19E)
             return 11;
-        else if (poseModel == PoseModel::COCO_25B_23 || poseModel == PoseModel::COCO_25B_17)
+        else if (poseModel == PoseModel::COCO_25B_23 || poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::MPII_25B_16)
             return 12;
-        else if (numberBodyParts == 16)
-            return 13;
         else if (numberBodyParts == 18)
             return 0;
         else if (numberBodyParts == 19)
@@ -456,11 +455,14 @@ namespace caffe {
             {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{},{},{},{},{},{},{},{}
         },
         std::vector<std::vector<int>>{                                                                              // MPII_25B_16
-            {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
+            // {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
+            {},{},{},{},{},{13},{12},{  },{  },{  },{  },{ },{ },{ },{ },{ },{ },{8},{9},{},{},{},{},{},{}
         },
     };
 
-    // Note: Same than LMDB_TO_OPENPOSE_KEYPOINTS unless some keypoint must be masked out
+    // Idea: Keypoint that is empty will be masked out (including the PAFs that use it)
+    // For simplicity: Same than LMDB_TO_OPENPOSE_KEYPOINTS unless masked keypoints.
+    // But the only thing that matters is whether it is empty (e.g., {}) or not (e.g., {1} or {99,92} or {-1}).
     // E.g., for foot dataset to avoid overfitting on duplicated body keypoints
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> CHANNELS_TO_MASK{
         std::vector<std::vector<int>>{
@@ -529,10 +531,11 @@ namespace caffe {
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19E
         },
         std::vector<std::vector<int>>{                                                                              // COCO_25B_23
-            { },{ },{ },{ },{ },{ },{ },{ },{ },{ },{  },{  },{  },{  },{  },{15},{16},{},{},{17},{18},{19},{20},{21},{22}
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{-1},{-1},{17},{18},{19},{20},{21},{22}
+            // { },{ },{ },{ },{ },{ },{ },{ },{ },{ },{  },{  },{  },{  },{  },{15},{16},{},{},{17},{18},{19},{20},{21},{22}
         },
         std::vector<std::vector<int>>{                                                                              // COCO_25B_17
-            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{},{},{},{},{},{},{},{}
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{-1},{-1},{},{},{},{},{},{}
         },
         std::vector<std::vector<int>>{                                                                              // MPII_25B_16
             {},{},{},{},{},{13},{12},{  },{  },{  },{  },{ },{ },{ },{ },{ },{ },{8},{9},{},{},{},{},{},{}
@@ -601,7 +604,7 @@ namespace caffe {
 
 
     // Parameters and functions to change if new number body parts
-    const std::array<std::vector<std::array<int,2>>, (int)PoseModel::Size> SWAP_LEFT_RIGHT_KEYPOINTS{
+    const std::array<std::vector<std::array<int,2>>, NUMBER_MODELS> SWAP_LEFT_RIGHT_KEYPOINTS{
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{11,8},{12,9},{13,10},{15,14},{17,16}},                    // 18 (COCO_18, DOME_18)
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // 19 (COCO_19(b), DOME_19)
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17},                    // 59 (DOME_59), COCO_59_17, MPII_59
@@ -620,11 +623,10 @@ namespace caffe {
         std::vector<std::array<int,2>>{{4,1},{5,2},{6,3},{10,7},{11,8}, {12,9}, {14,13},{16,15},{17,20},{18,21},{19,22}}, // 23 (COCO_23, COCO_23_17)
         std::vector<std::array<int,2>>{{0,2},{1,3},{4,5},{6,7},{10,11},{12,13},{14,15},{16,17},{20,21}},            // CAR_22
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19E
-        std::vector<std::array<int,2>>{{1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}},// COCO_25B (COCO_25B_23, COCO_25B_17)
-        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // MPII_25B_16
+        std::vector<std::array<int,2>>{{1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}},// 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
     };
 
-    const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_A{
+    const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_A{
         std::vector<int>{1, 8,  9, 1,   11, 12, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  14, 15},                       // 18 (COCO_18, DOME_18)
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16},                       // 19 (COCO_19, DOME_19)
         std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16,                        // 59 (DOME_59), COCO_59_17, MPII_59
@@ -658,11 +660,18 @@ namespace caffe {
             // Redundant ones
             // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    2, 5,            2, 5,             2, 5,         9, 12,       4,      11,        4, 7,        },//11, 14},
-        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_25B (COCO_25B_23, COCO_25B_17)
-        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // MPII_25B_16
+        std::vector<int>{                                                                                           // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
+            // Minimum spanning tree
+            // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
+                 0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5, 5,
+            // Redundant ones
+            // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
+                    6, 6,       3,        3,4,              5, 6,         9,      9, 10,     11,    15}
+            // Ignored: shoulders, hips-ankles (-0.1% COCO_23), ankles-small toes (-0.1% COCO_23)
+            //              5,        11,12,                        15,16},
     };
 
-    const std::array<std::vector<int>, (int)PoseModel::Size> LABEL_MAP_B{
+    const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_B{
         std::vector<int>{8, 9, 10, 11,  12, 13, 2, 3, 4, 16, 5, 6, 7, 17, 0, 14, 15, 16, 17},                       // 18 (COCO_18, DOME_18)
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18},                       // 19 (COCO_19, DOME_19)
         std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18,                        // 59 (DOME_59), COCO_59_17, MPII_59
@@ -696,8 +705,15 @@ namespace caffe {
             // Redundant ones
             // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    17, 18,          9, 12,            4, 7,        11, 14,       7,      14,        9, 12,       },//23, 20},
-        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // COCO_25B (COCO_25B_23, COCO_25B_17)
-        std::vector<int>{0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},                                             // MPII_25B_16
+        std::vector<int>{                                                                                           // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
+            // Minimum spanning tree
+            // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
+                 1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,
+            // Redundant ones
+            // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
+                   17,18,       4,        5,6,              9,10,        10,      11,12,     12,    16},
+            // Ignored: shoulders, hips-ankles (-0.1% COCO_23), small toes-ankles (-0.1% COCO_23)
+            //              6,        15,16,                        20,23},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -867,6 +883,12 @@ namespace caffe {
 
 
     // Fixed functions
+    bool addBkgChannel(const PoseModel poseModel)
+    {
+        return (poseModel != PoseModel::COCO_25B_23 && poseModel != PoseModel::COCO_25B_17
+                && poseModel != PoseModel::MPII_25B_16);
+    }
+
     int getNumberBodyParts(const PoseModel poseModel)
     {
         return NUMBER_BODY_PARTS.at((int)poseModel);
@@ -889,7 +911,7 @@ namespace caffe {
 
     int getNumberBodyBkgAndPAF(const PoseModel poseModel)
     {
-        return getNumberBodyAndPafChannels(poseModel) + 1;
+        return getNumberBodyAndPafChannels(poseModel) + (addBkgChannel(poseModel) ? 1 : 0);
     }
 
     const std::vector<std::vector<int>>& getLmdbToOpenPoseKeypoints(const PoseModel poseModel)

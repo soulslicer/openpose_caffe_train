@@ -91,129 +91,6 @@ void setLabel(cv::Mat& image, const std::string& label, const cv::Point& org)
     cv::putText(image, label, org, fontface, scale, cv::Scalar{255,255,255}, thickness, 20);
 }
 
-void debugVisualize(const cv::Mat& image, const MetaData& metaData, const AugmentSelection& augmentSelection,
-                    const PoseModel poseModel, const Phase& phase_, const OPTransformationParameter& param_)
-{
-    cv::Mat imageToVisualize = image.clone();
-
-    cv::rectangle(imageToVisualize, metaData.objPos-cv::Point2f{3.f,3.f}, metaData.objPos+cv::Point2f{3.f,3.f},
-                  cv::Scalar{255,255,0}, CV_FILLED);
-    const auto numberBpPafChannels = getNumberBodyAndPafChannels(poseModel);
-    for (auto part = 0 ; part < numberBpPafChannels ; part++)
-    {
-        const auto currentPoint = metaData.jointsSelf.points[part];
-        // Hand case
-        if (numberBpPafChannels == 21)
-        {
-            if (part < 4)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
-            else if (part < 6 || part == 12 || part == 13)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,0,0}, -1);
-            else if (part < 8 || part == 14 || part == 15)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
-            else if (part < 10|| part == 16 || part == 17)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,100,0}, -1);
-            else if (part < 12|| part == 18 || part == 19)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,100,100}, -1);
-            else
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,100,100}, -1);
-        }
-        else if (numberBpPafChannels == 9)
-        {
-            if (part==0 || part==1 || part==2 || part==6)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
-            else if (part==3 || part==4 || part==5 || part==7)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,0,0}, -1);
-            else
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
-        }
-        // Body case (CPM)
-        else if (numberBpPafChannels == 14 || numberBpPafChannels == 28)
-        {
-            if (part < 14)
-            {
-                if (part==2 || part==3 || part==4 || part==8 || part==9 || part==10)
-                    cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,0,255}, -1);
-                else if (part==5 || part==6 || part==7 || part==11 || part==12 || part==13)
-                    cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,0,0}, -1);
-                else
-                    cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,255,0}, -1);
-            }
-            else if (part < 16)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{0,255,0}, -1);
-            else
-            {
-                if (part==17 || part==18 || part==19 || part==23 || part==24)
-                    cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,0,0}, -1);
-                else if (part==20 || part==21 || part==22 || part==25 || part==26)
-                    cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,100,100}, -1);
-                else
-                    cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{255,200,200}, -1);
-            }
-        }
-        else
-        {
-            if (metaData.jointsSelf.isVisible[part] <= 1)
-                cv::circle(imageToVisualize, currentPoint, 3, cv::Scalar{200,200,255}, -1);
-        }
-    }
-
-    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{-368/2.f,-368/2.f},
-             metaData.objPos + cv::Point2f{368/2.f,-368/2.f}, cv::Scalar{0,255,0}, 2);
-    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{368/2.f,-368/2.f},
-             metaData.objPos + cv::Point2f{368/2.f,368/2.f}, cv::Scalar{0,255,0}, 2);
-    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{368/2.f,368/2.f},
-             metaData.objPos + cv::Point2f{-368/2.f,368/2.f}, cv::Scalar{0,255,0}, 2);
-    cv::line(imageToVisualize, metaData.objPos + cv::Point2f{-368/2.f,368/2.f},
-             metaData.objPos + cv::Point2f{-368/2.f,-368/2.f}, cv::Scalar{0,255,0}, 2);
-
-    for (auto person=0;person<metaData.numberOtherPeople;person++)
-    {
-        cv::rectangle(imageToVisualize,
-                      metaData.objPosOthers[person]-cv::Point2f{3.f,3.f},
-                      metaData.objPosOthers[person]+cv::Point2f{3.f,3.f}, cv::Scalar{0,255,255}, CV_FILLED);
-        for (auto part = 0 ; part < numberBpPafChannels ; part++)
-            if (metaData.jointsOthers[person].isVisible[part] <= 1)
-                cv::circle(imageToVisualize, metaData.jointsOthers[person].points[part], 3, cv::Scalar{0,0,255}, -1);
-    }
-
-    // Draw text
-    char imagename [100];
-    if (phase_ == TRAIN)
-    {
-        std::stringstream ss;
-        // ss << "Augmenting with:" << (augmentSelection.flip ? "flip" : "no flip")
-        //    << "; Rotate " << augmentSelection.RotAndFinalSize.first << " deg; scaling: "
-        //    << augmentSelection.scale << "; crop: " << augmentSelection.cropCenter.height
-        //    << "," << augmentSelection.cropCenter.width;
-        ss << metaData.datasetString << " " << metaData.writeNumber << " index:" << metaData.annotationListIndex
-           << "; person:" << metaData.peopleIndex << "; o_scale: " << metaData.scaleSelf;
-        std::string stringInfo = ss.str();
-        setLabel(imageToVisualize, stringInfo, cv::Point{0, 20});
-
-        std::stringstream ss2;
-        ss2 << "mult: " << augmentSelection.scale << "; rot: " << augmentSelection.RotAndFinalSize.first << "; flip: "
-            << (augmentSelection.flip?"true":"ori");
-        stringInfo = ss2.str();
-        setLabel(imageToVisualize, stringInfo, cv::Point{0, 40});
-
-        cv::rectangle(imageToVisualize, cv::Point{0, (int)(imageToVisualize.rows)},
-                      cv::Point{(int)(param_.crop_size_x()), (int)(param_.crop_size_y()+imageToVisualize.rows)},
-                      cv::Scalar{255,255,255}, 1);
-
-        sprintf(imagename, "visualize/augment_%04d_epoch_%03d_writenum_%03d.jpg", metaData.writeNumber,
-                metaData.epoch, metaData.writeNumber);
-    }
-    else
-    {
-        const std::string stringInfo = "no augmentation for testing";
-        setLabel(imageToVisualize, stringInfo, cv::Point{0, 20});
-
-        sprintf(imagename, "visualize/augment_%04d.jpg", metaData.writeNumber);
-    }
-    //LOG(INFO) << "filename is " << imagename;
-    cv::imwrite(imagename, imageToVisualize);
-}
 template<typename Dtype>
 int getType(Dtype dtype)
 {
@@ -487,24 +364,19 @@ cv::Rect getObjROI(const int stride, const std::vector<cv::Point2f> points,
 }
 
 template <typename Dtype>
-void maskOutIfVisibleIsX(Dtype* transformedLabel, const std::vector<cv::Point2f> points,
-                         const std::vector<float>& isVisible, const int stride,
-                         const int gridX, const int gridY, const int backgroundMaskIndex, const PoseModel poseModel,
-                         const int X)
+void maskPerson(
+    Dtype* transformedLabel, const std::vector<cv::Point2f> points, const std::vector<float>& isVisible,
+    const int stride, const int gridX, const int gridY, const int backgroundMaskIndex,
+    const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
+    const float sideRatioX = 0.3f, const float sideRatioY = 0.3f)
 {
-    // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
-    std::vector<int> missingBodyPartsBase;
-    // Get visible == 3 parts
-    for (auto part = 0; part < isVisible.size(); part++)
-        if (isVisible[part] == X)
-            missingBodyPartsBase.emplace_back(part);
     // Get missing indexes taking into account visible==3
     const auto missingIndexes = getIndexesForParts(poseModel, missingBodyPartsBase, isVisible);
     // If missing indexes --> Mask out whole person
     if (!missingIndexes.empty())
     {
         // Get valid ROI bounding box
-        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY);
+        const auto roi = getObjROI(stride, points, isVisible, gridX, gridY, sideRatioX, sideRatioY);
         // Apply ROI
         const auto channelOffset = gridX * gridY;
         const auto type = getType(Dtype(0));
@@ -517,10 +389,32 @@ void maskOutIfVisibleIsX(Dtype* transformedLabel, const std::vector<cv::Point2f>
                 maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
             }
             // Apply ROI to background channel
-            cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundMaskIndex*channelOffset]);
-            maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+            if (backgroundMaskIndex >= 0)
+            {
+                cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundMaskIndex*channelOffset]);
+                maskMissTemp(roi).setTo(0.f); // For debugging use 0.5f
+            }
         }
     }
+}
+
+template <typename Dtype>
+void maskPersonIfVisibleIsX(
+    Dtype* transformedLabel, const std::vector<cv::Point2f> points, const std::vector<float>& isVisible,
+    const int stride, const int gridX, const int gridY, const int backgroundMaskIndex,
+    const PoseModel poseModel, const int X,
+    const float sideRatioX = 0.3f, const float sideRatioY = 0.3f)
+{
+    // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
+    std::vector<int> missingBodyPartsBase;
+    // Get visible == 3 parts
+    for (auto part = 0; part < isVisible.size(); part++)
+        if (isVisible[part] == X)
+            missingBodyPartsBase.emplace_back(part);
+    // Make out channels
+    maskPerson(
+        transformedLabel, points, isVisible, stride, gridX, gridY, backgroundMaskIndex, poseModel,
+        missingBodyPartsBase);
 }
 // OpenPose: added ended
 
@@ -697,12 +591,13 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
     return image;
 }
 
-cv::Mat readMaskMiss(const PoseCategory poseCategory, const int initImageHeight,
+cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel, const int initImageHeight,
                      const int initImageWidth, const int datumArea,
                      const std::string& data)
 {
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
+        || poseModel == PoseModel::MPII_25B_16
         // COCO & Car
         // TODO: Car23 needs a mask, Car12 does not have one!!!
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
@@ -885,7 +780,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Read mask miss (LMDB channel 2)
             const auto initImageWidth = (int)image.cols;
             const auto initImageHeight = (int)image.rows;
-            maskMiss = readMaskMiss(poseCategory, initImageHeight, initImageWidth, datumArea, data);
+            maskMiss = readMaskMiss(poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data);
         }
         else
             LOG(INFO) << "Invalid metaData" + getLine(__LINE__, __FUNCTION__, __FILE__);
@@ -931,8 +826,6 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
     // Data augmentation
     timer1.Start();
     AugmentSelection augmentSelection;
-    // // Debug - Visualize original
-    // debugVisualize(image, metaData, augmentSelection, poseModel, phase_, param_);
     // Augmentation
     cv::Mat backgroundImageAugmented;
     VLOG(2) << "   input size (" << initImageWidth << ", " << initImageHeight << ")";
@@ -1026,9 +919,6 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
     // Augmentation time
     VLOG(2) << "  Aug: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debug - Visualize final (augmented) image
-    // debugVisualize(imageAugmented, metaData, augmentSelection, poseModel, phase_, param_);
-
     return validMetaData;
 }
 
@@ -1107,6 +997,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
     // Debugging - Visualize - Write on disk
     // if (poseModel == PoseModel::COCO_25E)
     {
+        // if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
         // if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
         // if (metaData.writeNumber < 5 && sCounterAuxiliary < 5)
         // if (metaData.writeNumber < 10 && sCounterAuxiliary < 10)
@@ -1264,12 +1155,18 @@ void maskHands(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std
 }
 
 void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
-              const float stride, const float ratio, const int kneeIndexBase)
+              const float stride, const float ratio, const PoseModel poseModel)
 {
+    const auto kneeIndexBase = (poseModel == PoseModel::COCO_23_17 ? 8 : 10);
     for (auto part = 0 ; part < 2 ; part++)
     {
-        const auto kneeIndex = kneeIndexBase+part*3;
-        const auto ankleIndex = kneeIndex+1;
+        auto kneeIndex = kneeIndexBase+part*3;
+        auto ankleIndex = kneeIndex+1;
+        if (poseModel == PoseModel::COCO_25B_17)
+        {
+            kneeIndex = 13+part;
+            ankleIndex = 15+part;
+        }
         if (isVisible.at(kneeIndex) != 2 && isVisible.at(ankleIndex) != 2)
         {
             const auto ratioStride = 1.f / stride;
@@ -1346,7 +1243,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     const auto channelOffset = gridY * gridX;
     const auto numberBodyParts = getNumberBodyParts(mPoseModel); // #BP
     const auto numberPafChannels = getNumberPafChannels(mPoseModel); // 2 x #PAF
-    // numberBodyParts + numberPafChannels + 1
     const auto addDistance = param_.add_distance();
     const auto numberTotalChannels = getNumberBodyBkgAndPAF(mPoseModel)
                                    + addDistance * getDistanceAverage(mPoseModel).size();
@@ -1446,48 +1342,57 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                               &transformedLabel[index*channelOffset + channelOffset], 0);
             }
             // Background
-            const auto backgroundIndex = numberPafChannels + numberBodyParts;
-            cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
-            // If hands
-            if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
+            if (addBkgChannel(mPoseModel))
             {
-                maskHands(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
-                for (const auto& jointsOther : metaData.jointsOthers)
-                    maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
-            }
-            // If foot
-            if (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
-                || mPoseModel == PoseModel::COCO_25_17E)
-            {
-                const auto kneeIndexBase = (mPoseModel == PoseModel::COCO_23_17 ? 8 : 10);
-                maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
-                         kneeIndexBase);
-                for (const auto& jointsOther : metaData.jointsOthers)
-                    maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.8f, kneeIndexBase);
+                const auto backgroundIndex = numberPafChannels + numberBodyParts;
+                cv::Mat maskMissTemp(gridY, gridX, type, &transformedLabel[backgroundIndex*channelOffset]);
+                // If hands
+                if (numberBodyParts == 59 && mPoseModel != PoseModel::MPII_59)
+                {
+                    maskHands(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.6f);
+                    for (const auto& jointsOther : metaData.jointsOthers)
+                        maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
+                }
+                // If foot
+                if (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
+                    || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17)
+                {
+                    maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
+                             mPoseModel);
+                    for (const auto& jointsOther : metaData.jointsOthers)
+                        maskFeet(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.8f, mPoseModel);
+                }
             }
         }
 
         // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
         // Self
+        const auto backgroundMaskIndexTemp = (addBkgChannel(mPoseModel) ? backgroundMaskIndex : -1);
         const auto& joints = metaData.jointsSelf;
         if (mPoseModel == PoseModel::CAR_22)
-            maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
-                                gridX, gridY, backgroundMaskIndex, mPoseModel, 2);
-        maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
-                            gridX, gridY, backgroundMaskIndex, mPoseModel, 3);
-        maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
-                            gridX, gridY, backgroundMaskIndex, mPoseModel, 4);
+            maskPersonIfVisibleIsX(
+                transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+                mPoseModel, 2);
+        maskPersonIfVisibleIsX(
+            transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+            mPoseModel, 3);
+        maskPersonIfVisibleIsX(
+            transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+            mPoseModel, 4);
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
         {
             const auto& joints = metaData.jointsOthers[otherPerson];
             if (mPoseModel == PoseModel::CAR_22)
-                maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
-                                    gridX, gridY, backgroundMaskIndex, mPoseModel, 2);
-            maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
-                                gridX, gridY, backgroundMaskIndex, mPoseModel, 3);
-            maskOutIfVisibleIsX(transformedLabel, joints.points, joints.isVisible, stride,
-                                gridX, gridY, backgroundMaskIndex, mPoseModel, 4);
+                maskPersonIfVisibleIsX(
+                    transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+                    mPoseModel, 2);
+            maskPersonIfVisibleIsX(
+                transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+                mPoseModel, 3);
+            maskPersonIfVisibleIsX(
+                transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+                mPoseModel, 4);
         }
 
         // Body parts
@@ -1513,6 +1418,24 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                         transformedLabel + (numberPafChannels+part)*channelOffset,
                         centerPoint, stride, gridX, gridY, param_.sigma());
                 }
+            }
+        }
+
+        // For upper neck and top head --> mask out people bounding boxes, leave rest as mask = 1, neck/head value = 0
+        if (mPoseModel == PoseModel::COCO_25B_23 || mPoseModel == PoseModel::COCO_25B_17)
+        {
+            // Mask people
+            const std::vector<int> neckHeadIndexes{17, 18};
+            maskPerson(
+                transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+                mPoseModel, neckHeadIndexes, 1.f, 1.f);
+            // For every other person
+            for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
+            {
+                const auto& joints = metaData.jointsOthers[otherPerson];
+                maskPerson(
+                    transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
+                    mPoseModel, neckHeadIndexes, 1.f, 1.f);
             }
         }
 
@@ -1633,19 +1556,22 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     // Naive implementation
     const auto backgroundIndex = numberTotalChannels+numberPafChannels+numberBodyParts;
     auto* transformedLabelBkg = &transformedLabel[backgroundIndex*channelOffset];
-    for (auto gY = 0; gY < gridY; gY++)
+    if (addBkgChannel(mPoseModel))
     {
-        const auto yOffset = gY*gridX;
-        for (auto gX = 0; gX < gridX; gX++)
+        for (auto gY = 0; gY < gridY; gY++)
         {
-            const auto xyOffset = yOffset + gX;
-            Dtype maximum = 0.;
-            for (auto part = numberTotalChannels+numberPafChannels ; part < backgroundIndex ; part++)
+            const auto yOffset = gY*gridX;
+            for (auto gX = 0; gX < gridX; gX++)
             {
-                const auto index = part * channelOffset + xyOffset;
-                maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
+                const auto xyOffset = yOffset + gX;
+                Dtype maximum = 0.;
+                for (auto part = numberTotalChannels+numberPafChannels ; part < backgroundIndex ; part++)
+                {
+                    const auto index = part * channelOffset + xyOffset;
+                    maximum = (maximum > transformedLabel[index]) ? maximum : transformedLabel[index];
+                }
+                transformedLabelBkg[xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
             }
-            transformedLabelBkg[xyOffset] = std::max(Dtype(1.)-maximum, Dtype(0.));
         }
     }
     // Background mask channel
@@ -1766,20 +1692,23 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
     }
 
     // Background mask channel
-    // Set to 1 bkg if some keypoint was annotated as true in that pixel
-    // Because this would mean that the real bkg (even if there are some missing keypoints)
-    // will not be 1, so this approximation is better than nothing.
-    for (auto gY = 0; gY < gridY; gY++)
+    if (addBkgChannel(mPoseModel))
     {
-        const auto yOffset = gY*gridX;
-        for (auto gX = 0; gX < gridX; gX++)
+        // Set to 1 bkg if some keypoint was annotated as true in that pixel
+        // Because this would mean that the real bkg (even if there are some missing keypoints)
+        // will not be 1, so this approximation is better than nothing.
+        for (auto gY = 0; gY < gridY; gY++)
         {
-            const auto xyOffset = yOffset + gX;
-            // // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
-            // if (mPoseModel == PoseModel::CAR_12 && transformedLabelBkg[xyOffset] < 1 - 1e-9)
-            // if (transformedLabelBkg[xyOffset] < 1 - 1e-9)
-            if (transformedLabelBkg[xyOffset] < 0.85)
-                transformedLabelBkgMask[xyOffset] = Dtype(1);
+            const auto yOffset = gY*gridX;
+            for (auto gX = 0; gX < gridX; gX++)
+            {
+                const auto xyOffset = yOffset + gX;
+                // // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+                // if (mPoseModel == PoseModel::CAR_12 && transformedLabelBkg[xyOffset] < 1 - 1e-9)
+                // if (transformedLabelBkg[xyOffset] < 1 - 1e-9)
+                if (transformedLabelBkg[xyOffset] < 0.85)
+                    transformedLabelBkgMask[xyOffset] = Dtype(1);
+            }
         }
     }
 }

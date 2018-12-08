@@ -160,6 +160,9 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     {
         const int stride = this->layer_param_.op_transform_param().stride();
         const int numberChannels = this->mOPDataTransformers[0]->getNumberChannels();
+        for (const auto& oPDataTransformerPtr : this->mOPDataTransformers)
+            CHECK(oPDataTransformerPtr->getNumberChannels() == this->mOPDataTransformers[0]->getNumberChannels())
+                << "Are you using compatible models?";
         std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
