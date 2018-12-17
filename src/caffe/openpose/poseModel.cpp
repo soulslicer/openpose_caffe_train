@@ -98,7 +98,7 @@ namespace caffe {
 //     {15, "LWrist"},
 //     {16, "Background"},
 // };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_18 {
+const std::map<unsigned int, std::string> POSE_BODY_18_BODY_PARTS {
     {0,  "Nose"},
     {1,  "Neck"},
     {2,  "RShoulder"},
@@ -119,7 +119,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_18 {
     {17, "LEar"},
     {18, "Background"},
 };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_19 {
+const std::map<unsigned int, std::string> POSE_BODY_19_BODY_PARTS {
     {0,  "Nose"},
     {1,  "Neck"},
     {2,  "RShoulder"},
@@ -141,7 +141,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_19 {
     {18, "LEar"},
     {19, "Background"},
 };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_23 {
+const std::map<unsigned int, std::string> POSE_BODY_23_BODY_PARTS {
     {0,  "Nose"},
     {1,  "RShoulder"},
     {2,  "RElbow"},
@@ -167,7 +167,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_23 {
     {22, "RHeel"},
     {23, "Background"},
 };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_25 {
+const std::map<unsigned int, std::string> POSE_BODY_25_BODY_PARTS {
     {0,  "Nose"},
     {1,  "Neck"},
     {2,  "RShoulder"},
@@ -195,7 +195,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_25 {
     {24, "RHeel"},
     {25, "Background"},
 };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_25B {
+const std::map<unsigned int, std::string> POSE_BODY_25B_BODY_PARTS {
     {0,  "Nose"},
     {1,  "LEye"},
     {2,  "REye"},
@@ -222,7 +222,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_25B {
     {23, "RSmallToe"},
     {24, "RHeel"},
 };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_59 {
+const std::map<unsigned int, std::string> POSE_BODY_59_BODY_PARTS {
     // Body
     {0,  "Nose"},
     {1,  "Neck"},
@@ -258,7 +258,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_59 {
     // Background
     {59, "Background"},
 };
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_65 {
+const std::map<unsigned int, std::string> POSE_BODY_65_BODY_PARTS {
     // Body
     {0,  "Nose"},
     {1,  "Neck"},
@@ -301,7 +301,7 @@ const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_65 {
     {65, "Background"},
 };
 const auto F95 = 25;
-const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_95 {
+const std::map<unsigned int, std::string> POSE_BODY_95_BODY_PARTS {
     {0,  "Nose"},
     {1,  "LEye"},
     {2,  "REye"},
@@ -930,20 +930,20 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     };
 
     const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
-        OPENPOSE_BODY_PARTS_18, // 18 (COCO_18, DOME_18)
-        OPENPOSE_BODY_PARTS_19, // 19 (COCO_19(b), DOME_19)
-        OPENPOSE_BODY_PARTS_59, // 59 (DOME_59), COCO_59_17, MPII_59
-        OPENPOSE_BODY_PARTS_19, // COCO_19b
-        OPENPOSE_BODY_PARTS_19, // COCO_19_V2
-        OPENPOSE_BODY_PARTS_25, // 25 (COCO_25, COCO_25_17)
-        OPENPOSE_BODY_PARTS_65, // 65 (MPII_65_42)
+        POSE_BODY_18_BODY_PARTS, // 18 (COCO_18, DOME_18)
+        POSE_BODY_19_BODY_PARTS, // 19 (COCO_19(b), DOME_19)
+        POSE_BODY_59_BODY_PARTS, // 59 (DOME_59), COCO_59_17, MPII_59
+        POSE_BODY_19_BODY_PARTS, // COCO_19b
+        POSE_BODY_19_BODY_PARTS, // COCO_19_V2
+        POSE_BODY_25_BODY_PARTS, // 25 (COCO_25, COCO_25_17)
+        POSE_BODY_65_BODY_PARTS, // 65 (MPII_65_42)
         CAR_12_PARTS, // CAR_12
-        OPENPOSE_BODY_PARTS_25, // 25E (COCO_25E, COCO_25_17E)
-        OPENPOSE_BODY_PARTS_23, // 23 (COCO_23, COCO_23_17)
+        POSE_BODY_25_BODY_PARTS, // 25E (COCO_25E, COCO_25_17E)
+        POSE_BODY_23_BODY_PARTS, // 23 (COCO_23, COCO_23_17)
         CAR_22_PARTS, // CAR_22
-        OPENPOSE_BODY_PARTS_19, // COCO_19E
-        OPENPOSE_BODY_PARTS_25B, // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
-        OPENPOSE_BODY_PARTS_95, // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
+        POSE_BODY_19_BODY_PARTS, // COCO_19E
+        POSE_BODY_25B_BODY_PARTS, // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
+        POSE_BODY_95_BODY_PARTS, // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
