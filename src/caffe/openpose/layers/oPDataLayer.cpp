@@ -160,9 +160,11 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     {
         const int stride = this->layer_param_.op_transform_param().stride();
         const int numberChannels = this->mOPDataTransformers[0]->getNumberChannels();
-        for (const auto& oPDataTransformerPtr : this->mOPDataTransformers)
-            CHECK(oPDataTransformerPtr->getNumberChannels() == this->mOPDataTransformers[0]->getNumberChannels())
-                << "Are you using compatible models?";
+        for (auto i = 0u ; i < this->mOPDataTransformers.size() ; i++)
+            CHECK(this->mOPDataTransformers[i]->getNumberChannels() == this->mOPDataTransformers[0]->getNumberChannels())
+                << "Are you using compatible models? " << this->mOPDataTransformers[i]->getNumberChannels()
+                << " vs. " << this->mOPDataTransformers[0]->getNumberChannels()
+                << " channels (models " << mModels[i] << " vs. " << mModels[0] << ")";
         std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
@@ -426,14 +428,14 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     // Timer (every 20 iterations x batch size)
     mCounter++;
     const auto repeatEveryXVisualizations = 4;
-    if (mCounter == 20*repeatEveryXVisualizations)
+    if (mCounter % 20*repeatEveryXVisualizations == 0)
     {
         std::string text = "Time: " + std::to_string(mDuration/repeatEveryXVisualizations * 1e-9) + "s";
         const auto accumulatedCounters = float(
             std::accumulate(mCounterTimer.begin(), mCounterTimer.end(), mCounterTimerBkg));
         for (auto i = 0u ; i < mCounterTimer.size() ; i++)
         {
-            text += "\tRatio" + std::to_string(i) + ": ";
+            text += "\t" + mModels.at(i) + ": ";
             text += std::to_string(mCounterTimer.at(i)/accumulatedCounters);
         }
         text += "\tRatioBkg: " + std::to_string(mCounterTimerBkg/accumulatedCounters);

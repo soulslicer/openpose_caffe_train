@@ -28,9 +28,15 @@ enum class PoseModel : unsigned short
     COCO_23_17,
     CAR_22,
     COCO_19E,
+    // COCO + MPII + Foot
     COCO_25B_23,
     COCO_25B_17, // 20
     MPII_25B_16,
+    // COCO + MPII + Foot + Face
+    COCO_95_23,
+    COCO_95_17,
+    MPII_95_16,
+    FACE_95_70,
     Size,
 };
 enum class PoseCategory : unsigned short
@@ -38,7 +44,8 @@ enum class PoseCategory : unsigned short
     COCO,
     DOME,
     MPII,
-    CAR
+    CAR,
+    FACE
 };
 
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString);
@@ -65,6 +72,8 @@ const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
+const std::map<unsigned int, std::string>& getMapping(const PoseModel poseModel);
+
 const std::vector<float>& getDistanceAverage(const PoseModel poseModel);
 
 const std::vector<float>& getDistanceSigma(const PoseModel poseModel);
@@ -74,8 +83,10 @@ unsigned int getRootIndex(const PoseModel poseModel);
 std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
                                     const std::vector<float>& isVisible, const float minVisibleToBlock = 4.f);
 
-std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
-                                    const float minVisibleToBlock = 4.f);
+std::vector<int> getEmptyChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
+                                  const float minVisibleToBlock = 4.f);
+
+std::vector<int> getMinus1Channels(const PoseModel poseModel, const std::vector<float>& isVisible);
 
 }  // namespace caffe
 

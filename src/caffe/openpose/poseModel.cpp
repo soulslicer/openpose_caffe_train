@@ -1,5 +1,6 @@
 #include <algorithm>    // std::sort, std::unique, std::distance
 #include <iostream>
+#include <map>
 #include <caffe/openpose/poseModel.hpp>
 #include <caffe/openpose/getLine.hpp>
 
@@ -97,246 +98,321 @@ namespace caffe {
 //     {15, "LWrist"},
 //     {16, "Background"},
 // };
-// OPENPOSE_BODY_PARTS_18 {
-//     {0,  "Nose"},
-//     {1,  "Neck"},
-//     {2,  "RShoulder"},
-//     {3,  "RElbow"},
-//     {4,  "RWrist"},
-//     {5,  "LShoulder"},
-//     {6,  "LElbow"},
-//     {7,  "LWrist"},
-//     {8,  "RHip"},
-//     {9,  "RKnee"},
-//     {10, "RAnkle"},
-//     {11, "LHip"},
-//     {12, "LKnee"},
-//     {13, "LAnkle"},
-//     {14, "REye"},
-//     {15, "LEye"},
-//     {16, "REar"},
-//     {17, "LEar"},
-//     {18, "Background"},
-// };
-// OPENPOSE_BODY_PARTS_23 {
-//     {0,  "Nose"},
-//     {1,  "RShoulder"},
-//     {2,  "RElbow"},
-//     {3,  "RWrist"},
-//     {4,  "LShoulder"},
-//     {5,  "LElbow"},
-//     {6,  "LWrist"},
-//     {7,  "RHip"},
-//     {8,  "RKnee"},
-//     {9,  "RAnkle"},
-//     {10, "LHip"},
-//     {11, "LKnee"},
-//     {12, "LAnkle"},
-//     {13, "REye"},
-//     {14, "LEye"},
-//     {15, "REar"},
-//     {16, "LEar"},
-//     {17, "LBigToe"},
-//     {18, "LSmallToe"},
-//     {19, "LHeel"},
-//     {20, "RBigToe"},
-//     {21, "RSmallToe"},
-//     {22, "RHeel"},
-//     {23, "Background"},
-// };
-// OPENPOSE_BODY_PARTS_25, OPENPOSE_BODY_PARTS_19(b) {
-//     {0,  "Nose"},
-//     {1,  "Neck"},
-//     {2,  "RShoulder"},
-//     {3,  "RElbow"},
-//     {4,  "RWrist"},
-//     {5,  "LShoulder"},
-//     {6,  "LElbow"},
-//     {7,  "LWrist"},
-//     {8,  "MHip"},
-//     {9,  "RHip"},
-//     {10, "RKnee"},
-//     {11, "RAnkle"},
-//     {12, "LHip"},
-//     {13, "LKnee"},
-//     {14, "LAnkle"},
-//     {15, "REye"},
-//     {16, "LEye"},
-//     {17, "REar"},
-//     {18, "LEar"},
-//     {19, "LBigToe"},
-//     {20, "LSmallToe"},
-//     {21, "LHeel"},
-//     {22, "RBigToe"},
-//     {23, "RSmallToe"},
-//     {24, "RHeel"},
-//     {19/25, "Background"},
-// };
-// OPENPOSE_BODY_PARTS_25B {
-//     {0,  "Nose"},
-//     {1,  "LEye"},
-//     {2,  "REye"},
-//     {3,  "LEar"},
-//     {4,  "REar"},
-//     {5,  "LShoulder"},
-//     {6,  "RShoulder"},
-//     {7,  "LElbow"},
-//     {8,  "RElbow"},
-//     {9,  "LWrist"},
-//     {10, "RWrist"},
-//     {11, "LHip"},
-//     {12, "RHip"},
-//     {13, "LKnee"},
-//     {14, "RKnee"},
-//     {15, "LAnkle"},
-//     {16, "RAnkle"},
-//     {17, "UpperNeck"},
-//     {18, "HeadTop"},
-//     {19, "LBigToe"},
-//     {20, "LSmallToe"},
-//     {21, "LHeel"},
-//     {22, "RBigToe"},
-//     {23, "RSmallToe"},
-//     {24, "RHeel"},
-//     {25, "Background"},
-// };
-// OPENPOSE_BODY_PARTS_59 {
-//     // Body
-//     {0,  "Nose"},
-//     {1,  "Neck"},
-//     {2,  "RShoulder"},
-//     {3,  "RElbow"},
-//     {4,  "RWrist"},
-//     {5,  "LShoulder"},
-//     {6,  "LElbow"},
-//     {7,  "LWrist"},
-//     {8,  "LowerAbs"},
-//     {9,  "RHip"},
-//     {10, "RKnee"},
-//     {11, "RAnkle"},
-//     {12, "LHip"},
-//     {13, "LKnee"},
-//     {14, "LAnkle"},
-//     {15, "REye"},
-//     {16, "LEye"},
-//     {17, "REar"},
-//     {18, "LEar"},
-//     // Left hand
-//     {19, "LThumb1CMC"},         {20, "LThumb2Knuckles"},{21, "LThumb3IP"},  {22, "LThumb4FingerTip"},
-//     {23, "LIndex1Knuckles"},    {24, "LIndex2PIP"},     {25, "LIndex3DIP"}, {26, "LIndex4FingerTip"},
-//     {27, "LMiddle1Knuckles"},   {28, "LMiddle2PIP"},    {29, "LMiddle3DIP"},{30, "LMiddle4FingerTip"},
-//     {31, "LRing1Knuckles"},     {32, "LRing2PIP"},      {33, "LRing3DIP"},  {34, "LRing4FingerTip"},
-//     {35, "LPinky1Knuckles"},    {36, "LPinky2PIP"},     {37, "LPinky3DIP"}, {38, "LPinky4FingerTip"},
-//     // Right hand
-//     {39, "RThumb1CMC"},         {40, "RThumb2Knuckles"},{41, "RThumb3IP"},  {42, "RThumb4FingerTip"},
-//     {43, "RIndex1Knuckles"},    {44, "RIndex2PIP"},     {45, "RIndex3DIP"}, {46, "RIndex4FingerTip"},
-//     {47, "RMiddle1Knuckles"},   {48, "RMiddle2PIP"},    {49, "RMiddle3DIP"},{50, "RMiddle4FingerTip"},
-//     {51, "RRing1Knuckles"},     {52, "RRing2PIP"},      {53, "RRing3DIP"},  {54, "RRing4FingerTip"},
-//     {55, "RPinky1Knuckles"},    {56, "RPinky2PIP"},     {57, "RPinky3DIP"}, {58, "RPinky4FingerTip"},
-//     // Background
-//     {59, "Background"},
-// };
-// OPENPOSE_BODY_PARTS_65 {
-//     // Body
-//     {0,  "Nose"},
-//     {1,  "Neck"},
-//     {2,  "RShoulder"},
-//     {3,  "RElbow"},
-//     {4,  "RWrist"},
-//     {5,  "LShoulder"},
-//     {6,  "LElbow"},
-//     {7,  "LWrist"},
-//     {8,  "MidHip"},
-//     {9,  "RHip"},
-//     {10, "RKnee"},
-//     {11, "RAnkle"},
-//     {12, "LHip"},
-//     {13, "LKnee"},
-//     {14, "LAnkle"},
-//     {15, "REye"},
-//     {16, "LEye"},
-//     {17, "REar"},
-//     {18, "LEar"},
-//     {19, "LBigToe"},
-//     {20, "LSmallToe"},
-//     {21, "LHeel"},
-//     {22, "RBigToe"},
-//     {23, "RSmallToe"},
-//     {24, "RHeel"},
-//     // Left hand
-//     {25, "LThumb1CMC"},         {26, "LThumb2Knuckles"},{27, "LThumb3IP"},  {28, "LThumb4FingerTip"},
-//     {29, "LIndex1Knuckles"},    {30, "LIndex2PIP"},     {31, "LIndex3DIP"}, {32, "LIndex4FingerTip"},
-//     {33, "LMiddle1Knuckles"},   {34, "LMiddle2PIP"},    {35, "LMiddle3DIP"},{36, "LMiddle4FingerTip"},
-//     {37, "LRing1Knuckles"},     {38, "LRing2PIP"},      {39, "LRing3DIP"},  {40, "LRing4FingerTip"},
-//     {41, "LPinky1Knuckles"},    {42, "LPinky2PIP"},     {43, "LPinky3DIP"}, {44, "LPinky4FingerTip"},
-//     // Right hand
-//     {45, "RThumb1CMC"},         {46, "RThumb2Knuckles"},{47, "RThumb3IP"},  {48, "RThumb4FingerTip"},
-//     {49, "RIndex1Knuckles"},    {50, "RIndex2PIP"},     {51, "RIndex3DIP"}, {52, "RIndex4FingerTip"},
-//     {53, "RMiddle1Knuckles"},   {54, "RMiddle2PIP"},    {55, "RMiddle3DIP"},{56, "RMiddle4FingerTip"},
-//     {57, "RRing1Knuckles"},     {58, "RRing2PIP"},      {59, "RRing3DIP"},  {60, "RRing4FingerTip"},
-//     {61, "RPinky1Knuckles"},    {62, "RPinky2PIP"},     {63, "RPinky3DIP"}, {64, "RPinky4FingerTip"},
-//     // Background
-//     {65, "Background"},
-// };
-// CAR_12_PARTS {
-//     {0,  "FRWheel"},
-//     {1,  "FLWheel"},
-//     {2,  "BRWheel"},
-//     {3,  "BLWheel"},
-//     {4,  "FRLight"},
-//     {5,  "FLLight"},
-//     {6,  "BRLight"},
-//     {7,  "BLLight"},
-//     {8,  "FRTop"},
-//     {9,  "FLTop"},
-//     {10, "BRTop"},
-//     {11, "BLTop"},
-//     {12, "Background"},
-// };
-// CAR_22_PARTS {
-//     {0,  "FLWheel"},
-//     {1,  "BLWheel"},
-//     {2,  "FRWheel"},
-//     {3,  "BRWheel"},
-//     {4,  "FRFogLight"},
-//     {5,  "FLFogLight"},
-//     {6,  "FRLight"},
-//     {7,  "FLLight"},
-//     {8,  "Grilles"},
-//     {9,  "FBumper"},
-//     {10, "LMirror"},
-//     {11, "RMirror"},
-//     {12, "FRTop"},
-//     {13, "FLTop"},
-//     {14, "BLTop"},
-//     {15, "BRTop"},
-//     {16, "BLLight"},
-//     {17, "BRLight"},
-//     {18, "Trunk"},
-//     {19, "BBumper"},
-//     {20, "BLCorner"},
-//     {21, "BRCorner"},
-//     {22, "Tailpipe"},
-//     {23, "Background"},
-// };
-// // Hand legend:
-// //     - Thumb:
-// //         - Carpometacarpal Joints (CMC)
-// //         - Interphalangeal Joints (IP)
-// //     - Other fingers:
-// //         - Knuckles or Metacarpophalangeal Joints (MCP)
-// //         - PIP (Proximal Interphalangeal Joints)
-// //         - DIP (Distal Interphalangeal Joints)
-// //     - All fingers:
-// //         - Fingertips
-// // More information: Page 6 of http://www.mccc.edu/~behrensb/documents/TheHandbig.pdf
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_18 {
+    {0,  "Nose"},
+    {1,  "Neck"},
+    {2,  "RShoulder"},
+    {3,  "RElbow"},
+    {4,  "RWrist"},
+    {5,  "LShoulder"},
+    {6,  "LElbow"},
+    {7,  "LWrist"},
+    {8,  "RHip"},
+    {9,  "RKnee"},
+    {10, "RAnkle"},
+    {11, "LHip"},
+    {12, "LKnee"},
+    {13, "LAnkle"},
+    {14, "REye"},
+    {15, "LEye"},
+    {16, "REar"},
+    {17, "LEar"},
+    {18, "Background"},
+};
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_19 {
+    {0,  "Nose"},
+    {1,  "Neck"},
+    {2,  "RShoulder"},
+    {3,  "RElbow"},
+    {4,  "RWrist"},
+    {5,  "LShoulder"},
+    {6,  "LElbow"},
+    {7,  "LWrist"},
+    {8,  "MHip"},
+    {9,  "RHip"},
+    {10, "RKnee"},
+    {11, "RAnkle"},
+    {12, "LHip"},
+    {13, "LKnee"},
+    {14, "LAnkle"},
+    {15, "REye"},
+    {16, "LEye"},
+    {17, "REar"},
+    {18, "LEar"},
+    {19, "Background"},
+};
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_23 {
+    {0,  "Nose"},
+    {1,  "RShoulder"},
+    {2,  "RElbow"},
+    {3,  "RWrist"},
+    {4,  "LShoulder"},
+    {5,  "LElbow"},
+    {6,  "LWrist"},
+    {7,  "RHip"},
+    {8,  "RKnee"},
+    {9,  "RAnkle"},
+    {10, "LHip"},
+    {11, "LKnee"},
+    {12, "LAnkle"},
+    {13, "REye"},
+    {14, "LEye"},
+    {15, "REar"},
+    {16, "LEar"},
+    {17, "LBigToe"},
+    {18, "LSmallToe"},
+    {19, "LHeel"},
+    {20, "RBigToe"},
+    {21, "RSmallToe"},
+    {22, "RHeel"},
+    {23, "Background"},
+};
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_25 {
+    {0,  "Nose"},
+    {1,  "Neck"},
+    {2,  "RShoulder"},
+    {3,  "RElbow"},
+    {4,  "RWrist"},
+    {5,  "LShoulder"},
+    {6,  "LElbow"},
+    {7,  "LWrist"},
+    {8,  "MHip"},
+    {9,  "RHip"},
+    {10, "RKnee"},
+    {11, "RAnkle"},
+    {12, "LHip"},
+    {13, "LKnee"},
+    {14, "LAnkle"},
+    {15, "REye"},
+    {16, "LEye"},
+    {17, "REar"},
+    {18, "LEar"},
+    {19, "LBigToe"},
+    {20, "LSmallToe"},
+    {21, "LHeel"},
+    {22, "RBigToe"},
+    {23, "RSmallToe"},
+    {24, "RHeel"},
+    {25, "Background"},
+};
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_25B {
+    {0,  "Nose"},
+    {1,  "LEye"},
+    {2,  "REye"},
+    {3,  "LEar"},
+    {4,  "REar"},
+    {5,  "LShoulder"},
+    {6,  "RShoulder"},
+    {7,  "LElbow"},
+    {8,  "RElbow"},
+    {9,  "LWrist"},
+    {10, "RWrist"},
+    {11, "LHip"},
+    {12, "RHip"},
+    {13, "LKnee"},
+    {14, "RKnee"},
+    {15, "LAnkle"},
+    {16, "RAnkle"},
+    {17, "UpperNeck"},
+    {18, "HeadTop"},
+    {19, "LBigToe"},
+    {20, "LSmallToe"},
+    {21, "LHeel"},
+    {22, "RBigToe"},
+    {23, "RSmallToe"},
+    {24, "RHeel"},
+};
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_59 {
+    // Body
+    {0,  "Nose"},
+    {1,  "Neck"},
+    {2,  "RShoulder"},
+    {3,  "RElbow"},
+    {4,  "RWrist"},
+    {5,  "LShoulder"},
+    {6,  "LElbow"},
+    {7,  "LWrist"},
+    {8,  "LowerAbs"},
+    {9,  "RHip"},
+    {10, "RKnee"},
+    {11, "RAnkle"},
+    {12, "LHip"},
+    {13, "LKnee"},
+    {14, "LAnkle"},
+    {15, "REye"},
+    {16, "LEye"},
+    {17, "REar"},
+    {18, "LEar"},
+    // Left hand
+    {19, "LThumb1CMC"},         {20, "LThumb2Knuckles"},{21, "LThumb3IP"},  {22, "LThumb4FingerTip"},
+    {23, "LIndex1Knuckles"},    {24, "LIndex2PIP"},     {25, "LIndex3DIP"}, {26, "LIndex4FingerTip"},
+    {27, "LMiddle1Knuckles"},   {28, "LMiddle2PIP"},    {29, "LMiddle3DIP"},{30, "LMiddle4FingerTip"},
+    {31, "LRing1Knuckles"},     {32, "LRing2PIP"},      {33, "LRing3DIP"},  {34, "LRing4FingerTip"},
+    {35, "LPinky1Knuckles"},    {36, "LPinky2PIP"},     {37, "LPinky3DIP"}, {38, "LPinky4FingerTip"},
+    // Right hand
+    {39, "RThumb1CMC"},         {40, "RThumb2Knuckles"},{41, "RThumb3IP"},  {42, "RThumb4FingerTip"},
+    {43, "RIndex1Knuckles"},    {44, "RIndex2PIP"},     {45, "RIndex3DIP"}, {46, "RIndex4FingerTip"},
+    {47, "RMiddle1Knuckles"},   {48, "RMiddle2PIP"},    {49, "RMiddle3DIP"},{50, "RMiddle4FingerTip"},
+    {51, "RRing1Knuckles"},     {52, "RRing2PIP"},      {53, "RRing3DIP"},  {54, "RRing4FingerTip"},
+    {55, "RPinky1Knuckles"},    {56, "RPinky2PIP"},     {57, "RPinky3DIP"}, {58, "RPinky4FingerTip"},
+    // Background
+    {59, "Background"},
+};
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_65 {
+    // Body
+    {0,  "Nose"},
+    {1,  "Neck"},
+    {2,  "RShoulder"},
+    {3,  "RElbow"},
+    {4,  "RWrist"},
+    {5,  "LShoulder"},
+    {6,  "LElbow"},
+    {7,  "LWrist"},
+    {8,  "MidHip"},
+    {9,  "RHip"},
+    {10, "RKnee"},
+    {11, "RAnkle"},
+    {12, "LHip"},
+    {13, "LKnee"},
+    {14, "LAnkle"},
+    {15, "REye"},
+    {16, "LEye"},
+    {17, "REar"},
+    {18, "LEar"},
+    {19, "LBigToe"},
+    {20, "LSmallToe"},
+    {21, "LHeel"},
+    {22, "RBigToe"},
+    {23, "RSmallToe"},
+    {24, "RHeel"},
+    // Left hand
+    {25, "LThumb1CMC"},         {26, "LThumb2Knuckles"},{27, "LThumb3IP"},  {28, "LThumb4FingerTip"},
+    {29, "LIndex1Knuckles"},    {30, "LIndex2PIP"},     {31, "LIndex3DIP"}, {32, "LIndex4FingerTip"},
+    {33, "LMiddle1Knuckles"},   {34, "LMiddle2PIP"},    {35, "LMiddle3DIP"},{36, "LMiddle4FingerTip"},
+    {37, "LRing1Knuckles"},     {38, "LRing2PIP"},      {39, "LRing3DIP"},  {40, "LRing4FingerTip"},
+    {41, "LPinky1Knuckles"},    {42, "LPinky2PIP"},     {43, "LPinky3DIP"}, {44, "LPinky4FingerTip"},
+    // Right hand
+    {45, "RThumb1CMC"},         {46, "RThumb2Knuckles"},{47, "RThumb3IP"},  {48, "RThumb4FingerTip"},
+    {49, "RIndex1Knuckles"},    {50, "RIndex2PIP"},     {51, "RIndex3DIP"}, {52, "RIndex4FingerTip"},
+    {53, "RMiddle1Knuckles"},   {54, "RMiddle2PIP"},    {55, "RMiddle3DIP"},{56, "RMiddle4FingerTip"},
+    {57, "RRing1Knuckles"},     {58, "RRing2PIP"},      {59, "RRing3DIP"},  {60, "RRing4FingerTip"},
+    {61, "RPinky1Knuckles"},    {62, "RPinky2PIP"},     {63, "RPinky3DIP"}, {64, "RPinky4FingerTip"},
+    // Background
+    {65, "Background"},
+};
+const auto F95 = 25;
+const std::map<unsigned int, std::string> OPENPOSE_BODY_PARTS_95 {
+    {0,  "Nose"},
+    {1,  "LEye"},
+    {2,  "REye"},
+    {3,  "LEar"},
+    {4,  "REar"},
+    {5,  "LShoulder"},
+    {6,  "RShoulder"},
+    {7,  "LElbow"},
+    {8,  "RElbow"},
+    {9,  "LWrist"},
+    {10, "RWrist"},
+    {11, "LHip"},
+    {12, "RHip"},
+    {13, "LKnee"},
+    {14, "RKnee"},
+    {15, "LAnkle"},
+    {16, "RAnkle"},
+    {17, "UpperNeck"},
+    {18, "HeadTop"},
+    {19, "LBigToe"},
+    {20, "LSmallToe"},
+    {21, "LHeel"},
+    {22, "RBigToe"},
+    {23, "RSmallToe"},
+    {24, "RHeel"},
+    // Face
+    {F95+0, "FaceContour0"},   {F95+1, "FaceContour1"},   {F95+2, "FaceContour2"},   {F95+3, "FaceContour3"},   {F95+4, "FaceContour4"},   {F95+5, "FaceContour5"},   // Contour 1/3
+    {F95+6, "FaceContour6"},   {F95+7, "FaceContour7"},   {F95+8, "FaceContour8"},   {F95+9, "FaceContour9"},   {F95+10, "FaceContour10"}, {F95+11, "FaceContour11"}, // Contour 2/3
+    {F95+12, "FaceContour12"}, {F95+13, "FaceContour13"}, {F95+14, "FaceContour14"}, {F95+15, "FaceContour15"}, {F95+16, "FaceContour16"},                            // Contour 3/3
+    {F95+17, "REyeBrow0"},  {F95+18, "REyeBrow1"},  {F95+19, "REyeBrow2"},  {F95+20, "REyeBrow3"},  {F95+21, "REyeBrow4"}, // Right eyebrow
+    {F95+22, "LEyeBrow4"},  {F95+23, "LEyeBrow3"},  {F95+24, "LEyeBrow2"},  {F95+25, "LEyeBrow1"},  {F95+26, "LEyeBrow0"}, // Left eyebrow
+    {F95+27, "NoseUpper0"}, {F95+28, "NoseUpper1"}, {F95+29, "NoseUpper2"}, {F95+30, "NoseUpper3"}, // Upper nose
+    {F95+31, "NoseLower0"}, {F95+32, "NoseLower1"}, {F95+33, "NoseLower2"}, {F95+34, "NoseLower3"}, {F95+35, "NoseLower4"}, // Lower nose
+    {F95+36, "REye0"}, {F95+37, "REye1"}, {F95+38, "REye2"}, {F95+39, "REye3"}, {F95+40, "REye4"}, {F95+41, "REye5"}, // Right eye
+    {F95+42, "LEye0"}, {F95+43, "LEye1"}, {F95+44, "LEye2"}, {F95+45, "LEye3"}, {F95+46, "LEye4"}, {F95+47, "LEye5"}, // Left eye
+    {F95+48, "OMouth0"}, {F95+49, "OMouth1"}, {F95+50, "OMouth2"}, {F95+51, "OMouth3"}, {F95+52, "OMouth4"}, {F95+53, "OMouth5"}, // Outer mouth 1/2
+    {F95+54, "OMouth6"}, {F95+55, "OMouth7"}, {F95+56, "OMouth8"}, {F95+57, "OMouth9"}, {F95+58, "OMouth10"}, {F95+59, "OMouth11"}, // Outer mouth 2/2
+    {F95+60, "IMouth0"}, {F95+61, "IMouth1"}, {F95+62, "IMouth2"}, {F95+63, "IMouth3"}, {F95+64, "IMouth4"}, {F95+65, "IMouth5"}, {F95+66, "IMouth6"}, {F95+67, "IMouth7"}, // Inner mouth
+    {F95+68, "RPupil"}, {F95+69, "LPupil"}, // Pupils
+    // // Left hand
+    // {25, "LThumb1CMC"},         {26, "LThumb2Knuckles"},{27, "LThumb3IP"},  {28, "LThumb4FingerTip"},
+    // {29, "LIndex1Knuckles"},    {30, "LIndex2PIP"},     {31, "LIndex3DIP"}, {32, "LIndex4FingerTip"},
+    // {33, "LMiddle1Knuckles"},   {34, "LMiddle2PIP"},    {35, "LMiddle3DIP"},{36, "LMiddle4FingerTip"},
+    // {37, "LRing1Knuckles"},     {38, "LRing2PIP"},      {39, "LRing3DIP"},  {40, "LRing4FingerTip"},
+    // {41, "LPinky1Knuckles"},    {42, "LPinky2PIP"},     {43, "LPinky3DIP"}, {44, "LPinky4FingerTip"},
+    // // Right hand
+    // {45, "RThumb1CMC"},         {46, "RThumb2Knuckles"},{47, "RThumb3IP"},  {48, "RThumb4FingerTip"},
+    // {49, "RIndex1Knuckles"},    {50, "RIndex2PIP"},     {51, "RIndex3DIP"}, {52, "RIndex4FingerTip"},
+    // {53, "RMiddle1Knuckles"},   {54, "RMiddle2PIP"},    {55, "RMiddle3DIP"},{56, "RMiddle4FingerTip"},
+    // {57, "RRing1Knuckles"},     {58, "RRing2PIP"},      {59, "RRing3DIP"},  {60, "RRing4FingerTip"},
+    // {61, "RPinky1Knuckles"},    {62, "RPinky2PIP"},     {63, "RPinky3DIP"}, {64, "RPinky4FingerTip"},
+};
+// Hand legend:
+//     - Thumb:
+//         - Carpometacarpal Joints (CMC)
+//         - Interphalangeal Joints (IP)
+//     - Other fingers:
+//         - Knuckles or Metacarpophalangeal Joints (MCP)
+//         - PIP (Proximal Interphalangeal Joints)
+//         - DIP (Distal Interphalangeal Joints)
+//     - All fingers:
+//         - Fingertips
+// More information: Page 6 of http://www.mccc.edu/~behrensb/documents/TheHandbig.pdf
+const std::map<unsigned int, std::string> CAR_12_PARTS {
+    {0,  "FRWheel"},
+    {1,  "FLWheel"},
+    {2,  "BRWheel"},
+    {3,  "BLWheel"},
+    {4,  "FRLight"},
+    {5,  "FLLight"},
+    {6,  "BRLight"},
+    {7,  "BLLight"},
+    {8,  "FRTop"},
+    {9,  "FLTop"},
+    {10, "BRTop"},
+    {11, "BLTop"},
+    {12, "Background"},
+};
+const std::map<unsigned int, std::string> CAR_22_PARTS {
+    {0,  "FLWheel"},
+    {1,  "BLWheel"},
+    {2,  "FRWheel"},
+    {3,  "BRWheel"},
+    {4,  "FRFogLight"},
+    {5,  "FLFogLight"},
+    {6,  "FRLight"},
+    {7,  "FLLight"},
+    {8,  "Grilles"},
+    {9,  "FBumper"},
+    {10, "LMirror"},
+    {11, "RMirror"},
+    {12, "FRTop"},
+    {13, "FLTop"},
+    {14, "BLTop"},
+    {15, "BRTop"},
+    {16, "BLLight"},
+    {17, "BRLight"},
+    {18, "Trunk"},
+    {19, "BBumper"},
+    {20, "BLCorner"},
+    {21, "BRCorner"},
+    {22, "Tailpipe"},
+    {23, "Background"},
+};
 
 
 
 
 
     // Auxiliary functions
-    const auto NUMBER_MODELS = 13; // How many are the same
+    const auto NUMBER_MODELS = 14; // How many are the same
     int poseModelToIndex(const PoseModel poseModel)
     {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
@@ -362,10 +438,12 @@ namespace caffe {
             return 9;
         else if (numberBodyParts == 25)
             return 5;
-        else if (numberBodyParts == 59)
+        else if (numberBodyParts == 59) // COCO + Hand
             return 2;
-        else if (numberBodyParts == 65)
+        else if (numberBodyParts == 65) // COCO + Foot + Hand
             return 6;
+        else if (numberBodyParts == 95) // COCO + MPII + Foot + Face
+            return 13;
         // else
         throw std::runtime_error{"PoseModel does not have corresponding index yet."
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -377,9 +455,9 @@ namespace caffe {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25, 95,95,95,95};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16, 23,17,16,70};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -448,6 +526,7 @@ namespace caffe {
         std::vector<std::vector<int>>{
             {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}          // COCO_19E
         },
+        // COCO + MPII + Foot
         std::vector<std::vector<int>>{                                                                              // COCO_25B_23
             {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{},{},{17},{18},{19},{20},{21},{22}
         },
@@ -457,6 +536,49 @@ namespace caffe {
         std::vector<std::vector<int>>{                                                                              // MPII_25B_16
             // {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
             {},{},{},{},{},{13},{12},{  },{  },{  },{  },{ },{ },{ },{ },{ },{ },{8},{9},{},{},{},{},{},{}
+        },
+        // COCO + MPII + Foot + Face
+        std::vector<std::vector<int>>{                                                                              // COCO_95_23
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {},{},                                                                                                  // MPII
+            {17},{18},{19},{20},{21},{22},                                                                          // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_95_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_95_16
+            // {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
+            {},{},{},{},{},{13},{12},{},{},{},{},{},{},{},{},{},{},                                                 // COCO
+            {8},{9},                                                                                                // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // FACE_95_70
+            // {27},
+            // {F95+27,F95+28,F95+29,F95+30,F95+31,F95+32,F95+34,F95+35},
+            {27,28,29,30,31,32,34,35},
+            // {42},
+            // {F95+42,F95+43,F95+44,F95+45,F95+46,F95+47},
+            {42,43,44,45,46,47},
+            // {36}, // COCO 1/2
+            // {F95+36,F95+37,F95+38,F95+39,F95+40,F95+41}, // COCO 1/2
+            {36,37,38,39,40,41}, // COCO 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{}, // COCO 2/2
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16}, // Face contour
+            {17},{18},{19},{20},{21},{22},{23},{24},{25},{26}, // Eyebrows
+            {27},{28},{29},{30},{31},{32},{33},{34},{35}, // Nose
+            {36},{37},{38},{39},{40},{41},{42},{43},{44},{45},{46},{47}, // Eyes
+            {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
+            {68},{69} // Pupils
         },
     };
 
@@ -540,6 +662,40 @@ namespace caffe {
         std::vector<std::vector<int>>{                                                                              // MPII_25B_16
             {},{},{},{},{},{13},{12},{  },{  },{  },{  },{ },{ },{ },{ },{ },{ },{8},{9},{},{},{},{},{},{}
         },
+        // COCO + MPII + Foot + Face
+        std::vector<std::vector<int>>{                                                                              // COCO_95_23
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {-1},{-1},                                                                                              // MPII
+            {17},{18},{19},{20},{21},{22},                                                                          // Foot
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},// Face 1/2
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_95_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {-1},{-1},                                                                                              // MPII
+            {-1},{-1},{-1},{-1},{-1},{-1},                                                                          // Foot
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},// Face 1/2
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_95_16
+            // {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
+            {},{},{},{},{},{13},{12},{},{},{},{},{},{},{},{},{},{},                                                 // COCO
+            {8},{9},                                                                                                // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // FACE_95_70
+            {-1},{-1},{-1},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                               // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16}, // Face contour
+            {17},{18},{19},{20},{21},{22},{23},{24},{25},{26}, // Eyebrows
+            {27},{28},{29},{30},{31},{32},{33},{34},{35}, // Nose
+            {36},{37},{38},{39},{40},{41},{42},{43},{44},{45},{46},{47}, // Eyes
+            {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
+            {68},{69} // Pupils
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -573,6 +729,10 @@ namespace caffe {
             return std::make_pair(PoseModel::COCO_25B_17, PoseCategory::COCO);
         else if (poseModeString == "COCO_25B_23")
             return std::make_pair(PoseModel::COCO_25B_23, PoseCategory::COCO);
+        else if (poseModeString == "COCO_95_17")
+            return std::make_pair(PoseModel::COCO_95_17, PoseCategory::COCO);
+        else if (poseModeString == "COCO_95_23")
+            return std::make_pair(PoseModel::COCO_95_23, PoseCategory::COCO);
         // Dome
         else if (poseModeString == "DOME_18")
             return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
@@ -587,6 +747,11 @@ namespace caffe {
             return std::make_pair(PoseModel::MPII_59, PoseCategory::MPII);
         else if (poseModeString == "MPII_65_42")
             return std::make_pair(PoseModel::MPII_65_42, PoseCategory::MPII);
+        else if (poseModeString == "MPII_95_16")
+            return std::make_pair(PoseModel::MPII_95_16, PoseCategory::MPII);
+        // Face
+        else if (poseModeString == "FACE_95_70")
+            return std::make_pair(PoseModel::FACE_95_70, PoseCategory::FACE);
         // Car
         else if (poseModeString == "CAR_12")
             return std::make_pair(PoseModel::CAR_12, PoseCategory::CAR);
@@ -624,6 +789,16 @@ namespace caffe {
         std::vector<std::array<int,2>>{{0,2},{1,3},{4,5},{6,7},{10,11},{12,13},{14,15},{16,17},{20,21}},            // CAR_22
         std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},                   // COCO_19E
         std::vector<std::array<int,2>>{{1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}},// 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
+        // COCO + MPII + Foot + Face
+        std::vector<std::array<int,2>>{                                                                             // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
+            {1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}, // COCO + MPII + Foot
+            {F95,F95+16},{F95+1,F95+15},{F95+2,F95+14},{F95+3,F95+13},{F95+4,F95+12},{F95+5,F95+11},{F95+6,F95+10},{F95+7,F95+9}, // Contour
+            {F95+17,F95+26},{F95+18,F95+25},{F95+19,F95+24},{F95+20,F95+23},{F95+21,F95+22}, // Eyebrows
+            {F95+31,F95+35},{F95+32,F95+34}, // Nose
+            {F95+36,F95+45},{F95+37,F95+44},{F95+38,F95+43},{F95+39,F95+42},{F95+40,F95+47},{F95+41,F95+46}, // Eyes
+            {F95+48,F95+54},{F95+49,F95+53},{F95+50,F95+52},{F95+55,F95+59},{F95+56,F95+58},{F95+60,F95+64},{F95+61,F95+63},{F95+65,F95+67}, // Mouth
+            {F95+68,F95+69} // Pupils
+        },
     };
 
     const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_A{
@@ -666,9 +841,28 @@ namespace caffe {
                  0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5, 5,
             // Redundant ones
             // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
-                    6, 6,       3,        3,4,              5, 6,         9,      9, 10,     11,    15}
+                    6, 6,       3,        3,4,              5, 6,         9,      9, 10,     11,    15},
             // Ignored: shoulders, hips-ankles (-0.1% COCO_23), ankles-small toes (-0.1% COCO_23)
             //              5,        11,12,                        15,16},
+        // COCO + MPII + Foot + Face
+        std::vector<int>{                                                                                           // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
+            // Minimum spanning tree
+            // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
+                 0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5, 5,
+            // Redundant ones
+            // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
+                    6, 6,       3,        3,4,              5, 6,         9,      9, 10,     11,    15,
+            // Ignored: shoulders, hips-ankles (-0.1% COCO_23), ankles-small toes (-0.1% COCO_23)
+            //              5,        11,12,                        15,16,
+               0, 2, 1, // COCO-Face (+1 extra, not 2)
+               F95+0,F95+1,F95+2,F95+3,F95+4,F95+5,F95+6,F95+7,F95+8,F95+9, F95+10,F95+11,F95+12,F95+13,F95+14,F95+15, // Contour (+0)
+               F95+0, F95+16,F95+17,F95+18,F95+19,F95+20,F95+21,F95+22,F95+23,F95+24,F95+25, // Countour-Eyebrow + Eyebrows (+1)
+               F95+21,F95+22,F95+27,F95+28,F95+29,F95+30,F95+33,F95+32,F95+33,F95+34, // Eyebrow-Nose + Nose (+1)
+               F95+27,F95+27,F95+36,F95+37,F95+38,F95+39,F95+40,F95+42,F95+43,F95+44,F95+45,F95+46, // Nose-Eyes + Eyes (+1)
+               F95+33,F95+48,F95+49,F95+50,F95+51,F95+52,F95+53,F95+54,F95+55,F95+56,F95+57,F95+58, // Nose-Mouth + Outer Mouth (+0)
+               F95+48,F95+54,F95+60,F95+61,F95+62,F95+63,F95+64,F95+65,F95+66, // Outer-Inner + Inner Mouth (+1)
+               F95+36,F95+39,F95+42,F95+45, // Eyes-Pupils (+2)
+        },
     };
 
     const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_B{
@@ -714,6 +908,42 @@ namespace caffe {
                    17,18,       4,        5,6,              9,10,        10,      11,12,     12,    16},
             // Ignored: shoulders, hips-ankles (-0.1% COCO_23), small toes-ankles (-0.1% COCO_23)
             //              6,        15,16,                        20,23},
+        // COCO + MPII + Foot + Face
+        std::vector<int>{                                                                                           // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
+            // Minimum spanning tree
+            // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
+                 1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,
+            // Redundant ones
+            // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
+                   17,18,       4,        5,6,              9,10,        10,      11,12,     12,    16,
+            // Ignored: shoulders, hips-ankles (-0.1% COCO_23), small toes-ankles (-0.1% COCO_23)
+            //              6,        15,16,                        20,23,
+               F95+30,F95+39,F95+42, // COCO-Face (+2 extra)
+               F95+1,F95+2,F95+3,F95+4,F95+5,F95+6,F95+7,F95+8,F95+9,F95+10,F95+11,F95+12,F95+13,F95+14,F95+15,F95+16, // Contour (+0)
+               F95+17,F95+26,F95+18,F95+19,F95+20,F95+21,F95+22,F95+23,F95+24,F95+25,F95+26, // Countour-Eyebrow + Eyebrows (+1)
+               F95+27,F95+27,F95+28,F95+29,F95+30,F95+33,F95+32,F95+31,F95+34,F95+35, // Eyebrow-Nose + Nose (+1)
+               F95+39,F95+42,F95+37,F95+38,F95+39,F95+40,F95+41,F95+43,F95+44,F95+45,F95+46,F95+47, // Nose-Eyes + Eyes (+1)
+               F95+51,F95+49,F95+50,F95+51,F95+52,F95+53,F95+54,F95+55,F95+56,F95+57,F95+58,F95+59, // Nose-Mouth + Outer Mouth (+0)
+               F95+60,F95+64,F95+61,F95+62,F95+63,F95+64,F95+65,F95+66,F95+67, // Outer-Inner + Inner Mouth (+1)
+               F95+68,F95+68,F95+69,F95+69, // Eyes-Pupils (+2)
+        }
+    };
+
+    const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
+        OPENPOSE_BODY_PARTS_18, // 18 (COCO_18, DOME_18)
+        OPENPOSE_BODY_PARTS_19, // 19 (COCO_19(b), DOME_19)
+        OPENPOSE_BODY_PARTS_59, // 59 (DOME_59), COCO_59_17, MPII_59
+        OPENPOSE_BODY_PARTS_19, // COCO_19b
+        OPENPOSE_BODY_PARTS_19, // COCO_19_V2
+        OPENPOSE_BODY_PARTS_25, // 25 (COCO_25, COCO_25_17)
+        OPENPOSE_BODY_PARTS_65, // 65 (MPII_65_42)
+        CAR_12_PARTS, // CAR_12
+        OPENPOSE_BODY_PARTS_25, // 25E (COCO_25E, COCO_25_17E)
+        OPENPOSE_BODY_PARTS_23, // 23 (COCO_23, COCO_23_17)
+        CAR_22_PARTS, // CAR_22
+        OPENPOSE_BODY_PARTS_19, // COCO_19E
+        OPENPOSE_BODY_PARTS_25B, // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
+        OPENPOSE_BODY_PARTS_95, // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -786,6 +1016,11 @@ namespace caffe {
         std::vector<float>{}, // CAR_22
         std::vector<float>{}, // BODY_19E
         std::vector<float>{}, // MPII_25B_16
+        // COCO + MPII + Foot + Face
+        std::vector<float>{},
+        std::vector<float>{},
+        std::vector<float>{},
+        std::vector<float>{},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -859,6 +1094,11 @@ namespace caffe {
         std::vector<float>{}, // BODY_19E
         std::vector<float>{}, // COCO_25B (COCO_25B_23, COCO_25B_17)
         std::vector<float>{}, // MPII_25B_16
+        // COCO + MPII + Foot + Face
+        std::vector<float>{},
+        std::vector<float>{},
+        std::vector<float>{},
+        std::vector<float>{},
     };
 
     const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
@@ -876,6 +1116,11 @@ namespace caffe {
         1u,     // BODY_19E
         1u,     // COCO_25B (COCO_25B_23, COCO_25B_17)
         1u,     // MPII_25B_16
+        // COCO + MPII + Foot + Face
+        1u,
+        1u,
+        1u,
+        1u,
     };
 
 
@@ -886,7 +1131,7 @@ namespace caffe {
     bool addBkgChannel(const PoseModel poseModel)
     {
         return (poseModel != PoseModel::COCO_25B_23 && poseModel != PoseModel::COCO_25B_17
-                && poseModel != PoseModel::MPII_25B_16);
+                && poseModel != PoseModel::MPII_25B_16 && getNumberBodyParts(poseModel) < 70);
     }
 
     int getNumberBodyParts(const PoseModel poseModel)
@@ -937,6 +1182,11 @@ namespace caffe {
     const std::vector<int>& getPafIndexB(const PoseModel poseModel)
     {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
+    }
+
+    const std::map<unsigned int, std::string>& getMapping(const PoseModel poseModel)
+    {
+        return MAPPINGS.at(poseModelToIndex(poseModel));
     }
 
     const std::vector<float>& getDistanceAverage(const PoseModel poseModel)
@@ -999,8 +1249,8 @@ namespace caffe {
         return missingChannels;
     }
 
-    std::vector<int> getMissingChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
-                                        const float minVisibleToBlock)
+    std::vector<int> getEmptyChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
+                                      const float minVisibleToBlock)
     {
         // Missing body parts
         std::vector<int> missingBodyParts;
@@ -1010,5 +1260,17 @@ namespace caffe {
             if (lmdbToOpenPoseKeypoints[i].empty())
                 missingBodyParts.emplace_back(i);
         return getIndexesForParts(poseModel, missingBodyParts, isVisible, minVisibleToBlock);
+    }
+
+    std::vector<int> getMinus1Channels(const PoseModel poseModel, const std::vector<float>& isVisible)
+    {
+        // Missing body parts
+        std::vector<int> missingBodyParts;
+        // const auto& lmdbToOpenPoseKeypoints = getLmdbToOpenPoseKeypoints(poseModel);
+        const auto& lmdbToOpenPoseKeypoints = getMaskedChannels(poseModel);
+        for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
+            if (lmdbToOpenPoseKeypoints[i].size() == 1 && lmdbToOpenPoseKeypoints[i][0] == -1)
+                missingBodyParts.emplace_back(i);
+        return getIndexesForParts(poseModel, missingBodyParts, isVisible);
     }
 }  // namespace caffe
