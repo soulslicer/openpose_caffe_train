@@ -70,6 +70,7 @@ public:
                    std::vector<long double>& distanceAverageNew,
                    std::vector<long double>& distanceSigmaNew,
                    std::vector<unsigned long long>& distanceAverageNewCounter,
+                   const int datasetIndex,
                    const Datum* datum, const Datum* const datumNegative = nullptr);
     int getNumberChannels() const;
 protected:
@@ -93,12 +94,12 @@ protected:
 
     // Label generation
     void generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel, const Datum* datum,
-                              const Datum* const datumNegative,
+                              const Datum* const datumNegative, const int datasetIndex,
                               std::vector<long double>& distanceAverageNew,
                               std::vector<long double>& distanceSigmaNew,
                               std::vector<unsigned long long>& distanceCounterNew);
     void generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize, const cv::Mat& maskMiss,
-                          const MetaData& metaData,
+                          const MetaData& metaData, const int datasetIndex,
                           const std::vector<float>& distanceAverage,
                           const std::vector<float>& distanceSigma,
                           std::vector<long double>& distanceAverageNew,

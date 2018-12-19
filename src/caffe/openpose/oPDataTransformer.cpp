@@ -14,6 +14,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
 // OpenPose: added end
@@ -32,6 +33,10 @@
 
 namespace caffe {
 // OpenPose: added ended
+std::vector<unsigned long long> sNumberMaxOcclusions;
+std::vector<double> sKeypointSigmas;
+std::mutex sOcclusionsMutex;
+
 struct AugmentSelection
 {
     bool flip = false;
@@ -474,6 +479,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
                                          std::vector<long double>& distanceAverageNew,
                                          std::vector<long double>& distanceSigmaNew,
                                          std::vector<unsigned long long>& distanceCounterNew,
+                                         const int datasetIndex,
                                          const Datum* datum,
                                          const Datum* const datumNegative)
 {
@@ -494,7 +500,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative,
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative, datasetIndex,
                          distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
@@ -593,8 +599,7 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
 }
 
 cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel, const int initImageHeight,
-                     const int initImageWidth, const int datumArea,
-                     const std::string& data)
+                     const int initImageWidth, const int datumArea, const std::string& data, const bool allMasked)
 {
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
@@ -603,7 +608,7 @@ cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel,
         // TODO: Car23 needs a mask, Car12 does not have one!!!
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
         // DOME & MPII
-        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
+        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{(allMasked ? 0. : 255.)}));
     // // Naive copy
     // cv::Mat maskMiss2;
     // // COCO
@@ -742,7 +747,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
                              cv::Mat& imageAugmented, cv::Mat& maskMissAugmented,
                              const Datum* datum, const Datum* const datumNegative,
                              const OPTransformationParameter& param_, const PoseCategory poseCategory,
-                             const PoseModel poseModel, const Phase phase_)
+                             const PoseModel poseModel, const Phase phase_, const int datasetIndex)
 {
     // Time measurement
     CPUTimer timer1;
@@ -781,7 +786,9 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Read mask miss (LMDB channel 2)
             const auto initImageWidth = (int)image.cols;
             const auto initImageHeight = (int)image.rows;
-            maskMiss = readMaskMiss(poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data);
+            maskMiss = readMaskMiss(
+                poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data,
+                metaData.datasetString == "face70_mask_out");
         }
         else
             LOG(INFO) << "Invalid metaData" + getLine(__LINE__, __FUNCTION__, __FILE__);
@@ -850,7 +857,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Augmentation (scale, rotation, cropping, and flipping)
             // Order does matter, otherwise code will fail doing augmentation
             float scaleMultiplier;
-            std::tie(augmentSelection.scale, scaleMultiplier) = estimateScale(metaData, param_);
+            std::tie(augmentSelection.scale, scaleMultiplier) = estimateScale(metaData, param_, datasetIndex);
             // Swap center?
             swapCenterPoint(metaData, param_, scaleMultiplier, poseModel);
             // Apply scale
@@ -884,9 +891,13 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
                                      // Either show bkg image or mask out black region
                                      (backgroundImage.empty() ? 0 : 255));
             }
+            // Lock
+            std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+            // Get value
+            const auto numberMaxOcclusions = sNumberMaxOcclusions[datasetIndex];
+            lock.unlock();
             // Introduce occlusions
-            doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
-                         poseModel);
+            doOcclusions(imageAugmented, backgroundImageAugmented, metaData, numberMaxOcclusions, poseModel);
             // Resize mask
             if (!maskMissAugmented.empty())
                 cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
@@ -1119,6 +1130,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
                                                     const Datum* datum, const Datum* const datumNegative,
+                                                    const int datasetIndex,
                                                     std::vector<long double>& distanceAverageNew,
                                                     std::vector<long double>& distanceSigmaNew,
                                                     std::vector<unsigned long long>& distanceCounterNew)
@@ -1130,13 +1142,27 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     const auto finalImageHeight = (int)param_.crop_size_y();
     const auto gridX = finalImageWidth / stride;
     const auto gridY = finalImageHeight / stride;
+    // Lock
+    std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+    // First time
+    if (sNumberMaxOcclusions.empty())
+    {
+        splitUnsigned(sNumberMaxOcclusions, param_.number_max_occlusions(), DELIMITER);
+        splitFloating(sKeypointSigmas, param_.sigmas(), DELIMITER);
+    }
+    // Dynamic resize
+    if (sNumberMaxOcclusions.size() <= datasetIndex)
+        sNumberMaxOcclusions.resize(datasetIndex, sNumberMaxOcclusions[0]);
+    if (sKeypointSigmas.size() <= datasetIndex)
+        sKeypointSigmas.resize(datasetIndex, sKeypointSigmas[0]);
+    lock.unlock();
 
     MetaData metaData;
     cv::Mat imageAugmented;
     cv::Mat maskMissAugmented;
     const auto validMetaData = generateAugmentedImages<Dtype>(
         metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
-        datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_);
+        datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_, datasetIndex);
     // If error reading meta data --> Labels to 0 and return
     if (!validMetaData || datumNegative == nullptr)
     {
@@ -1159,7 +1185,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Generate and copy label
     const auto& distanceAverage = getDistanceAverage(mPoseModel);
     const auto& sigmaAverage = getDistanceSigma(mPoseModel);
-    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData,
+    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, datasetIndex,
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
@@ -1279,6 +1305,7 @@ void fillMaskChannels(Dtype* transformedLabel, const int gridX, const int gridY,
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize,
                                                 const cv::Mat& maskMiss, const MetaData& metaData,
+                                                const int datasetIndex,
                                                 const std::vector<float>& distanceAverage,
                                                 const std::vector<float>& distanceSigma,
                                                 std::vector<long double>& distanceAverageNew,
@@ -1417,6 +1444,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             }
         }
 
+        // Sigma
+        // Lock
+        std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+        // Get value
+        const auto keypointSigma = sKeypointSigmas[datasetIndex];
+        lock.unlock();
+
         // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
         // Self
         const auto backgroundMaskIndexTemp = (addBkgChannel(mPoseModel) ? backgroundMaskIndex : -1);
@@ -1457,7 +1491,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 putGaussianMaps(
                     transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
                     transformedLabel + (numberPafChannels+part)*channelOffset,
-                    centerPoint, stride, gridX, gridY, param_.sigma());
+                    centerPoint, stride, gridX, gridY, keypointSigma);
             }
             // For every other person
             for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1468,7 +1502,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     putGaussianMaps(
                         transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
                         transformedLabel + (numberPafChannels+part)*channelOffset,
-                        centerPoint, stride, gridX, gridY, param_.sigma());
+                        centerPoint, stride, gridX, gridY, keypointSigma);
                 }
             }
         }
@@ -1529,7 +1563,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                 channelDistance + (2*partTarget+1)*channelOffset,
                                 maskDistance + 2*partTarget*channelOffset,
                                 maskDistance + (2*partTarget+1)*channelOffset,
-                                count, rootPoint, targetPoint, stride, gridX, gridY, param_.sigma(),
+                                count, rootPoint, targetPoint, stride, gridX, gridY, keypointSigma,
                                 &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
                                 &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
                                 distanceCounterNew[partTarget]
@@ -1548,7 +1582,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                     channelDistance + (2*partTarget+1)*channelOffset,
                                     maskDistance + 2*partTarget*channelOffset,
                                     maskDistance + (2*partTarget+1)*channelOffset,
-                                    count, rootPoint, targetPoint, stride, gridX, gridY, param_.sigma(),
+                                    count, rootPoint, targetPoint, stride, gridX, gridY, keypointSigma,
                                     &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
                                     &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
                                     distanceCounterNew[partTarget]
@@ -1559,7 +1593,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
             }
             // // Neck-star version
-            // const auto rootIndex = getRootIndex(mPoseModel);
+            // const auto rootIndex = getRootIndex();
             // for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
             // {
             //     if (rootIndex != partOrigin)
@@ -1577,7 +1611,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             //                 channelDistance + (2*partTarget+1)*channelOffset,
             //                 maskDistance + 2*partTarget*channelOffset,
             //                 maskDistance + (2*partTarget+1)*channelOffset,
-            //                 count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(),
+            //                 count, rootPoint, centerPoint, stride, gridX, gridY, keypointSigma,
             //                 &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
             //                 &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
             //                 distanceCounterNew[partTarget]
@@ -1596,7 +1630,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             //                     channelDistance + (2*partTarget+1)*channelOffset,
             //                     maskDistance + 2*partTarget*channelOffset,
             //                     maskDistance + (2*partTarget+1)*channelOffset,
-            //                     count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(),
+            //                     count, rootPoint, centerPoint, stride, gridX, gridY, keypointSigma,
             //                     &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
             //                     &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
             //                     distanceCounterNew[partTarget]

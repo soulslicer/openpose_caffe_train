@@ -78,7 +78,7 @@ const std::vector<float>& getDistanceAverage(const PoseModel poseModel);
 
 const std::vector<float>& getDistanceSigma(const PoseModel poseModel);
 
-unsigned int getRootIndex(const PoseModel poseModel);
+unsigned int getRootIndex();
 
 std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
                                     const std::vector<float>& isVisible, const float minVisibleToBlock = 4.f);

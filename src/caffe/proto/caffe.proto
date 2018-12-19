@@ -484,13 +484,13 @@ message OPTransformationParameter {
   optional float center_swap_prob = 15 [default = 0.0];
   // Scaling
   optional float scale_prob = 16 [default = 0.5];
-  optional float scale_min = 17 [default = 0.9];
-  optional float scale_max = 18 [default = 1.1];
+  optional string scale_mins = 17 [default = "0.9"];
+  optional string scale_maxs = 18 [default = "1.1"];
   optional float target_dist = 19 [default = 1.0];
   // Oclussion
-  optional uint32 number_max_occlusions = 20 [default = 0];
+  optional string number_max_occlusions = 20 [default = "0"];
   // Label generation
-  optional float sigma = 21 [default = 7.0];
+  optional string sigmas = 21 [default = "7.0"];
   // Model information
   optional string models = 22 [default = "COCO"];
   optional string sources = 23 [default = ""];

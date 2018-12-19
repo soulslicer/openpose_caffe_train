@@ -1101,28 +1101,6 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<float>{},
     };
 
-    const std::array<unsigned int, (int)PoseModel::Size> ROOT_INDEXES{
-        1u,     // 18 (COCO_18, DOME_18)
-        1u,     // 19 (COCO_19, DOME_19)
-        1u,     // 59 (DOME_59), COCO_59_17, MPII_59
-        1u,     // COCO_19b
-        1u,     // COCO_19_V2
-        1u,     // 25 (COCO_25, COCO_25_17)
-        1u,     // 65 (MPII_65_42)
-        1u,     // CAR_12
-        1u,     // 25 (COCO_25E, COCO_25_17E)
-        1u,     // 23 (COCO_23, COCO_23_17)
-        1u,     // CAR_22
-        1u,     // BODY_19E
-        1u,     // COCO_25B (COCO_25B_23, COCO_25B_17)
-        1u,     // MPII_25B_16
-        // COCO + MPII + Foot + Face
-        1u,
-        1u,
-        1u,
-        1u,
-    };
-
 
 
 
@@ -1130,8 +1108,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     // Fixed functions
     bool addBkgChannel(const PoseModel poseModel)
     {
-        return (poseModel != PoseModel::COCO_25B_23 && poseModel != PoseModel::COCO_25B_17
-                && poseModel != PoseModel::MPII_25B_16 && getNumberBodyParts(poseModel) < 70);
+        return (getMapping(poseModel).size() != NUMBER_BODY_PARTS[(int)poseModel]);
     }
 
     int getNumberBodyParts(const PoseModel poseModel)
@@ -1199,9 +1176,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         return DISTANCE_SIGMA.at(poseModelToIndex(poseModel));
     }
 
-    unsigned int getRootIndex(const PoseModel poseModel)
+    unsigned int getRootIndex()
     {
-        return ROOT_INDEXES.at(poseModelToIndex(poseModel));
+        return 1u;
     }
 
     std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,

@@ -13,7 +13,8 @@ namespace caffe {
     void swapCenterPoint(MetaData& metaData, const OPTransformationParameter& param_, const float scale,
                          const PoseModel poseModel);
     // Scale
-    std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_);
+    std::pair<float, float> estimateScale(
+        const MetaData& metaData, const OPTransformationParameter& param_, const int index);
     // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image);
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel);
     // Rotation
@@ -42,6 +43,25 @@ namespace caffe {
     // Other functions
     void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize);
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit);
+    // Auxiliary functions
+    const std::string DELIMITER = ";";
+    std::vector<std::string> split(const std::string& stringToSplit, const std::string& delimiter = DELIMITER);
+    template <typename Dtype>
+    void splitFloating(std::vector<Dtype>& splitedText, const std::string& stringToSplit, const std::string& delimiter = DELIMITER)
+    {
+        splitedText.clear();
+        const auto stringSplit = split(stringToSplit, delimiter);
+        for (const auto& string : stringSplit)
+            splitedText.emplace_back(std::stod(string));
+    }
+    template <typename Dtype>
+    void splitUnsigned(std::vector<Dtype>& splitedText, const std::string& stringToSplit, const std::string& delimiter = DELIMITER)
+    {
+        splitedText.clear();
+        const auto stringSplit = split(stringToSplit, delimiter);
+        for (const auto& string : stringSplit)
+            splitedText.emplace_back(std::stoull(string));
+    }
 
 }  // namespace caffe
 

@@ -19,34 +19,6 @@
 
 namespace caffe {
 
-// OpenPose: added
-const std::string DELIMITER = ";";
-std::vector<std::string> split(const std::string& stringToSplit, const std::string& delimiter)
-{
-    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
-    std::string token;
-    std::vector<std::string> splittedString;
-
-    while ((pos_end = stringToSplit.find(delimiter, pos_start)) != std::string::npos)
-    {
-        token = stringToSplit.substr(pos_start, pos_end - pos_start);
-        pos_start = pos_end + delim_len;
-        splittedString.emplace_back(token);
-    }
-    splittedString.emplace_back(stringToSplit.substr(pos_start));
-
-    return splittedString;
-}
-template <typename Dtype>
-void split(std::vector<Dtype>& splitedText, const std::string& stringToSplit, const std::string& delimiter)
-{
-    splitedText.clear();
-    const auto stringSplit = split(stringToSplit, delimiter);
-    for (const auto& string : stringSplit)
-        splitedText.emplace_back(std::stod(string));
-}
-// OpenPose: added end
-
 template <typename Dtype>
 OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     BasePrefetchingDataLayer<Dtype>(param),
@@ -64,7 +36,7 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     // Set mSources, mModels, and mProbabilites
     mSources = split(param.op_transform_param().sources(), DELIMITER);
     mModels = split(param.op_transform_param().models(), DELIMITER);
-    split(mProbabilities, param.op_transform_param().probabilities(), DELIMITER);
+    splitFloating(mProbabilities, param.op_transform_param().probabilities(), DELIMITER);
     // If only 1 model specified --> repeat for each source
     if (mModels.size() == 1 && mSources.size() > 1)
         mModels.resize(mSources.size(), mModels[0]);
@@ -93,14 +65,14 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     mCounterTimerBkg = 0;
     mOffsets.resize(mSources.size(), 0);
     // Set up negatives DB
-    if (!param.op_transform_param().source_background().empty())
+    if (!op_transform_param_.source_background().empty())
     {
         backgroundDb = true;
-        onlyBackgroundProbability = param.op_transform_param().prob_only_background();
+        onlyBackgroundProbability = op_transform_param_.prob_only_background();
         CHECK_GE(onlyBackgroundProbability, 0.f);
         CHECK_LT(onlyBackgroundProbability, 1.f);
         dbBackground.reset(db::GetDB(DataParameter_DB::DataParameter_DB_LMDB));
-        dbBackground->Open(param.op_transform_param().source_background(), db::READ);
+        dbBackground->Open(op_transform_param_.source_background(), db::READ);
         cursorBackground.reset(dbBackground->NewCursor());
     }
     else
@@ -111,8 +83,10 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     // Sanity checks
     const auto totalProbabilities = std::accumulate(mProbabilities.begin(), mProbabilities.end(), 0.f);
     if (std::abs(totalProbabilities + onlyBackgroundProbability - 1.f) > 1e-6)
-        throw std::runtime_error{"Probabilities sum up something different to 100%"
-                                 + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        throw std::runtime_error{
+            "Probabilities sum up something different to 100%: "
+            + std::to_string(100*(totalProbabilities + onlyBackgroundProbability))
+            + getLine(__LINE__, __FUNCTION__, __FILE__)};
     // Timer
     mDuration = 0;
     mCounter = 0;
@@ -389,20 +363,13 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         // Process image & label
         const auto begin = std::chrono::high_resolution_clock::now();
         if (backgroundDb)
-            oPDataTransformerPtr->Transform(&(this->transformed_data_),
-                                            &(this->transformed_label_),
-                                            mDistanceAverage,
-                                            mDistanceSigma,
-                                            mDistanceAverageCounter,
-                                            (desiredDbIsBkg ? nullptr : &datum),
-                                            &datumBackground);
+            oPDataTransformerPtr->Transform(
+                &(this->transformed_data_), &(this->transformed_label_), mDistanceAverage, mDistanceSigma,
+                mDistanceAverageCounter, randomIndex, (desiredDbIsBkg ? nullptr : &datum), &datumBackground);
         else
-            oPDataTransformerPtr->Transform(&(this->transformed_data_),
-                                            &(this->transformed_label_),
-                                            mDistanceAverage,
-                                            mDistanceSigma,
-                                            mDistanceAverageCounter,
-                                            (desiredDbIsBkg ? nullptr : &datum));
+            oPDataTransformerPtr->Transform(
+                &(this->transformed_data_), &(this->transformed_label_), mDistanceAverage, mDistanceSigma,
+                mDistanceAverageCounter, randomIndex, (desiredDbIsBkg ? nullptr : &datum));
         const auto end = std::chrono::high_resolution_clock::now();
         mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 
@@ -427,7 +394,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
     // Timer (every 20 iterations x batch size)
     mCounter++;
-    const auto repeatEveryXVisualizations = 4;
+    const auto repeatEveryXVisualizations = 8;
     if (mCounter % 20*repeatEveryXVisualizations == 0)
     {
         std::string text = "Time: " + std::to_string(mDuration/repeatEveryXVisualizations * 1e-9) + "s";
