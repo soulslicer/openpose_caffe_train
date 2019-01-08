@@ -37,6 +37,8 @@ enum class PoseModel : unsigned short
     COCO_95_17,
     MPII_95_16,
     FACE_95_70,
+    // PT
+    PT_25B_15,
     Size,
 };
 enum class PoseCategory : unsigned short
@@ -45,7 +47,8 @@ enum class PoseCategory : unsigned short
     DOME,
     MPII,
     CAR,
-    FACE
+    FACE,
+    PT
 };
 
 std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString);

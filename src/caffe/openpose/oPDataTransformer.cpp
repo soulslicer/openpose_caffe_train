@@ -1190,7 +1190,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
-    // visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    // THIS IS ALL BLACK SCREEN?
+    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    //exit(-1);
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)

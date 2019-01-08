@@ -580,7 +580,55 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
             {68},{69} // Pupils
         },
+        std::vector<std::vector<int>>{                                                                              // PT_25B_15
+            {13},{},{},{},{},{9},{8},{10},{7},{11},{6},{3},{2},{4},{1},{5},{0},{12},{14},{},{},{},{},{},{}
+        },
     };
+
+//    POSETRACK_MAPPING = dict()
+//    POSETRACK_MAPPING["RANKLE"] = 0 -
+//    POSETRACK_MAPPING["RKNEE"] = 1
+//    POSETRACK_MAPPING["RHIP"] = 2
+//    POSETRACK_MAPPING["LHIP"] = 3
+//    POSETRACK_MAPPING["LKNEE"] = 4
+//    POSETRACK_MAPPING["LANKLE"] = 5
+//    POSETRACK_MAPPING["RWRIST"] = 6
+//    POSETRACK_MAPPING["RELBOW"] = 7
+//    POSETRACK_MAPPING["RSHOULDER"] = 8
+//    POSETRACK_MAPPING["LSHOULDER"] = 9
+//    POSETRACK_MAPPING["LELBOW"] = 10
+//    POSETRACK_MAPPING["LWRIST"] = 11
+//    POSETRACK_MAPPING["NECK"] = 12
+//    POSETRACK_MAPPING["NOSE"] = 13 # Have nose
+//    POSETRACK_MAPPING["TOP"] = 14
+
+//    const std::map<unsigned int, std::string> POSE_BODY_25B_BODY_PARTS {
+//        {0,  "Nose"}, - 13
+//        {1,  "LEye"}, -
+//        {2,  "REye"},
+//        {3,  "LEar"},
+//        {4,  "REar"},
+//        {5,  "LShoulder"}, - 9
+//        {6,  "RShoulder"}, - 8
+//        {7,  "LElbow"}, - 10
+//        {8,  "RElbow"}, - 7
+//        {9,  "LWrist"}, - 11
+//        {10, "RWrist"}, - 6
+//        {11, "LHip"}, - 3
+//        {12, "RHip"}, - 2
+//        {13, "LKnee"}, - 4
+//        {14, "RKnee"}, - 1
+//        {15, "LAnkle"}, - 5
+//        {16, "RAnkle"}, - 0
+//        {17, "UpperNeck"}, - 12
+//        {18, "HeadTop"}, - 14
+//        {19, "LBigToe"},
+//        {20, "LSmallToe"},
+//        {21, "LHeel"},
+//        {22, "RBigToe"},
+//        {23, "RSmallToe"},
+//        {24, "RHeel"},
+//    };
 
     // Idea: Keypoint that is empty will be masked out (including the PAFs that use it)
     // For simplicity: Same than LMDB_TO_OPENPOSE_KEYPOINTS unless masked keypoints.
@@ -696,6 +744,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
             {68},{69} // Pupils
         },
+        std::vector<std::vector<int>>{                                                                              // PT_25B_15
+            {13},{},{},{},{},{9},{8},{10},{7},{11},{6},{3},{2},{4},{1},{5},{0},{12},{14},{},{},{},{},{},{}
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -752,6 +803,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         // Face
         else if (poseModeString == "FACE_95_70")
             return std::make_pair(PoseModel::FACE_95_70, PoseCategory::FACE);
+        // PT
+        else if (poseModeString == "PT_25B_15")
+            return std::make_pair(PoseModel::PT_25B_15, PoseCategory::FACE);
         // Car
         else if (poseModeString == "CAR_12")
             return std::make_pair(PoseModel::CAR_12, PoseCategory::CAR);
