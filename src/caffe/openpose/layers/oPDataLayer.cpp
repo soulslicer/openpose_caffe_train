@@ -394,10 +394,12 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     }
     // Timer (every 20 iterations x batch size)
     mCounter++;
-    const auto repeatEveryXVisualizations = 8;
-    if (mCounter % 20*repeatEveryXVisualizations == 0)
+    const auto repeatEveryXVisualizations = 4;
+    if (mCounter % (20*repeatEveryXVisualizations) == 0)
     {
         std::string text = "Time: " + std::to_string(mDuration/repeatEveryXVisualizations * 1e-9) + "s";
+        mCounter = 0;
+        mDuration = 0;
         const auto accumulatedCounters = float(
             std::accumulate(mCounterTimer.begin(), mCounterTimer.end(), mCounterTimerBkg));
         for (auto i = 0u ; i < mCounterTimer.size() ; i++)
@@ -411,8 +413,6 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
         {
             std::cout << "\nAverage counter (0): " + std::to_string(mDistanceAverageCounter[0]);
             std::cout << "\nAverage distance: ";
-            mDuration = 0;
-            mCounter = 0;
             // Update average
             auto distanceAverage = mDistanceAverage;
             for (auto i = 0 ; i < distanceAverage.size() ; i++)
