@@ -128,9 +128,9 @@ namespace caffe {
             }
             // Dynamic resize
             if (sScaleMins.size() <= datasetIndex)
-                sScaleMins.resize(datasetIndex, sScaleMins[0]);
+                sScaleMins.resize(datasetIndex+1, sScaleMins[0]);
             if (sScaleMaxs.size() <= datasetIndex)
-                sScaleMaxs.resize(datasetIndex, sScaleMaxs[0]);
+                sScaleMaxs.resize(datasetIndex+1, sScaleMaxs[0]);
             // Get value
             const auto paramMax = sScaleMaxs[datasetIndex];
             const auto paramMin = sScaleMins[datasetIndex];
