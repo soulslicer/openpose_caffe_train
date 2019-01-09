@@ -1152,9 +1152,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     }
     // Dynamic resize
     if (sNumberMaxOcclusions.size() <= datasetIndex)
-        sNumberMaxOcclusions.resize(datasetIndex, sNumberMaxOcclusions[0]);
+        sNumberMaxOcclusions.resize(datasetIndex+1, sNumberMaxOcclusions[0]);
     if (sKeypointSigmas.size() <= datasetIndex)
-        sKeypointSigmas.resize(datasetIndex, sKeypointSigmas[0]);
+        sKeypointSigmas.resize(datasetIndex+1, sKeypointSigmas[0]);
     lock.unlock();
 
     MetaData metaData;
