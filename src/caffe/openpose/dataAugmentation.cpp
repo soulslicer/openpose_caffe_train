@@ -2,6 +2,7 @@
 #include <chrono>
 #include <fstream> // std::ifstream
 #include <iostream>
+#include <mutex>
 #include <stdexcept> // std::runtime_error
 // #include <opencv2/contrib/contrib.hpp> // cv::CLAHE, CV_Lab2BGR
 #include <caffe/openpose/getLine.hpp>
@@ -102,7 +103,11 @@ namespace caffe {
         }
     }
 
-    std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_)
+    std::vector<double> sScaleMins;
+    std::vector<double> sScaleMaxs;
+    std::mutex sScaleMutex;
+    std::pair<float, float> estimateScale(
+        const MetaData& metaData, const OPTransformationParameter& param_, const int datasetIndex)
     {
         // Estimate random scale
         const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
@@ -113,9 +118,28 @@ namespace caffe {
             scaleMultiplier = 1.f;
         else
         {
+            // Get max and min
+            std::unique_lock<std::mutex> lock{sScaleMutex};
+            // First time
+            if (sScaleMins.empty())
+            {
+                splitFloating(sScaleMins, param_.scale_mins(), DELIMITER);
+                splitFloating(sScaleMaxs, param_.scale_maxs(), DELIMITER);
+            }
+            // Dynamic resize
+            if (sScaleMins.size() <= datasetIndex)
+                sScaleMins.resize(datasetIndex, sScaleMins[0]);
+            if (sScaleMaxs.size() <= datasetIndex)
+                sScaleMaxs.resize(datasetIndex, sScaleMaxs[0]);
+            // Get value
+            const auto paramMax = sScaleMaxs[datasetIndex];
+            const auto paramMin = sScaleMins[datasetIndex];
+            lock.unlock();
+            // Second dice
             const float dice2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
             // scaleMultiplier: linear shear into [scale_min, scale_max]
-            scaleMultiplier = (param_.scale_max() - param_.scale_min()) * dice2 + param_.scale_min();
+            scaleMultiplier = (paramMax - paramMin) * dice2 + paramMin;
+            // scaleMultiplier = (param_.scale_maxs()[index] - param_.scale_mins()[index]) * dice2 + param_.scale_mins()[index];
         }
         const float scaleAbs = param_.target_dist()/metaData.scaleSelf;
         return std::make_pair(scaleAbs * scaleMultiplier, scaleMultiplier);
@@ -454,5 +478,22 @@ namespace caffe {
         // convert back to RGB
         cv::Mat image_clahe;
         cvtColor(labImage, bgrImage, CV_Lab2BGR);
+    }
+
+    std::vector<std::string> split(const std::string& stringToSplit, const std::string& delimiter)
+    {
+        size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+        std::string token;
+        std::vector<std::string> splittedString;
+
+        while ((pos_end = stringToSplit.find(delimiter, pos_start)) != std::string::npos)
+        {
+            token = stringToSplit.substr(pos_start, pos_end - pos_start);
+            pos_start = pos_end + delim_len;
+            splittedString.emplace_back(token);
+        }
+        splittedString.emplace_back(stringToSplit.substr(pos_start));
+
+        return splittedString;
     }
 }  // namespace caffe

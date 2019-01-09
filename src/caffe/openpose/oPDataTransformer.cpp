@@ -14,6 +14,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <thread>
 // OpenPose: added end
@@ -32,6 +33,10 @@
 
 namespace caffe {
 // OpenPose: added ended
+std::vector<unsigned long long> sNumberMaxOcclusions;
+std::vector<double> sKeypointSigmas;
+std::mutex sOcclusionsMutex;
+
 struct AugmentSelection
 {
     bool flip = false;
@@ -367,11 +372,12 @@ template <typename Dtype>
 void maskPerson(
     Dtype* transformedLabel, const std::vector<cv::Point2f> points, const std::vector<float>& isVisible,
     const int stride, const int gridX, const int gridY, const int backgroundMaskIndex,
-    const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
+    const bool bodyIndexes, const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
     const float sideRatioX = 0.3f, const float sideRatioY = 0.3f)
 {
     // Get missing indexes taking into account visible==3
-    const auto missingIndexes = getIndexesForParts(poseModel, missingBodyPartsBase, isVisible);
+    const auto missingIndexes = (bodyIndexes
+        ? getIndexesForParts(poseModel, missingBodyPartsBase, isVisible) : missingBodyPartsBase);
     // If missing indexes --> Mask out whole person
     if (!missingIndexes.empty())
     {
@@ -413,7 +419,7 @@ void maskPersonIfVisibleIsX(
             missingBodyPartsBase.emplace_back(part);
     // Make out channels
     maskPerson(
-        transformedLabel, points, isVisible, stride, gridX, gridY, backgroundMaskIndex, poseModel,
+        transformedLabel, points, isVisible, stride, gridX, gridY, backgroundMaskIndex, true, poseModel,
         missingBodyPartsBase);
 }
 // OpenPose: added ended
@@ -473,6 +479,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
                                          std::vector<long double>& distanceAverageNew,
                                          std::vector<long double>& distanceSigmaNew,
                                          std::vector<unsigned long long>& distanceCounterNew,
+                                         const int datasetIndex,
                                          const Datum* datum,
                                          const Datum* const datumNegative)
 {
@@ -493,7 +500,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
     auto* transformedLabelPtr = transformedLabel->mutable_cpu_data();
     CPUTimer timer;
     timer.Start();
-    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative,
+    generateDataAndLabel(transformedDataPtr, transformedLabelPtr, datum, datumNegative, datasetIndex,
                          distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "Transform: " << timer.MicroSeconds() / 1000.0  << " ms";
 }
@@ -592,17 +599,16 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
 }
 
 cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel, const int initImageHeight,
-                     const int initImageWidth, const int datumArea,
-                     const std::string& data)
+                     const int initImageWidth, const int datumArea, const std::string& data, const bool allMasked)
 {
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
-        || poseModel == PoseModel::MPII_25B_16
+        || (poseModel == PoseModel::MPII_25B_16 || poseModel == PoseModel::MPII_95_16)
         // COCO & Car
         // TODO: Car23 needs a mask, Car12 does not have one!!!
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
         // DOME & MPII
-        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{255}));
+        : cv::Mat(initImageHeight, initImageWidth, CV_8UC1, cv::Scalar{(allMasked ? 0. : 255.)}));
     // // Naive copy
     // cv::Mat maskMiss2;
     // // COCO
@@ -741,7 +747,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
                              cv::Mat& imageAugmented, cv::Mat& maskMissAugmented,
                              const Datum* datum, const Datum* const datumNegative,
                              const OPTransformationParameter& param_, const PoseCategory poseCategory,
-                             const PoseModel poseModel, const Phase phase_)
+                             const PoseModel poseModel, const Phase phase_, const int datasetIndex)
 {
     // Time measurement
     CPUTimer timer1;
@@ -780,7 +786,9 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Read mask miss (LMDB channel 2)
             const auto initImageWidth = (int)image.cols;
             const auto initImageHeight = (int)image.rows;
-            maskMiss = readMaskMiss(poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data);
+            maskMiss = readMaskMiss(
+                poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data,
+                metaData.datasetString == "face70_mask_out");
         }
         else
             LOG(INFO) << "Invalid metaData" + getLine(__LINE__, __FUNCTION__, __FILE__);
@@ -849,7 +857,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Augmentation (scale, rotation, cropping, and flipping)
             // Order does matter, otherwise code will fail doing augmentation
             float scaleMultiplier;
-            std::tie(augmentSelection.scale, scaleMultiplier) = estimateScale(metaData, param_);
+            std::tie(augmentSelection.scale, scaleMultiplier) = estimateScale(metaData, param_, datasetIndex);
             // Swap center?
             swapCenterPoint(metaData, param_, scaleMultiplier, poseModel);
             // Apply scale
@@ -883,9 +891,13 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
                                      // Either show bkg image or mask out black region
                                      (backgroundImage.empty() ? 0 : 255));
             }
+            // Lock
+            std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+            // Get value
+            const auto numberMaxOcclusions = sNumberMaxOcclusions[datasetIndex];
+            lock.unlock();
             // Introduce occlusions
-            doOcclusions(imageAugmented, backgroundImageAugmented, metaData, param_.number_max_occlusions(),
-                         poseModel);
+            doOcclusions(imageAugmented, backgroundImageAugmented, metaData, numberMaxOcclusions, poseModel);
             // Resize mask
             if (!maskMissAugmented.empty())
                 cv::resize(maskMissAugmented, maskMissAugmented, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
@@ -988,6 +1000,25 @@ void fillTransformedData(Dtype* transformedData, const cv::Mat& imageAugmented,
         throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
 }
 
+void putTextOnCvMat(cv::Mat& cvMat, const std::string& textToDisplay, const cv::Size& position,
+                    const cv::Scalar& color, const bool normalizeWidth, const int imageWidth)
+{
+    const auto font = cv::FONT_HERSHEY_SIMPLEX;
+    const auto ratio = imageWidth/1280.;
+    // const auto fontScale = 0.75;
+    const auto fontScale = 0.8 * ratio;
+    const auto fontThickness = std::max(1, (int)std::round(2*ratio));
+    const auto shadowOffset = std::max(1, (int)std::round(2*ratio));
+    int baseline = 0;
+    const auto textSize = cv::getTextSize(textToDisplay, font, fontScale, fontThickness, &baseline);
+    const cv::Size finalPosition{position.width - (normalizeWidth ? textSize.width : 0),
+                                 position.height + textSize.height/2};
+    cv::putText(cvMat, textToDisplay,
+                cv::Size{finalPosition.width + shadowOffset, finalPosition.height + shadowOffset},
+                font, fontScale, cv::Scalar{0,0,0}, fontThickness);
+    cv::putText(cvMat, textToDisplay, finalPosition, font, fontScale, color, fontThickness);
+}
+
 std::atomic<int> sCounterAuxiliary{0};
 template<typename Dtype>
 void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, const MetaData& metaData,
@@ -996,12 +1027,14 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
 {
     // Debugging - Visualize - Write on disk
     // if (poseModel == PoseModel::COCO_25E)
+    // if (poseModel == PoseModel::FACE_95_70)
     {
-        // if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
+        if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
+        // if (metaData.writeNumber < 2 && sCounterAuxiliary < 2)
         // if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
         // if (metaData.writeNumber < 5 && sCounterAuxiliary < 5)
         // if (metaData.writeNumber < 10 && sCounterAuxiliary < 10)
-        if (metaData.writeNumber < 100 && sCounterAuxiliary < 100)
+        // if (metaData.writeNumber < 100 && sCounterAuxiliary < 100)
         {
             // 1. Create `visualize` folder in training folder (where train_pose.sh is located)
             // 2. Comment the following if statement
@@ -1018,7 +1051,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
             {
                 // Reduce #images saved (ideally mask images should be the same)
                 // if (part < 1)
-                if (part==bkgChannel) // Background channel
+                // if (part==bkgChannel) // Background channel
                 // if (part==bkgChannel || (part >= bkgChannel && metaData.writeNumber < 3)) // Bkg channel + even dist
                 // if (part==bkgChannel || metaData.writeNumber < 3) // Bkg channel (for lots of images) + All channels (for few images)
                 // if (part==bkgChannel || (part >= bkgChannel && part % 2 == 0)) // Bkg channel + distance
@@ -1026,6 +1059,10 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                 // if (part < numberPafChannels || part == numberTotalChannels-1)
                 // if (part < 3 || part >= numberTotalChannels - 3)
                 {
+                    // Mix X and Y channels
+                    if (part % 2 == 1 && part < getNumberPafChannels(poseModel))
+                        continue;
+                    // Fill output image
                     cv::Mat finalImage = cv::Mat::zeros(gridY, 2*gridX, CV_8UC1);
                     for (auto subPart = 0; subPart < 2; subPart++)
                     {
@@ -1035,9 +1072,24 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                             const auto yOffset = gY*gridX;
                             for (auto gX = 0; gX < gridX; gX++)
                             {
-                                const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
-                                labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(
-                                    transformedLabel[channelIndex + yOffset + gX]));
+                                // Mix X and Y channels
+                                if (part < getNumberPafChannels(poseModel))
+                                {
+                                    const auto channelIndex1 = (part+numberTotalChannels*subPart)*channelOffset;
+                                    const auto value1 = std::abs(
+                                        transformedLabel[channelIndex1 + yOffset + gX]);
+                                    const auto channelIndex2 = (part+1+numberTotalChannels*subPart)*channelOffset;
+                                    const auto value2 = std::abs(
+                                        transformedLabel[channelIndex2 + yOffset + gX]);
+                                    labelMap.at<uchar>(gY,gX) = (int)(255*(value1*value1+value2*value2));
+                                }
+                                // Body part
+                                else
+                                {
+                                    const auto channelIndex = (part+numberTotalChannels*subPart)*channelOffset;
+                                    labelMap.at<uchar>(gY,gX) = (int)(255*std::abs(
+                                        transformedLabel[channelIndex + yOffset + gX]));
+                                }
                             }
                         }
                     }
@@ -1048,6 +1100,15 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                         cv::Mat labelMap = finalImage(cv::Rect{subPart*rezX, 0, rezX, rezY});
                         cv::addWeighted(labelMap, 0.5, imageAugmented, 0.5, 0.0, labelMap);
                     }
+                    // Add body part / PAF name to image
+                    std::string textToDisplay = "textToDisplay";
+                    if (part < getNumberPafChannels(poseModel))
+                        textToDisplay = getMapping(poseModel).at(getPafIndexA(poseModel).at(part/2))
+                                      + "->" + getMapping(poseModel).at(getPafIndexB(poseModel).at(part/2));
+                                      // + (part%2 == 0 ? " (X)" : " (Y)");
+                    else
+                        textToDisplay = getMapping(poseModel).at(part-getNumberPafChannels(poseModel));
+                    putTextOnCvMat(finalImage, textToDisplay, cv::Size{20,20}, cv::Scalar{255,255,255}, false, 3*368);
                     // Write on disk
                     const std::string randomC{char('a' + std::rand() % 26)};
                     char imagename [100];
@@ -1069,6 +1130,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,
                                                     const Datum* datum, const Datum* const datumNegative,
+                                                    const int datasetIndex,
                                                     std::vector<long double>& distanceAverageNew,
                                                     std::vector<long double>& distanceSigmaNew,
                                                     std::vector<unsigned long long>& distanceCounterNew)
@@ -1080,13 +1142,27 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     const auto finalImageHeight = (int)param_.crop_size_y();
     const auto gridX = finalImageWidth / stride;
     const auto gridY = finalImageHeight / stride;
+    // Lock
+    std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+    // First time
+    if (sNumberMaxOcclusions.empty())
+    {
+        splitUnsigned(sNumberMaxOcclusions, param_.number_max_occlusions(), DELIMITER);
+        splitFloating(sKeypointSigmas, param_.sigmas(), DELIMITER);
+    }
+    // Dynamic resize
+    if (sNumberMaxOcclusions.size() <= datasetIndex)
+        sNumberMaxOcclusions.resize(datasetIndex, sNumberMaxOcclusions[0]);
+    if (sKeypointSigmas.size() <= datasetIndex)
+        sKeypointSigmas.resize(datasetIndex, sKeypointSigmas[0]);
+    lock.unlock();
 
     MetaData metaData;
     cv::Mat imageAugmented;
     cv::Mat maskMissAugmented;
     const auto validMetaData = generateAugmentedImages<Dtype>(
         metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
-        datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_);
+        datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_, datasetIndex);
     // If error reading meta data --> Labels to 0 and return
     if (!validMetaData || datumNegative == nullptr)
     {
@@ -1109,7 +1185,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     // Generate and copy label
     const auto& distanceAverage = getDistanceAverage(mPoseModel);
     const auto& sigmaAverage = getDistanceSigma(mPoseModel);
-    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData,
+    generateLabelMap(transformedLabel, imageAugmented.size(), maskMissAugmented, metaData, datasetIndex,
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
@@ -1154,6 +1230,7 @@ void maskHands(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std
     }
 }
 
+// Note: Not used for XXXX_95_XX models, instead maskPerson is used
 void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std::vector<cv::Point2f>& points,
               const float stride, const float ratio, const PoseModel poseModel)
 {
@@ -1162,7 +1239,7 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
     {
         auto kneeIndex = kneeIndexBase+part*3;
         auto ankleIndex = kneeIndex+1;
-        if (poseModel == PoseModel::COCO_25B_17)
+        if (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_95_17)
         {
             kneeIndex = 13+part;
             ankleIndex = 15+part;
@@ -1228,6 +1305,7 @@ void fillMaskChannels(Dtype* transformedLabel, const int gridX, const int gridY,
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const cv::Size& imageSize,
                                                 const cv::Mat& maskMiss, const MetaData& metaData,
+                                                const int datasetIndex,
                                                 const std::vector<float>& distanceAverage,
                                                 const std::vector<float>& distanceSigma,
                                                 std::vector<long double>& distanceAverageNew,
@@ -1324,7 +1402,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             // Remove BP/PAF non-labeled channels
             // MPII hands special cases (2/4)
             //     - If left or right hand not labeled --> mask out training of those channels
-            const auto missingChannels = getMissingChannels(
+            const auto missingChannels = getEmptyChannels(
                 mPoseModel, metaData.jointsSelf.isVisible,
                 (mPoseModel == PoseModel::MPII_59 || mPoseModel == PoseModel::MPII_65_42
                     ? 2.f : 4.f));
@@ -1355,7 +1433,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
                 // If foot
                 if (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
-                    || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17)
+                    || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17
+                     || mPoseModel == PoseModel::COCO_95_17)
                 {
                     maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
                              mPoseModel);
@@ -1364,6 +1443,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
             }
         }
+
+        // Sigma
+        // Lock
+        std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+        // Get value
+        const auto keypointSigma = sKeypointSigmas[datasetIndex];
+        lock.unlock();
 
         // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
         // Self
@@ -1405,7 +1491,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 putGaussianMaps(
                     transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
                     transformedLabel + (numberPafChannels+part)*channelOffset,
-                    centerPoint, stride, gridX, gridY, param_.sigma());
+                    centerPoint, stride, gridX, gridY, keypointSigma);
             }
             // For every other person
             for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
@@ -1416,26 +1502,30 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     putGaussianMaps(
                         transformedLabel + (numberTotalChannels+numberPafChannels+part)*channelOffset,
                         transformedLabel + (numberPafChannels+part)*channelOffset,
-                        centerPoint, stride, gridX, gridY, param_.sigma());
+                        centerPoint, stride, gridX, gridY, keypointSigma);
                 }
             }
         }
 
         // For upper neck and top head --> mask out people bounding boxes, leave rest as mask = 1, neck/head value = 0
-        if (mPoseModel == PoseModel::COCO_25B_23 || mPoseModel == PoseModel::COCO_25B_17)
+        if (mPoseCategory == PoseCategory::COCO && (mPoseModel == PoseModel::COCO_25B_23
+            || mPoseModel == PoseModel::COCO_25B_17 || getNumberBodyParts(mPoseModel) > 70))
         {
             // Mask people
-            const std::vector<int> neckHeadIndexes{17, 18};
+            // Indexes: Real neck, top head, foot (for COCO_X_17), etc...
+            const auto minus1Channels = getMinus1Channels(mPoseModel, joints.isVisible);
             maskPerson(
                 transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-                mPoseModel, neckHeadIndexes, 1.f, 1.f);
+                false, mPoseModel, minus1Channels, 1.f, 1.f);
+                // false, mPoseModel, minus1Channels, 0.f, 0.f); // Debug
             // For every other person
             for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
             {
                 const auto& joints = metaData.jointsOthers[otherPerson];
                 maskPerson(
                     transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-                    mPoseModel, neckHeadIndexes, 1.f, 1.f);
+                    false, mPoseModel, minus1Channels, 1.f, 1.f);
+                    // false, mPoseModel, minus1Channels, 0.f, 0.f); // Debug
             }
         }
 
@@ -1473,7 +1563,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                 channelDistance + (2*partTarget+1)*channelOffset,
                                 maskDistance + 2*partTarget*channelOffset,
                                 maskDistance + (2*partTarget+1)*channelOffset,
-                                count, rootPoint, targetPoint, stride, gridX, gridY, param_.sigma(),
+                                count, rootPoint, targetPoint, stride, gridX, gridY, keypointSigma,
                                 &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
                                 &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
                                 distanceCounterNew[partTarget]
@@ -1492,7 +1582,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                                     channelDistance + (2*partTarget+1)*channelOffset,
                                     maskDistance + 2*partTarget*channelOffset,
                                     maskDistance + (2*partTarget+1)*channelOffset,
-                                    count, rootPoint, targetPoint, stride, gridX, gridY, param_.sigma(),
+                                    count, rootPoint, targetPoint, stride, gridX, gridY, keypointSigma,
                                     &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
                                     &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
                                     distanceCounterNew[partTarget]
@@ -1503,7 +1593,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
             }
             // // Neck-star version
-            // const auto rootIndex = getRootIndex(mPoseModel);
+            // const auto rootIndex = getRootIndex();
             // for (auto partOrigin = 0; partOrigin < numberBodyParts; partOrigin++)
             // {
             //     if (rootIndex != partOrigin)
@@ -1521,7 +1611,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             //                 channelDistance + (2*partTarget+1)*channelOffset,
             //                 maskDistance + 2*partTarget*channelOffset,
             //                 maskDistance + (2*partTarget+1)*channelOffset,
-            //                 count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(),
+            //                 count, rootPoint, centerPoint, stride, gridX, gridY, keypointSigma,
             //                 &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
             //                 &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
             //                 distanceCounterNew[partTarget]
@@ -1540,7 +1630,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             //                     channelDistance + (2*partTarget+1)*channelOffset,
             //                     maskDistance + 2*partTarget*channelOffset,
             //                     maskDistance + (2*partTarget+1)*channelOffset,
-            //                     count, rootPoint, centerPoint, stride, gridX, gridY, param_.sigma(),
+            //                     count, rootPoint, centerPoint, stride, gridX, gridY, keypointSigma,
             //                     &distanceAverage[2*partTarget], &distanceSigma[2*partTarget],
             //                     &distanceAverageNew[2*partTarget], &distanceSigmaNew[2*partTarget],
             //                     distanceCounterNew[partTarget]

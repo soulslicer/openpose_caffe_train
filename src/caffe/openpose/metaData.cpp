@@ -77,7 +77,13 @@ namespace caffe {
                             thereAre4s = true;
                         // Debugging-only
                         else
-                            LOG(INFO) << "Unexpected jointsOld.isVisible[lmdbToOurModelIndex].";
+                        {
+                            LOG(INFO) << "Unexpected jointsOld.isVisible[lmdbToOurModelIndex] = "
+                                      << jointsOld.isVisible[lmdbToOurModelIndex]
+                                      << " on index i = " << i
+                                      << " and lmdbToOurModelIndex = " << lmdbToOurModelIndex;
+                            thereAre4s = true; // Ignored channel for image
+                        }
                     }
                     // Set final visibility flag
                     // If point not annotated on LMDB file --> isVisible == 4
