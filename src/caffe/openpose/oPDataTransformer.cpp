@@ -539,7 +539,7 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
         const auto imageFullPath = mediaDirectory + imageSource;
         image = cv::imread(imageFullPath, CV_LOAD_IMAGE_COLOR);
         if (image.empty())
-            throw std::runtime_error{"Empty image at " + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
+            throw std::runtime_error{"Empty image" + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
     }
     // COCO & MPII
     else
@@ -797,7 +797,8 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
     {
         metaData.filled = false;
         validMetaData = false;
-        LOG(INFO) << "datum == nullptr" + getLine(__LINE__, __FUNCTION__, __FILE__);
+        if (datumNegative == nullptr)
+            throw std::runtime_error{"Both datum and datumNegative are nullptr" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     }
 
     // Parameters
@@ -997,7 +998,7 @@ void fillTransformedData(Dtype* transformedData, const cv::Mat& imageAugmented,
     }
     // Unknown
     else
-        throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        throw std::runtime_error{"Unknown normalization" + getLine(__LINE__, __FUNCTION__, __FILE__)};
 }
 
 void putTextOnCvMat(cv::Mat& cvMat, const std::string& textToDisplay, const cv::Size& position,
@@ -1164,7 +1165,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
         datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_, datasetIndex);
     // If error reading meta data --> Labels to 0 and return
-    if (!validMetaData || datumNegative == nullptr)
+    if (!validMetaData && datumNegative == nullptr)
     {
         const auto channelOffset = gridY * gridX;
         const auto addDistance = param_.add_distance();
