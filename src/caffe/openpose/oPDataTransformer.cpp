@@ -1029,7 +1029,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
     // if (poseModel == PoseModel::COCO_25E)
     // if (poseModel == PoseModel::FACE_95_70)
     {
-        if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
+        // if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
         // if (metaData.writeNumber < 2 && sCounterAuxiliary < 2)
         // if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
         // if (metaData.writeNumber < 5 && sCounterAuxiliary < 5)
@@ -1191,8 +1191,14 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 
     // // Debugging - Visualize - Write on disk
     // THIS IS ALL BLACK SCREEN?
+    static int counter = 0;
+    counter += 1;
+    if(counter == 3){
+        cv::imwrite("mask.png", maskMissAugmented);
+        cv::imwrite("imageAugmented.png", imageAugmented);
     visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
-    //exit(-1);
+    exit(-1);
+    }
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)

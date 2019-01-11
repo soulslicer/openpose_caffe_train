@@ -32,13 +32,12 @@ enum class PoseModel : unsigned short
     COCO_25B_23,
     COCO_25B_17, // 20
     MPII_25B_16,
+    PT_25B_15,
     // COCO + MPII + Foot + Face
     COCO_95_23,
     COCO_95_17,
-    MPII_95_16,
+    MPII_95_16, // 25
     FACE_95_70,
-    // PT
-    PT_25B_15,
     Size,
 };
 enum class PoseCategory : unsigned short
