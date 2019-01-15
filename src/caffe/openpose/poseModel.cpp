@@ -1048,10 +1048,10 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<int>{                                                                                           // 135 (COCO_135_23, COCO_135_17, MPII_135_16, HAND_135_42, FACE_135_70)
             // Minimum spanning tree
             // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
-                 0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5, 5,
+                 0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5,17,
             // Redundant ones
             // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
-                    6, 6,       3,        3,4,              5, 6,         9,      9, 10,     11,    15,
+                      6,        3,        3,4,              5, 6,         9,      9, 10,     11,    15,
             // Ignored: shoulders, hips-ankles (-0.1% COCO_23), ankles-small toes (-0.1% COCO_23)
             //              5,        11,12,                        15,16,
             // Left hand
@@ -1139,7 +1139,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                  1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,
             // Redundant ones
             // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
-                   17,18,       4,        5,6,              9,10,        10,      11,12,     12,    16,
+                     17,        4,        5,6,              9,10,        10,      11,12,     12,    16,
             // Ignored: shoulders, hips-ankles (-0.1% COCO_23), small toes-ankles (-0.1% COCO_23)
             //              6,        15,16,                        20,23,
             // Left hand

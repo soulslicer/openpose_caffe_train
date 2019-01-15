@@ -1442,9 +1442,9 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 }
                 // If foot
                 if (mPoseCategory == PoseCategory::COCO
-                    && (getNumberBodyParts(mPoseModel) > 70)
-                        || (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
-                            || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17))
+                    && (getNumberBodyParts(mPoseModel) > 70
+                        || mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
+                        || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17))
                 {
                     maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
                              mPoseModel);
