@@ -201,6 +201,7 @@ const std::map<unsigned int, std::string> POSE_BODY_25B_BODY_PARTS {
     {23, "RSmallToe"},
     {24, "RHeel"},
 };
+const auto H59 = 19;
 const std::map<unsigned int, std::string> POSE_BODY_59_BODY_PARTS {
     // Body
     {0,  "Nose"},
@@ -223,20 +224,21 @@ const std::map<unsigned int, std::string> POSE_BODY_59_BODY_PARTS {
     {17, "REar"},
     {18, "LEar"},
     // Left hand
-    {19, "LThumb1CMC"},         {20, "LThumb2Knuckles"},{21, "LThumb3IP"},  {22, "LThumb4FingerTip"},
-    {23, "LIndex1Knuckles"},    {24, "LIndex2PIP"},     {25, "LIndex3DIP"}, {26, "LIndex4FingerTip"},
-    {27, "LMiddle1Knuckles"},   {28, "LMiddle2PIP"},    {29, "LMiddle3DIP"},{30, "LMiddle4FingerTip"},
-    {31, "LRing1Knuckles"},     {32, "LRing2PIP"},      {33, "LRing3DIP"},  {34, "LRing4FingerTip"},
-    {35, "LPinky1Knuckles"},    {36, "LPinky2PIP"},     {37, "LPinky3DIP"}, {38, "LPinky4FingerTip"},
+    {H59+0, "LThumb1CMC"},       {H59+1, "LThumb2Knuckles"}, {H59+2, "LThumb3IP"},   {H59+3, "LThumb4FingerTip"},
+    {H59+4, "LIndex1Knuckles"},  {H59+5, "LIndex2PIP"},      {H59+6, "LIndex3DIP"},  {H59+7, "LIndex4FingerTip"},
+    {H59+8, "LMiddle1Knuckles"}, {H59+9, "LMiddle2PIP"},     {H59+10, "LMiddle3DIP"},{H59+11, "LMiddle4FingerTip"},
+    {H59+12, "LRing1Knuckles"},  {H59+13, "LRing2PIP"},      {H59+14, "LRing3DIP"},  {H59+15, "LRing4FingerTip"},
+    {H59+16, "LPinky1Knuckles"}, {H59+17, "LPinky2PIP"},     {H59+18, "LPinky3DIP"}, {H59+19, "LPinky4FingerTip"},
     // Right hand
-    {39, "RThumb1CMC"},         {40, "RThumb2Knuckles"},{41, "RThumb3IP"},  {42, "RThumb4FingerTip"},
-    {43, "RIndex1Knuckles"},    {44, "RIndex2PIP"},     {45, "RIndex3DIP"}, {46, "RIndex4FingerTip"},
-    {47, "RMiddle1Knuckles"},   {48, "RMiddle2PIP"},    {49, "RMiddle3DIP"},{50, "RMiddle4FingerTip"},
-    {51, "RRing1Knuckles"},     {52, "RRing2PIP"},      {53, "RRing3DIP"},  {54, "RRing4FingerTip"},
-    {55, "RPinky1Knuckles"},    {56, "RPinky2PIP"},     {57, "RPinky3DIP"}, {58, "RPinky4FingerTip"},
+    {H59+20, "RThumb1CMC"},      {H59+21, "RThumb2Knuckles"},{H59+22, "RThumb3IP"},  {H59+23, "RThumb4FingerTip"},
+    {H59+24, "RIndex1Knuckles"}, {H59+25, "RIndex2PIP"},     {H59+26, "RIndex3DIP"}, {H59+27, "RIndex4FingerTip"},
+    {H59+28, "RMiddle1Knuckles"},{H59+29, "RMiddle2PIP"},    {H59+30, "RMiddle3DIP"},{H59+31, "RMiddle4FingerTip"},
+    {H59+32, "RRing1Knuckles"},  {H59+33, "RRing2PIP"},      {H59+34, "RRing3DIP"},  {H59+35, "RRing4FingerTip"},
+    {H59+36, "RPinky1Knuckles"}, {H59+37, "RPinky2PIP"},     {H59+38, "RPinky3DIP"}, {H59+39, "RPinky4FingerTip"},
     // Background
     {59, "Background"},
 };
+const auto H65 = 25;
 const std::map<unsigned int, std::string> POSE_BODY_65_BODY_PARTS {
     // Body
     {0,  "Nose"},
@@ -264,6 +266,18 @@ const std::map<unsigned int, std::string> POSE_BODY_65_BODY_PARTS {
     {22, "RBigToe"},
     {23, "RSmallToe"},
     {24, "RHeel"},
+    // Left hand
+    {H65+0, "LThumb1CMC"},       {H65+1, "LThumb2Knuckles"}, {H65+2, "LThumb3IP"},   {H65+3, "LThumb4FingerTip"},
+    {H65+4, "LIndex1Knuckles"},  {H65+5, "LIndex2PIP"},      {H65+6, "LIndex3DIP"},  {H65+7, "LIndex4FingerTip"},
+    {H65+8, "LMiddle1Knuckles"}, {H65+9, "LMiddle2PIP"},     {H65+10, "LMiddle3DIP"},{H65+11, "LMiddle4FingerTip"},
+    {H65+12, "LRing1Knuckles"},  {H65+13, "LRing2PIP"},      {H65+14, "LRing3DIP"},  {H65+15, "LRing4FingerTip"},
+    {H65+16, "LPinky1Knuckles"}, {H65+17, "LPinky2PIP"},     {H65+18, "LPinky3DIP"}, {H65+19, "LPinky4FingerTip"},
+    // Right hand
+    {H65+20, "RThumb1CMC"},      {H65+21, "RThumb2Knuckles"},{H65+22, "RThumb3IP"},  {H65+23, "RThumb4FingerTip"},
+    {H65+24, "RIndex1Knuckles"}, {H65+25, "RIndex2PIP"},     {H65+26, "RIndex3DIP"}, {H65+27, "RIndex4FingerTip"},
+    {H65+28, "RMiddle1Knuckles"},{H65+29, "RMiddle2PIP"},    {H65+30, "RMiddle3DIP"},{H65+31, "RMiddle4FingerTip"},
+    {H65+32, "RRing1Knuckles"},  {H65+33, "RRing2PIP"},      {H65+34, "RRing3DIP"},  {H65+35, "RRing4FingerTip"},
+    {H65+36, "RPinky1Knuckles"}, {H65+37, "RPinky2PIP"},     {H65+38, "RPinky3DIP"}, {H65+39, "RPinky4FingerTip"},
     // Left hand
     {25, "LThumb1CMC"},         {26, "LThumb2Knuckles"},{27, "LThumb3IP"},  {28, "LThumb4FingerTip"},
     {29, "LIndex1Knuckles"},    {30, "LIndex2PIP"},     {31, "LIndex3DIP"}, {32, "LIndex4FingerTip"},
@@ -320,18 +334,61 @@ const std::map<unsigned int, std::string> POSE_BODY_95_BODY_PARTS {
     {F95+54, "OMouth6"}, {F95+55, "OMouth7"}, {F95+56, "OMouth8"}, {F95+57, "OMouth9"}, {F95+58, "OMouth10"}, {F95+59, "OMouth11"}, // Outer mouth 2/2
     {F95+60, "IMouth0"}, {F95+61, "IMouth1"}, {F95+62, "IMouth2"}, {F95+63, "IMouth3"}, {F95+64, "IMouth4"}, {F95+65, "IMouth5"}, {F95+66, "IMouth6"}, {F95+67, "IMouth7"}, // Inner mouth
     {F95+68, "RPupil"}, {F95+69, "LPupil"}, // Pupils
-    // // Left hand
-    // {25, "LThumb1CMC"},         {26, "LThumb2Knuckles"},{27, "LThumb3IP"},  {28, "LThumb4FingerTip"},
-    // {29, "LIndex1Knuckles"},    {30, "LIndex2PIP"},     {31, "LIndex3DIP"}, {32, "LIndex4FingerTip"},
-    // {33, "LMiddle1Knuckles"},   {34, "LMiddle2PIP"},    {35, "LMiddle3DIP"},{36, "LMiddle4FingerTip"},
-    // {37, "LRing1Knuckles"},     {38, "LRing2PIP"},      {39, "LRing3DIP"},  {40, "LRing4FingerTip"},
-    // {41, "LPinky1Knuckles"},    {42, "LPinky2PIP"},     {43, "LPinky3DIP"}, {44, "LPinky4FingerTip"},
-    // // Right hand
-    // {45, "RThumb1CMC"},         {46, "RThumb2Knuckles"},{47, "RThumb3IP"},  {48, "RThumb4FingerTip"},
-    // {49, "RIndex1Knuckles"},    {50, "RIndex2PIP"},     {51, "RIndex3DIP"}, {52, "RIndex4FingerTip"},
-    // {53, "RMiddle1Knuckles"},   {54, "RMiddle2PIP"},    {55, "RMiddle3DIP"},{56, "RMiddle4FingerTip"},
-    // {57, "RRing1Knuckles"},     {58, "RRing2PIP"},      {59, "RRing3DIP"},  {60, "RRing4FingerTip"},
-    // {61, "RPinky1Knuckles"},    {62, "RPinky2PIP"},     {63, "RPinky3DIP"}, {64, "RPinky4FingerTip"},
+};
+const auto H135 = 25;
+const auto F135 = H135+40;
+const std::map<unsigned int, std::string> POSE_BODY_135_BODY_PARTS {
+    {0,  "Nose"},
+    {1,  "LEye"},
+    {2,  "REye"},
+    {3,  "LEar"},
+    {4,  "REar"},
+    {5,  "LShoulder"},
+    {6,  "RShoulder"},
+    {7,  "LElbow"},
+    {8,  "RElbow"},
+    {9,  "LWrist"},
+    {10, "RWrist"},
+    {11, "LHip"},
+    {12, "RHip"},
+    {13, "LKnee"},
+    {14, "RKnee"},
+    {15, "LAnkle"},
+    {16, "RAnkle"},
+    {17, "UpperNeck"},
+    {18, "HeadTop"},
+    {19, "LBigToe"},
+    {20, "LSmallToe"},
+    {21, "LHeel"},
+    {22, "RBigToe"},
+    {23, "RSmallToe"},
+    {24, "RHeel"},
+    // Left hand
+    {H135+0, "LThumb1CMC"},       {H135+1, "LThumb2Knuckles"}, {H135+2, "LThumb3IP"},   {H135+3, "LThumb4FingerTip"},
+    {H135+4, "LIndex1Knuckles"},  {H135+5, "LIndex2PIP"},      {H135+6, "LIndex3DIP"},  {H135+7, "LIndex4FingerTip"},
+    {H135+8, "LMiddle1Knuckles"}, {H135+9, "LMiddle2PIP"},     {H135+10, "LMiddle3DIP"},{H135+11, "LMiddle4FingerTip"},
+    {H135+12, "LRing1Knuckles"},  {H135+13, "LRing2PIP"},      {H135+14, "LRing3DIP"},  {H135+15, "LRing4FingerTip"},
+    {H135+16, "LPinky1Knuckles"}, {H135+17, "LPinky2PIP"},     {H135+18, "LPinky3DIP"}, {H135+19, "LPinky4FingerTip"},
+    // Right hand
+    {H135+20, "RThumb1CMC"},      {H135+21, "RThumb2Knuckles"},{H135+22, "RThumb3IP"},  {H135+23, "RThumb4FingerTip"},
+    {H135+24, "RIndex1Knuckles"}, {H135+25, "RIndex2PIP"},     {H135+26, "RIndex3DIP"}, {H135+27, "RIndex4FingerTip"},
+    {H135+28, "RMiddle1Knuckles"},{H135+29, "RMiddle2PIP"},    {H135+30, "RMiddle3DIP"},{H135+31, "RMiddle4FingerTip"},
+    {H135+32, "RRing1Knuckles"},  {H135+33, "RRing2PIP"},      {H135+34, "RRing3DIP"},  {H135+35, "RRing4FingerTip"},
+    {H135+36, "RPinky1Knuckles"}, {H135+37, "RPinky2PIP"},     {H135+38, "RPinky3DIP"}, {H135+39, "RPinky4FingerTip"},
+    // Face
+    {F135+0, "FaceContour0"},   {F135+1, "FaceContour1"},   {F135+2, "FaceContour2"},   {F135+3, "FaceContour3"},   {F135+4, "FaceContour4"},   {F135+5, "FaceContour5"},   // Contour 1/3
+    {F135+6, "FaceContour6"},   {F135+7, "FaceContour7"},   {F135+8, "FaceContour8"},   {F135+9, "FaceContour9"},   {F135+10, "FaceContour10"}, {F135+11, "FaceContour11"}, // Contour 2/3
+    {F135+12, "FaceContour12"}, {F135+13, "FaceContour13"}, {F135+14, "FaceContour14"}, {F135+15, "FaceContour15"}, {F135+16, "FaceContour16"},                             // Contour 3/3
+    {F135+17, "REyeBrow0"},  {F135+18, "REyeBrow1"},  {F135+19, "REyeBrow2"},  {F135+20, "REyeBrow3"},  {F135+21, "REyeBrow4"}, // Right eyebrow
+    {F135+22, "LEyeBrow4"},  {F135+23, "LEyeBrow3"},  {F135+24, "LEyeBrow2"},  {F135+25, "LEyeBrow1"},  {F135+26, "LEyeBrow0"}, // Left eyebrow
+    {F135+27, "NoseUpper0"}, {F135+28, "NoseUpper1"}, {F135+29, "NoseUpper2"}, {F135+30, "NoseUpper3"}, // Upper nose
+    {F135+31, "NoseLower0"}, {F135+32, "NoseLower1"}, {F135+33, "NoseLower2"}, {F135+34, "NoseLower3"}, {F135+35, "NoseLower4"}, // Lower nose
+    {F135+36, "REye0"}, {F135+37, "REye1"}, {F135+38, "REye2"}, {F135+39, "REye3"}, {F135+40, "REye4"}, {F135+41, "REye5"}, // Right eye
+    {F135+42, "LEye0"}, {F135+43, "LEye1"}, {F135+44, "LEye2"}, {F135+45, "LEye3"}, {F135+46, "LEye4"}, {F135+47, "LEye5"}, // Left eye
+    {F135+48, "OMouth0"}, {F135+49, "OMouth1"}, {F135+50, "OMouth2"}, {F135+51, "OMouth3"}, {F135+52, "OMouth4"}, {F135+53, "OMouth5"}, // Outer mouth 1/2
+    {F135+54, "OMouth6"}, {F135+55, "OMouth7"}, {F135+56, "OMouth8"}, {F135+57, "OMouth9"}, {F135+58, "OMouth10"}, {F135+59, "OMouth11"}, // Outer mouth 2/2
+    {F135+60, "IMouth0"}, {F135+61, "IMouth1"}, {F135+62, "IMouth2"}, {F135+63, "IMouth3"}, {F135+64, "IMouth4"}, {F135+65, "IMouth5"}, {F135+66, "IMouth6"}, {F135+67, "IMouth7"}, // Inner mouth
+    {F135+68, "RPupil"}, {F135+69, "LPupil"}, // Pupils
 };
 // Hand legend:
 //     - Thumb:
@@ -391,7 +448,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
 
     // Auxiliary functions
-    const auto NUMBER_MODELS = 14; // How many are the same
+    const auto NUMBER_MODELS = 15; // How many are the same
     int poseModelToIndex(const PoseModel poseModel)
     {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
@@ -423,6 +480,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             return 6;
         else if (numberBodyParts == 95) // COCO + MPII + Foot + Face
             return 13;
+        else if (numberBodyParts == 135) // COCO + MPII + Foot + Hands + Face
+            return 14;
         // else
         throw std::runtime_error{"PoseModel does not have corresponding index yet."
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -434,9 +493,11 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
 
     // Parameters and functions to change if new PoseModel
-    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25, 95,95,95,95};
+    const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{
+        18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25, 95,95,95,95, 135,135,135,135,135};
 
-    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16, 23,17,16,70};
+    const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{
+        17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16, 23,17,16,70,  23, 17, 16, 42, 70};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -552,6 +613,66 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{}, // COCO 2/2
             {},{},                                                                                                  // MPII
             {},{},{},{},{},{},                                                                                      // Foot
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16}, // Face contour
+            {17},{18},{19},{20},{21},{22},{23},{24},{25},{26}, // Eyebrows
+            {27},{28},{29},{30},{31},{32},{33},{34},{35}, // Nose
+            {36},{37},{38},{39},{40},{41},{42},{43},{44},{45},{46},{47}, // Eyes
+            {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
+            {68},{69} // Pupils
+        },
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<std::vector<int>>{                                                                              // COCO_135_23
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {},{},                                                                                                  // MPII
+            {17},{18},{19},{20},{21},{22},                                                                          // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_135_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_135_16
+            // {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
+            {},{},{},{},{},{13},{12},{},{},{},{},{},{},{},{},{},{},                                                 // COCO
+            {8},{9},                                                                                                // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // HAND_135_16
+            {},{},{},{},{},{},{},{},{},{0},{21},{},{},{},{},{},{},                                                  // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {1},{2},{3},{4},{5},{6},{7},{8},{9},{10},   {11},{12},{13},{14},{15},{16},{17},{18},{19},{20},          // Left hand
+            {22},{23},{24},{25},{26},{27},{28},{29},{30},{31},   {32},{33},{34},{35},{36},{37},{38},{39},{40},{41}, // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // FACE_135_70
+            // {27},
+            // {F95+27,F95+28,F95+29,F95+30,F95+31,F95+32,F95+34,F95+35},
+            {27,28,29,30,31,32,34,35},
+            // {42},
+            // {F95+42,F95+43,F95+44,F95+45,F95+46,F95+47},
+            {42,43,44,45,46,47},
+            // {36}, // COCO 1/2
+            // {F95+36,F95+37,F95+38,F95+39,F95+40,F95+41}, // COCO 1/2
+            {36,37,38,39,40,41}, // COCO 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{}, // COCO 2/2
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
             {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16}, // Face contour
             {17},{18},{19},{20},{21},{22},{23},{24},{25},{26}, // Eyebrows
             {27},{28},{29},{30},{31},{32},{33},{34},{35}, // Nose
@@ -676,6 +797,61 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
             {68},{69} // Pupils
         },
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<std::vector<int>>{                                                                              // COCO_135_23
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {-1},{-1},                                                                                              // MPII
+            {17},{18},{19},{20},{21},{22},                                                                          // Foot
+            // {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            // {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},    // Left hand
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},    // Right hand
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},// Face 1/2
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // COCO_135_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},                             // COCO
+            {-1},{-1},                                                                                              // MPII
+            {-1},{-1},{-1},{-1},{-1},{-1},                                                                          // Foot
+            // {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            // {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},    // Left hand
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},    // Right hand
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},// Face 1/2
+            {-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1},{-1}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_135_16
+            // {},{},{},{},{},{13},{12},{14},{11},{15},{10},{3},{2},{4},{1},{5},{0},{8},{9},{},{},{},{},{},{}
+            {},{},{},{},{},{13},{12},{},{},{},{},{},{},{},{},{},{},                                                 // COCO
+            {8},{9},                                                                                                // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // HAND_135_16
+            {},{},{},{},{},{},{},{},{},{0},{21},{},{},{},{},{},{},                                                  // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {1},{2},{3},{4},{5},{6},{7},{8},{9},{10},   {11},{12},{13},{14},{15},{16},{17},{18},{19},{20},          // Left hand
+            {22},{23},{24},{25},{26},{27},{28},{29},{30},{31},   {32},{33},{34},{35},{36},{37},{38},{39},{40},{41}, // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // FACE_135_70
+            {-1},{-1},{-1},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                               // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Right hand
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16}, // Face contour
+            {17},{18},{19},{20},{21},{22},{23},{24},{25},{26}, // Eyebrows
+            {27},{28},{29},{30},{31},{32},{33},{34},{35}, // Nose
+            {36},{37},{38},{39},{40},{41},{42},{43},{44},{45},{46},{47}, // Eyes
+            {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
+            {68},{69} // Pupils
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -713,6 +889,10 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             return std::make_pair(PoseModel::COCO_95_17, PoseCategory::COCO);
         else if (poseModeString == "COCO_95_23")
             return std::make_pair(PoseModel::COCO_95_23, PoseCategory::COCO);
+        else if (poseModeString == "COCO_135_17")
+            return std::make_pair(PoseModel::COCO_135_17, PoseCategory::COCO);
+        else if (poseModeString == "COCO_135_23")
+            return std::make_pair(PoseModel::COCO_135_23, PoseCategory::COCO);
         // Dome
         else if (poseModeString == "DOME_18")
             return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
@@ -723,15 +903,22 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         // MPII
         else if (poseModeString == "MPII_25B_16")
             return std::make_pair(PoseModel::MPII_25B_16, PoseCategory::MPII);
-        else if (poseModeString == "MPII_59")
-            return std::make_pair(PoseModel::MPII_59, PoseCategory::MPII);
-        else if (poseModeString == "MPII_65_42")
-            return std::make_pair(PoseModel::MPII_65_42, PoseCategory::MPII);
         else if (poseModeString == "MPII_95_16")
             return std::make_pair(PoseModel::MPII_95_16, PoseCategory::MPII);
+        else if (poseModeString == "MPII_135_16")
+            return std::make_pair(PoseModel::MPII_135_16, PoseCategory::MPII);
+        // Hand
+        else if (poseModeString == "MPII_59")
+            return std::make_pair(PoseModel::MPII_59, PoseCategory::HAND);
+        else if (poseModeString == "MPII_65_42")
+            return std::make_pair(PoseModel::MPII_65_42, PoseCategory::HAND);
+        else if (poseModeString == "HAND_135_42")
+            return std::make_pair(PoseModel::HAND_135_42, PoseCategory::HAND);
         // Face
         else if (poseModeString == "FACE_95_70")
             return std::make_pair(PoseModel::FACE_95_70, PoseCategory::FACE);
+        else if (poseModeString == "FACE_135_70")
+            return std::make_pair(PoseModel::FACE_135_70, PoseCategory::FACE);
         // Car
         else if (poseModeString == "CAR_12")
             return std::make_pair(PoseModel::CAR_12, PoseCategory::CAR);
@@ -772,12 +959,26 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         // COCO + MPII + Foot + Face
         std::vector<std::array<int,2>>{                                                                             // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
             {1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}, // COCO + MPII + Foot
-            {F95,F95+16},{F95+1,F95+15},{F95+2,F95+14},{F95+3,F95+13},{F95+4,F95+12},{F95+5,F95+11},{F95+6,F95+10},{F95+7,F95+9}, // Contour
+            {F95+0,F95+16},{F95+1,F95+15},{F95+2,F95+14},{F95+3,F95+13},{F95+4,F95+12},{F95+5,F95+11},{F95+6,F95+10},{F95+7,F95+9}, // Contour
             {F95+17,F95+26},{F95+18,F95+25},{F95+19,F95+24},{F95+20,F95+23},{F95+21,F95+22}, // Eyebrows
             {F95+31,F95+35},{F95+32,F95+34}, // Nose
             {F95+36,F95+45},{F95+37,F95+44},{F95+38,F95+43},{F95+39,F95+42},{F95+40,F95+47},{F95+41,F95+46}, // Eyes
             {F95+48,F95+54},{F95+49,F95+53},{F95+50,F95+52},{F95+55,F95+59},{F95+56,F95+58},{F95+60,F95+64},{F95+61,F95+63},{F95+65,F95+67}, // Mouth
             {F95+68,F95+69} // Pupils
+        },
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<std::array<int,2>>{                                                                             // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
+            {1,2},{3,4},{5,6},{7,8},{9,10},{11,12},{13,14},{15,16},{19,22},{20,23},{21,24}, // COCO + MPII + Foot
+            {H135+0,H135+20},{H135+1,H135+21},{H135+2,H135+22},{H135+3,H135+23},{H135+4,H135+24},      // Hands 1/4
+            {H135+5,H135+25},{H135+6,H135+26},{H135+7,H135+27},{H135+8,H135+28},{H135+9,H135+29},      // Hands 2/4
+            {H135+10,H135+30},{H135+11,H135+31},{H135+12,H135+32},{H135+13,H135+33},{H135+14,H135+34}, // Hands 3/4
+            {H135+15,H135+35},{H135+16,H135+36},{H135+17,H135+37},{H135+18,H135+38},{H135+19,H135+39}, // Hands 4/4
+            {F135+0,F135+16},{F135+1,F135+15},{F135+2,F135+14},{F135+3,F135+13},{F135+4,F135+12},{F135+5,F135+11},{F135+6,F135+10},{F135+7,F135+9}, // Contour
+            {F135+17,F135+26},{F135+18,F135+25},{F135+19,F135+24},{F135+20,F135+23},{F135+21,F135+22}, // Eyebrows
+            {F135+31,F135+35},{F135+32,F135+34}, // Nose
+            {F135+36,F135+45},{F135+37,F135+44},{F135+38,F135+43},{F135+39,F135+42},{F135+40,F135+47},{F135+41,F135+46}, // Eyes
+            {F135+48,F135+54},{F135+49,F135+53},{F135+50,F135+52},{F135+55,F135+59},{F135+56,F135+58},{F135+60,F135+64},{F135+61,F135+63},{F135+65,F135+67}, // Mouth
+            {F135+68,F135+69} // Pupils
         },
     };
 
@@ -843,6 +1044,30 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                F95+48,F95+54,F95+60,F95+61,F95+62,F95+63,F95+64,F95+65,F95+66, // Outer-Inner + Inner Mouth (+1)
                F95+36,F95+39,F95+42,F95+45, // Eyes-Pupils (+2)
         },
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<int>{                                                                                           // 135 (COCO_135_23, COCO_135_17, MPII_135_16, HAND_135_42, FACE_135_70)
+            // Minimum spanning tree
+            // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
+                 0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5, 5,
+            // Redundant ones
+            // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
+                    6, 6,       3,        3,4,              5, 6,         9,      9, 10,     11,    15,
+            // Ignored: shoulders, hips-ankles (-0.1% COCO_23), ankles-small toes (-0.1% COCO_23)
+            //              5,        11,12,                        15,16,
+            // Left hand
+               9,H135+0,H135+1,H135+2, 9,H135+4,H135+5,H135+6, 9,H135+8,H135+9,H135+10, 9,H135+12,H135+13,H135+14, 9,H135+16,H135+17,H135+18,
+            // Right hand
+               10,H135+20,H135+21,H135+22, 10,H135+24,H135+25,H135+26, 10,H135+28,H135+29,H135+30, 10,H135+32,H135+33,H135+34, 10,H135+36,H135+37,H135+38,
+            // Face
+               0, 2, 1, // COCO-Face (+1 extra, not 2)
+               F135+0,F135+1,F135+2,F135+3,F135+4,F135+5,F135+6,F135+7,F135+8,F135+9, F135+10,F135+11,F135+12,F135+13,F135+14,F135+15, // Contour (+0)
+               F135+0, F135+16,F135+17,F135+18,F135+19,F135+20,F135+21,F135+22,F135+23,F135+24,F135+25, // Countour-Eyebrow + Eyebrows (+1)
+               F135+21,F135+22,F135+27,F135+28,F135+29,F135+30,F135+33,F135+32,F135+33,F135+34, // Eyebrow-Nose + Nose (+1)
+               F135+27,F135+27,F135+36,F135+37,F135+38,F135+39,F135+40,F135+42,F135+43,F135+44,F135+45,F135+46, // Nose-Eyes + Eyes (+1)
+               F135+33,F135+48,F135+49,F135+50,F135+51,F135+52,F135+53,F135+54,F135+55,F135+56,F135+57,F135+58, // Nose-Mouth + Outer Mouth (+0)
+               F135+48,F135+54,F135+60,F135+61,F135+62,F135+63,F135+64,F135+65,F135+66, // Outer-Inner + Inner Mouth (+1)
+               F135+36,F135+39,F135+42,F135+45, // Eyes-Pupils (+2)
+        },
     };
 
     const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_B{
@@ -906,7 +1131,31 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                F95+51,F95+49,F95+50,F95+51,F95+52,F95+53,F95+54,F95+55,F95+56,F95+57,F95+58,F95+59, // Nose-Mouth + Outer Mouth (+0)
                F95+60,F95+64,F95+61,F95+62,F95+63,F95+64,F95+65,F95+66,F95+67, // Outer-Inner + Inner Mouth (+1)
                F95+68,F95+68,F95+69,F95+69, // Eyes-Pupils (+2)
-        }
+        },
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<int>{                                                                                           // 135 (COCO_135_23, COCO_135_17, MPII_135_16, HAND_135_42, FACE_135_70)
+            // Minimum spanning tree
+            // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
+                 1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,
+            // Redundant ones
+            // MPII redundant, ears, ears-shoulders, shoulders-wrists, wrists, wrists-hips, hips, ankles)
+                   17,18,       4,        5,6,              9,10,        10,      11,12,     12,    16,
+            // Ignored: shoulders, hips-ankles (-0.1% COCO_23), small toes-ankles (-0.1% COCO_23)
+            //              6,        15,16,                        20,23,
+            // Left hand
+               H135+0,H135+1,H135+2,H135+3, H135+4,H135+5,H135+6,H135+7, H135+8,H135+9,H135+10,H135+11, H135+12,H135+13,H135+14,H135+15, H135+16,H135+17,H135+18,H135+19,
+            // Right hand
+               H135+20,H135+21,H135+22,H135+23, H135+24,H135+25,H135+26,H135+27, H135+28,H135+29,H135+30,H135+31, H135+32,H135+33,H135+34,H135+35, H135+36,H135+37,H135+38,H135+39,
+            // Face
+               F135+30,F135+39,F135+42, // COCO-Face (+2 extra)
+               F135+1,F135+2,F135+3,F135+4,F135+5,F135+6,F135+7,F135+8,F135+9,F135+10,F135+11,F135+12,F135+13,F135+14,F135+15,F135+16, // Contour (+0)
+               F135+17,F135+26,F135+18,F135+19,F135+20,F135+21,F135+22,F135+23,F135+24,F135+25,F135+26, // Countour-Eyebrow + Eyebrows (+1)
+               F135+27,F135+27,F135+28,F135+29,F135+30,F135+33,F135+32,F135+31,F135+34,F135+35, // Eyebrow-Nose + Nose (+1)
+               F135+39,F135+42,F135+37,F135+38,F135+39,F135+40,F135+41,F135+43,F135+44,F135+45,F135+46,F135+47, // Nose-Eyes + Eyes (+1)
+               F135+51,F135+49,F135+50,F135+51,F135+52,F135+53,F135+54,F135+55,F135+56,F135+57,F135+58,F135+59, // Nose-Mouth + Outer Mouth (+0)
+               F135+60,F135+64,F135+61,F135+62,F135+63,F135+64,F135+65,F135+66,F135+67, // Outer-Inner + Inner Mouth (+1)
+               F135+68,F135+68,F135+69,F135+69, // Eyes-Pupils (+2)
+        },
     };
 
     const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
@@ -924,6 +1173,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         POSE_BODY_19_BODY_PARTS, // COCO_19E
         POSE_BODY_25B_BODY_PARTS, // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
         POSE_BODY_95_BODY_PARTS, // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
+        POSE_BODY_135_BODY_PARTS, // 135 (COCO_135_23, COCO_135_17, MPII_135_16, HAND_135_70, FACE_135_70)
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -997,10 +1247,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<float>{}, // BODY_19E
         std::vector<float>{}, // MPII_25B_16
         // COCO + MPII + Foot + Face
-        std::vector<float>{},
-        std::vector<float>{},
-        std::vector<float>{},
-        std::vector<float>{},
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -1075,10 +1324,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<float>{}, // COCO_25B (COCO_25B_23, COCO_25B_17)
         std::vector<float>{}, // MPII_25B_16
         // COCO + MPII + Foot + Face
-        std::vector<float>{},
-        std::vector<float>{},
-        std::vector<float>{},
-        std::vector<float>{},
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
+        // COCO + MPII + Foot + Hands + Face
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
     };
 
 

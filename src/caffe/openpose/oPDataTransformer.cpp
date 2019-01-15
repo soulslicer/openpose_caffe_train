@@ -603,7 +603,7 @@ cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel,
 {
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
-        || (poseModel == PoseModel::MPII_25B_16 || poseModel == PoseModel::MPII_95_16)
+        || poseCategory == PoseCategory::MPII
         // COCO & Car
         // TODO: Car23 needs a mask, Car12 does not have one!!!
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
@@ -786,9 +786,10 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Read mask miss (LMDB channel 2)
             const auto initImageWidth = (int)image.cols;
             const auto initImageHeight = (int)image.rows;
+            const auto allMasked = metaData.datasetString == "face70_mask_out" || poseCategory == PoseCategory::HAND;
             maskMiss = readMaskMiss(
                 poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data,
-                metaData.datasetString == "face70_mask_out");
+                allMasked);
         }
         else
             LOG(INFO) << "Invalid metaData" + getLine(__LINE__, __FUNCTION__, __FILE__);
@@ -1022,13 +1023,17 @@ void putTextOnCvMat(cv::Mat& cvMat, const std::string& textToDisplay, const cv::
 
 std::atomic<int> sCounterAuxiliary{0};
 template<typename Dtype>
-void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, const MetaData& metaData,
-               const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
-               const bool addDistance)
+void visualize(
+    const Dtype* const transformedLabel, const PoseModel poseModel, const PoseCategory poseCategory,
+    const MetaData& metaData, const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
+    const bool addDistance)
 {
     // Debugging - Visualize - Write on disk
-    // if (poseModel == PoseModel::COCO_25E)
-    // if (poseModel == PoseModel::FACE_95_70)
+    // if (poseCategory == PoseCategory::COCO)
+    // if (poseCategory == PoseCategory::MPII)
+    // if (poseCategory == PoseCategory::FACE)
+    // if (poseCategory == PoseCategory::HAND)
+    // if (false)
     {
         if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
         // if (metaData.writeNumber < 2 && sCounterAuxiliary < 2)
@@ -1048,6 +1053,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                                            + addDistance * getDistanceAverage(poseModel).size();
             const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
             (void)bkgChannel; // In case I do not use it inside the for loop
+            (void)poseCategory; // In case I do not use it inside the for loop
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
@@ -1191,7 +1197,9 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
     // // Debugging - Visualize - Write on disk
-    // visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+    // visualize(
+    //     transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
+    //     param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -1240,7 +1248,7 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
     {
         auto kneeIndex = kneeIndexBase+part*3;
         auto ankleIndex = kneeIndex+1;
-        if (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_95_17)
+        if (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_95_17 || poseModel == PoseModel::COCO_135_17)
         {
             kneeIndex = 13+part;
             ankleIndex = 15+part;
@@ -1433,9 +1441,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                         maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
                 }
                 // If foot
-                if (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
-                    || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17
-                     || mPoseModel == PoseModel::COCO_95_17)
+                if (mPoseCategory == PoseCategory::COCO
+                    && (getNumberBodyParts(mPoseModel) > 70)
+                        || (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
+                            || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17))
                 {
                     maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
                              mPoseModel);
