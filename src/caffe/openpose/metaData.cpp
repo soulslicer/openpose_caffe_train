@@ -56,6 +56,7 @@ namespace caffe {
                 //     v=1: labeled and visible
                 //     v=2: out of image / unlabeled
                 //     v=3: on of it's parents is v=2
+                //     v=4: Not labeled for this dataset
                 joints.isVisible[i] = 1;
                 // >1 elements
                 if (lmdbToOurModel[i].size() > 1)
@@ -130,7 +131,7 @@ namespace caffe {
             else
             {
                 joints.points[i] = cv::Point2f{0.f, 0.f};
-                joints.isVisible[i] = 2;
+                joints.isVisible[i] = 4;
             }
         }
     }

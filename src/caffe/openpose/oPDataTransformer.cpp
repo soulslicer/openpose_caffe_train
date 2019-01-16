@@ -869,7 +869,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
                 metaData,
                 cv::Size{(int)std::round(image.cols * augmentSelection.scale),
                          (int)std::round(image.rows * augmentSelection.scale)},
-                param_);
+                param_, datasetIndex);
             applyRotation(metaData, augmentSelection.RotAndFinalSize.first, poseModel);
             augmentSelection.cropCenter = estimateCrop(metaData, param_);
             applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, poseModel);

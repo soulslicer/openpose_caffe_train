@@ -476,7 +476,7 @@ message OPTransformationParameter {
   // Flipping
   optional float flip_prob = 9 [default = 0.5];
   // Rotation
-  optional float max_rotate_degree = 10 [default = 5.0];
+  optional string max_degree_rotations = 10 [default = "45.0"];
   // Cropping
   optional uint32 crop_size_x = 12 [default = 368];
   optional uint32 crop_size_y = 13 [default = 368];
