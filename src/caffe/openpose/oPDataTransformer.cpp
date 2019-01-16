@@ -1189,16 +1189,16 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // THIS IS ALL BLACK SCREEN?
-    static int counter = 0;
-    counter += 1;
-    if(counter == 3){
-        cv::imwrite("mask.png", maskMissAugmented);
-        cv::imwrite("imageAugmented.png", imageAugmented);
-    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
-    exit(-1);
-    }
+//    // // Debugging - Visualize - Write on disk
+//    // THIS IS ALL BLACK SCREEN?
+//    static int counter = 0;
+//    counter += 1;
+//    if(counter == 3){
+//        cv::imwrite("mask.png", maskMissAugmented);
+//        cv::imwrite("imageAugmented.png", imageAugmented);
+//    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+//    exit(-1);
+//    }
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)

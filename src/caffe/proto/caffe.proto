@@ -502,6 +502,9 @@ message OPTransformationParameter {
   optional uint32 normalization = 28 [default = 0];
   // Force the decoded image to have 1 color channels.
   optional bool add_distance = 29 [default = false];
+  // Video
+  optional string input_type = 30 [default = ""];
+  optional uint32 frame_size = 31 [default = 0];
   // // CLAHE
   // optional float clahe_tile_size = 30 [default = 8.0];
   // optional float clahe_clip_limit = 31 [default = 4.0];
