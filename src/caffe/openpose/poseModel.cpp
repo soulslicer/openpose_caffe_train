@@ -494,10 +494,10 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
     // Parameters and functions to change if new PoseModel
     const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{
-        18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25, 95,95,95,95, 135,135,135,135,135};
+        18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25, 95,95,95,95, 135,135,135,135,135,135};
 
     const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{
-        17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16, 23,17,16,70,  23, 17, 16, 42, 70};
+        17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16, 23,17,16,70,  23, 17, 16, 21, 42, 70};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -649,7 +649,16 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
         },
-        std::vector<std::vector<int>>{                                                                              // HAND_135_16
+        std::vector<std::vector<int>>{                                                                              // HAND_135_21
+            {},{},{},{},{},{},{},{},{},{},{0},{},{},{},{},{},{},                                                    // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {1},{2},{3},{4},{5},{6},{7},{8},{9},{10},   {11},{12},{13},{14},{15},{16},{17},{18},{19},{20},          // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // HAND_135_42
             {},{},{},{},{},{},{},{},{},{0},{21},{},{},{},{},{},{},                                                  // COCO
             {},{},                                                                                                  // MPII
             {},{},{},{},{},{},                                                                                      // Foot
@@ -830,7 +839,16 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
             {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
         },
-        std::vector<std::vector<int>>{                                                                              // HAND_135_16
+        std::vector<std::vector<int>>{                                                                              // HAND_135_21
+            {},{},{},{},{},{},{},{},{},{},{0},{},{},{},{},{},{},                                                    // COCO
+            {},{},                                                                                                  // MPII
+            {},{},{},{},{},{},                                                                                      // Foot
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},                                            // Left hand
+            {1},{2},{3},{4},{5},{6},{7},{8},{9},{10},   {11},{12},{13},{14},{15},{16},{17},{18},{19},{20},          // Right hand
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},// Face 1/2
+            {},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}// Face 2/2
+        },
+        std::vector<std::vector<int>>{                                                                              // HAND_135_42
             {},{},{},{},{},{},{},{},{},{0},{21},{},{},{},{},{},{},                                                  // COCO
             {},{},                                                                                                  // MPII
             {},{},{},{},{},{},                                                                                      // Foot
@@ -912,6 +930,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             return std::make_pair(PoseModel::MPII_59, PoseCategory::HAND);
         else if (poseModeString == "MPII_65_42")
             return std::make_pair(PoseModel::MPII_65_42, PoseCategory::HAND);
+        else if (poseModeString == "HAND_135_21")
+            return std::make_pair(PoseModel::HAND_135_21, PoseCategory::HAND);
         else if (poseModeString == "HAND_135_42")
             return std::make_pair(PoseModel::HAND_135_42, PoseCategory::HAND);
         // Face
@@ -1249,7 +1269,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         // COCO + MPII + Foot + Face
         std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
         // COCO + MPII + Foot + Hands + Face
-        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -1326,7 +1346,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         // COCO + MPII + Foot + Face
         std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
         // COCO + MPII + Foot + Hands + Face
-        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
     };
 
 

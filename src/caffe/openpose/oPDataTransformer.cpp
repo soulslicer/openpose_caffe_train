@@ -786,7 +786,8 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Read mask miss (LMDB channel 2)
             const auto initImageWidth = (int)image.cols;
             const auto initImageHeight = (int)image.rows;
-            const auto allMasked = metaData.datasetString == "face70_mask_out" || poseCategory == PoseCategory::HAND;
+            // const auto allMasked = metaData.datasetString == "face70_mask_out" || poseCategory == PoseCategory::HAND;
+            const auto allMasked = metaData.datasetString == "face70_mask_out" || poseModel == PoseModel::HAND_135_42;
             maskMiss = readMaskMiss(
                 poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data,
                 allMasked);
