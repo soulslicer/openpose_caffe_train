@@ -60,6 +60,8 @@ int getNumberBodyPartsLmdb(const PoseModel poseModel);
 
 int getNumberPafChannels(const PoseModel poseModel);
 
+int getNumberTafChannels(const int tafTopology);
+
 int getNumberBodyAndPafChannels(const PoseModel poseModel);
 
 int getNumberBodyBkgAndPAF(const PoseModel poseModel);

@@ -37,6 +37,9 @@ namespace caffe {
         std::string datasetString;
         int peopleIndex;
         int annotationListIndex;
+        // For TAF
+        std::vector<Joints> jointsOthersPrev;
+        Joints jointsSelfPrev;
     };
 
     template<typename Dtype>

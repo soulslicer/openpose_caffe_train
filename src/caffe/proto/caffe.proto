@@ -505,6 +505,7 @@ message OPTransformationParameter {
   // Video
   optional string input_type = 30 [default = ""];
   optional uint32 frame_size = 31 [default = 0];
+  optional uint32 taf_topology = 32 [default = 0];
   // // CLAHE
   // optional float clahe_tile_size = 30 [default = 8.0];
   // optional float clahe_clip_limit = 31 [default = 4.0];

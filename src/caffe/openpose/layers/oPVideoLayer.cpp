@@ -99,8 +99,6 @@ OPVideoLayer<Dtype>::OPVideoLayer(const LayerParameter& param) :
     }
     mFrameSize = param.op_transform_param().frame_size();
     // OpenPose: added end
-    std::cout << "VIDEO" << std::endl;
-    exit(-1);
 }
 
 template <typename Dtype>
@@ -115,6 +113,7 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top)
 {
     const int batch_size = this->layer_param_.data_param().batch_size();
+    const int frame_size = this->mFrameSize;
     // Read a data point, and use it to initialize the top blob.
     Datum datum;
     // datum.ParseFromString(cursor_->value()); // OpenPose: commented
@@ -124,23 +123,25 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     mOPDataTransformers.resize(mSources.size());
     for (auto i = 0u ; i < mOPDataTransformers.size() ; i++)
         mOPDataTransformers[i].reset(
-            new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, mModels[i]));
+            new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, mModels[i], mInputType[i]));
     // mOPDataTransformer->InitRand();
     // Force color
     bool forceColor = this->layer_param_.data_param().force_encoded_color();
     if ((forceColor && DecodeDatum(&datum, true)) || DecodeDatumNative(&datum))
         LOG(INFO) << "Decoding Datum";
-    // Image shape
+
+    // Multi Image shape (Data layer is ([frame*batch * 3 * 368 * 38])) - Set Data size
     const int width = this->phase_ != TRAIN ? datum.width() : this->layer_param_.op_transform_param().crop_size_x();
     const int height = this->phase_ != TRAIN ? datum.height() : this->layer_param_.op_transform_param().crop_size_y();
-    std::vector<int> topShape{batch_size, 3, height, width};
+    std::vector<int> topShape{batch_size * frame_size, 3, height, width};
     top[0]->Reshape(topShape);
-    this->transformed_data_.Reshape(1, topShape[1], topShape[2], topShape[3]);
-    // Reshape top[0] and prefetch_data according to the batch_size.
+    // Set output and prefetch size
+    this->transformed_data_.Reshape(topShape[0], topShape[1], topShape[2], topShape[3]);
     for (int i = 0; i < this->prefetch_.size(); ++i)
         this->prefetch_[i]->data_.Reshape(topShape);
-    LOG(INFO) << "Image shape: " << topShape[0] << ", " << topShape[1] << ", " << topShape[2] << ", " << topShape[3];
-    // Label
+    LOG(INFO) << "Video shape: " << topShape[0] << ", " << topShape[1] << ", " << topShape[2] << ", " << topShape[3];
+
+    // Labels
     if (this->output_labels_)
     {
         const int stride = this->layer_param_.op_transform_param().stride();
@@ -150,77 +151,15 @@ void OPVideoLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
                 << "Are you using compatible models? " << this->mOPDataTransformers[i]->getNumberChannels()
                 << " vs. " << this->mOPDataTransformers[0]->getNumberChannels()
                 << " channels (models " << mModels[i] << " vs. " << mModels[0] << ")";
-        std::vector<int> labelShape{batch_size, numberChannels, height/stride, width/stride};
+        std::vector<int> labelShape{batch_size * frame_size, numberChannels, height/stride, width/stride};
         top[1]->Reshape(labelShape);
         for (int i = 0; i < this->prefetch_.size(); ++i)
             this->prefetch_[i]->label_.Reshape(labelShape);
-        this->transformed_label_.Reshape(1, labelShape[1], labelShape[2], labelShape[3]);
+        this->transformed_label_.Reshape(labelShape[0], labelShape[1], labelShape[2], labelShape[3]);
         LOG(INFO) << "Label shape: " << labelShape[0] << ", " << labelShape[1] << ", " << labelShape[2] << ", " << labelShape[3];
     }
     else
         throw std::runtime_error{"output_labels_ must be set to true" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-    // OpenPose: end
-
-//    // If Staf
-//    std::vector<int> staf_ids;
-//    if(op_transform_param_.staf()){
-//        const std::string staf_ids_string = op_transform_param_.staf_ids();
-//        std::vector<std::string> strs;
-//        boost::split(strs,staf_ids_string,boost::is_any_of(" "));
-//        for(int i=0; i<strs.size(); i++){
-//            staf_ids.emplace_back(std::stoi(strs[i]));
-//        }
-//    }
-
-//    frame_size = this->layer_param_.op_transform_param().frame_size();
-
-//    const int batch_size = this->layer_param_.data_param().batch_size();
-//    // Read a data point, and use it to initialize the top blob.
-//    Datum datum;
-//    datum.ParseFromString(cursor_->value());
-
-//    // OpenPose Module
-//    mOPDataTransformer.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
-//    if (secondDb)
-//        mOPDataTransformerSecondary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_secondary(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
-//    if (thirdDb)
-//        mOPDataTransformerTertiary.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_tertiary(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
-//    if (ADb)
-//        mOPDataTransformerA.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_a(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
-//    if (BDb)
-//        mOPDataTransformerB.reset(new OPDataTransformer<Dtype>(op_transform_param_, this->phase_, op_transform_param_.model_b(), op_transform_param_.tpaf(), op_transform_param_.staf(), staf_ids));
-
-//    // Multi Image shape (Data layer is ([frame*batch * 3 * 368 * 38])) - Set Data size
-//    const int width = this->phase_ != TRAIN ? datum.width() : this->layer_param_.op_transform_param().crop_size_x();
-//    const int height = this->phase_ != TRAIN ? datum.height() : this->layer_param_.op_transform_param().crop_size_y();
-//    std::vector<int> topShape{batch_size * frame_size, 3, height, width};
-//    top[0]->Reshape(topShape);
-
-//    // Set output and prefetch size
-//    this->transformed_data_.Reshape(topShape[0], topShape[1], topShape[2], topShape[3]);
-//    for (int i = 0; i < this->prefetch_.size(); ++i)
-//        this->prefetch_[i]->data_.Reshape(topShape);
-//    LOG(INFO) << "Video shape: " << topShape[0] << ", " << topShape[1] << ", " << topShape[2] << ", " << topShape[3];
-
-//    // Labels
-//    if (this->output_labels_)
-//    {
-//        const int stride = this->layer_param_.op_transform_param().stride();
-//        const int numberChannels = this->mOPDataTransformer->getNumberChannels();
-//        std::vector<int> labelShape{batch_size * frame_size, numberChannels, height/stride, width/stride};
-//        top[1]->Reshape(labelShape);
-//        for (int i = 0; i < this->prefetch_.size(); ++i)
-//            this->prefetch_[i]->label_.Reshape(labelShape);
-//        for (int i = 0; i < this->prefetch_.size(); ++i)
-//            for (int j = 0; j < Batch<float>::extra_labels_count; ++j)
-//                this->prefetch_[i]->extra_labels_[j].Reshape(labelShape);
-//        this->transformed_label_.Reshape(labelShape[0], labelShape[1], labelShape[2], labelShape[3]);
-//        LOG(INFO) << "Label shape: " << labelShape[0] << ", " << labelShape[1] << ", " << labelShape[2] << ", " << labelShape[3];
-//    }
-//    else
-//        throw std::runtime_error{"output_labels_ must be set to true" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-
-//    cout << "\t\t****Data Layer successfully initialized****" << endl;
 }
 
 template <typename Dtype>
@@ -252,22 +191,208 @@ void OPVideoLayer<Dtype>::Next(const int index)
 template<typename Dtype>
 void OPVideoLayer<Dtype>::NextBackground()
 {
-    if (backgroundDb)
+    assert(backgroundDb);
+    cursorBackground->Next();
+    if (!cursorBackground->valid())
     {
-        cursorBackground->Next();
-        if (!cursorBackground->valid())
-        {
-            LOG_IF(INFO, Caffe::root_solver())
-                    << "Restarting negatives data prefetching from start.";
-            cursorBackground->SeekToFirst();
-        }
+        LOG_IF(INFO, Caffe::root_solver())
+                << "Restarting negatives data prefetching from start.";
+        cursorBackground->SeekToFirst();
     }
+    offsetBackground++;
+}
+
+template <typename Dtype>
+bool OPVideoLayer<Dtype>::SkipBackground()
+{
+    int size = Caffe::solver_count();
+    int rank = Caffe::solver_rank();
+    bool keep = (offsetBackground % size) == rank ||
+                  // In test mode, only rank 0 runs, so avoid skipping
+                  this->layer_param_.phase() == TEST;
+    return !keep;
+}
+
+template <typename Dtype>
+int getRandomIndex(const std::vector<Dtype>& probabilities, const Dtype onlyBackgroundProbability)
+{
+    const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+    auto accumulated = Dtype(0);
+    for (auto i = 0u ; i < probabilities.size() ; i++)
+    {
+        accumulated += probabilities[i];
+        // Choose i
+        if (dice < accumulated)
+            return i;
+    }
+    // Choose background
+    return -1;
 }
 
 // This function is called on prefetch thread
 template<typename Dtype>
 void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
 {
+    CPUTimer batch_timer;
+    batch_timer.Start();
+    double read_time = 0;
+    double trans_time = 0;
+    CPUTimer timer;
+    CHECK(batch->data_.count());
+    CHECK(this->transformed_data_.count());
+    const int batch_size = this->layer_param_.data_param().batch_size();
+
+    // OpenPose: added
+    auto* topLabel = batch->label_.mutable_cpu_data();
+    // OpenPose: added ended
+
+    Datum datum;
+    Datum datumBackground;
+    // OpenPose: added - Batch within
+    const auto randomIndex = getRandomIndex(mProbabilities, onlyBackgroundProbability);
+    const auto desiredDbIsBkg = randomIndex == -1;
+    // OpenPose: added ended
+    for (int item_id = 0; item_id < batch_size; ++item_id) {
+        timer.Start();
+        // OpenPose: commended
+        // while (Skip()) {
+        //     Next();
+        // }
+        // datum.ParseFromString(cursor_->value());
+        // OpenPose: commended ended
+        // OpenPose: added
+        auto inputType = this->mInputType[std::max(0, randomIndex)];
+        auto oPDataTransformerPtr = this->mOPDataTransformers[std::max(0, randomIndex)]; // If bkg --> Use 0
+        // If chosen dataset i
+        if (!desiredDbIsBkg) // i.e., if randomIndex >= 0
+        {
+            mCounterTimer[randomIndex]++;
+            while (Skip(randomIndex))
+                Next(randomIndex);
+            // datum.ParseFromString(cursor_->value());
+            datum.ParseFromString(mCursors[randomIndex]->value());
+        }
+        // If chosen only-bkg
+        else
+        {
+            mCounterTimerBkg++;
+            CHECK(backgroundDb);
+        }
+        if (backgroundDb)
+        {
+            while (SkipBackground())
+                NextBackground();
+            datumBackground.ParseFromString(cursorBackground->value());
+        }
+        // OpenPose: added ended
+        read_time += timer.MicroSeconds();
+
+        if (item_id == 0) {
+            // OpenPose: added
+            // this->transformed_data_.Reshape({1, 3, height, width});
+            // top_shape[0] = batch_size;
+            const int width = this->phase_ != TRAIN ? datum.width()
+                : this->layer_param_.op_transform_param().crop_size_x();
+            const int height = this->phase_ != TRAIN ? datum.height()
+                : this->layer_param_.op_transform_param().crop_size_y();
+            batch->data_.Reshape({batch_size * mFrameSize, 3, height, width});
+            // OpenPose: added ended
+            // OpenPose: commented
+            // // Reshape according to the first datum of each batch
+            // // on single input batches allows for inputs of varying dimension.
+            // // Use data_transformer to infer the expected blob shape from datum.
+            // vector<int> top_shape = this->data_transformer_->InferBlobShape(datum);
+            // this->transformed_data_.Reshape(top_shape);
+            // // Reshape batch according to the batch_size.
+            // top_shape[0] = batch_size;
+            // batch->data_.Reshape(top_shape);
+            // OpenPose: commented ended
+        }
+
+        // Apply data transformations (mirror, scale, crop...)
+        timer.Start();
+        // OpenPose: added
+        // Image
+        const int offset = batch->data_.offset(item_id);
+        auto* topData = batch->data_.mutable_cpu_data();
+        this->transformed_data_.set_cpu_data(topData);
+        // Label
+        const int offsetLabel = batch->label_.offset(item_id);
+        this->transformed_label_.set_cpu_data(topLabel);
+        // Process image & label
+        const auto begin = std::chrono::high_resolution_clock::now();
+
+        if(inputType == "image")
+            oPDataTransformerPtr->TransformVideoSF(item_id, mFrameSize, &(this->transformed_data_),
+                                            &(this->transformed_label_),
+                                            datum, datumBackground, randomIndex);
+        else
+            throw std::runtime_error("Not implemented");
+
+//        if (backgroundDb)
+//            oPDataTransformerPtr->Transform(
+//                &(this->transformed_data_), &(this->transformed_label_), mDistanceAverage, mDistanceSigma,
+//                mDistanceAverageCounter, randomIndex, (desiredDbIsBkg ? nullptr : &datum), &datumBackground);
+//        else
+//            oPDataTransformerPtr->Transform(
+//                &(this->transformed_data_), &(this->transformed_label_), mDistanceAverage, mDistanceSigma,
+//                mDistanceAverageCounter, randomIndex, (desiredDbIsBkg ? nullptr : &datum));
+        const auto end = std::chrono::high_resolution_clock::now();
+        mDuration += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+
+        // DB i
+        if (!desiredDbIsBkg) // i.e., if randomIndex >= 0
+            Next(randomIndex);
+        // If bkg DB included
+        if (backgroundDb)
+            NextBackground();
+        trans_time += timer.MicroSeconds();
+        // OpenPose: added ended
+        // OpenPose: commented
+        // this->data_transformer_->Transform(datum, &(this->transformed_data_));
+        // // Copy label.
+        // if (this->output_labels_) {
+        //   Dtype* topLabel = batch->label_.mutable_cpu_data();
+        //   topLabel[item_id] = datum.label();
+        // }
+        // trans_time += timer.MicroSeconds();
+        // Next();
+        // OpenPose: commented ended
+    }
+    // Timer (every 20 iterations x batch size)
+    mCounter++;
+    const auto repeatEveryXVisualizations = 4;
+    if (mCounter % (20*repeatEveryXVisualizations) == 0)
+    {
+        std::string text = "Time: " + std::to_string(mDuration/repeatEveryXVisualizations * 1e-9) + "s";
+        mCounter = 0;
+        mDuration = 0;
+        const auto accumulatedCounters = float(
+            std::accumulate(mCounterTimer.begin(), mCounterTimer.end(), mCounterTimerBkg));
+        for (auto i = 0u ; i < mCounterTimer.size() ; i++)
+        {
+            text += "\t" + mModels.at(i) + ": ";
+            text += std::to_string(mCounterTimer.at(i)/accumulatedCounters);
+        }
+        text += "\tRatioBkg: " + std::to_string(mCounterTimerBkg/accumulatedCounters);
+        std::cout << text; // << std::endl;
+        std::cout << "\n" << std::endl;
+    }
+    timer.Stop();
+    batch_timer.Stop();
+    DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
+    DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
+    DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
+
+    std::cout << "DONE!!" << std::endl;
+
+    // Video Test
+    auto oPDataTransformerPtr = this->mOPDataTransformers[std::max(0, randomIndex)];
+    oPDataTransformerPtr->TestVideo(mFrameSize, &(this->transformed_data_), &(this->transformed_label_));
+
+    std::cout << "VIDEO" << std::endl;
+    exit(-1);
+
 //    CPUTimer batch_timer;
 //    batch_timer.Start();
 //    double read_time = 0;

@@ -43,6 +43,9 @@ struct AugmentSelection
     std::pair<cv::Mat, cv::Size> RotAndFinalSize;
     cv::Point2i cropCenter;
     float scale = 1.f;
+    // Temp Data
+    float rotation = 0.f;
+    cv::Size pointOffset;
 };
 
 void doOcclusions(cv::Mat& imageAugmented, cv::Mat& backgroundImageAugmented, const MetaData& metaData,
@@ -426,7 +429,7 @@ void maskPersonIfVisibleIsX(
 
 template<typename Dtype>
 OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& param,
-        Phase phase, const std::string& modelString) // OpenPose: Added std::string
+        Phase phase, const std::string& modelString, const std::string& inputType) // OpenPose: Added std::string
         // : param_(param), phase_(phase) {
         : param_(param), phase_(phase), mCurrentEpoch{-1} {
     // OpenPose: commented
@@ -456,6 +459,7 @@ OPDataTransformer<Dtype>::OPDataTransformer(const OPTransformationParameter& par
     // PoseModel
     std::tie(mPoseModel, mPoseCategory) = flagsToPoseModel(modelString);
     mModelString = modelString;
+    mInputType = inputType;
     // OpenPose: added end
 }
 
@@ -508,13 +512,25 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
 template <typename Dtype>
 int OPDataTransformer<Dtype>::getNumberChannels() const
 {
-    // If distance
-    if (param_.add_distance())
-        return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getDistanceAverage(mPoseModel).size()); // For any
-        // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + 2*(getNumberBodyParts(mPoseModel)-1)); // Neck-star distance
-    // If no distance
+    if(mInputType == "image")
+    {
+        // If distance
+        if (param_.add_distance())
+            return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + getDistanceAverage(mPoseModel).size()); // For any
+            // return 2 * (getNumberBodyBkgAndPAF(mPoseModel) + 2*(getNumberBodyParts(mPoseModel)-1)); // Neck-star distance
+        // If no distance
+        else
+            return 2 * (getNumberTafChannels(param_.taf_topology())+getNumberBodyBkgAndPAF(mPoseModel));
+    }
+    else if(mInputType == "video")
+    {
+        return 2 * (getNumberTafChannels(param_.taf_topology())+getNumberBodyBkgAndPAF(mPoseModel));
+    }
     else
-        return 2 * getNumberBodyBkgAndPAF(mPoseModel);
+    {
+        throw std::runtime_error("Type not defined");
+    }
+    return -1;
 }
 // OpenPose: end
 
@@ -1126,6 +1142,340 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
         }
     }
 }
+
+template<typename Dtype>
+void matToCaffe(Dtype* caffeImg, const cv::Mat& imgAug){
+    const int imageAugmentedArea = imgAug.rows * imgAug.cols;
+    auto* uCharPtrCvMat = (unsigned char*)(imgAug.data);
+    //caffeImg = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
+    for (auto y = 0; y < imgAug.rows; y++)
+    {
+        const auto yOffset = y*imgAug.cols;
+        for (auto x = 0; x < imgAug.cols; x++)
+        {
+            const auto xyOffset = yOffset + x;
+            // const cv::Vec3b& bgr = imageAugmented.at<cv::Vec3b>(y, x);
+            auto* bgr = &uCharPtrCvMat[3*xyOffset];
+            caffeImg[xyOffset] = (bgr[0] - 128) / 256.0;
+            caffeImg[xyOffset + imageAugmentedArea] = (bgr[1] - 128) / 256.0;
+            caffeImg[xyOffset + 2*imageAugmentedArea] = (bgr[2] - 128) / 256.0;
+        }
+    }
+}
+
+template<typename Dtype>
+void caffeToMat(cv::Mat& img, const Dtype* caffeImg, cv::Size imageSize){
+    // Need a function to convert back
+    img = cv::Mat(imageSize, CV_8UC3);
+    const int imageAugmentedArea = img.rows * img.cols;
+    auto* imgPtr = (unsigned char*)(img.data);
+    for (auto y = 0; y < img.rows; y++)
+    {
+        const auto yOffset = y*img.cols;
+        for (auto x = 0; x < img.cols; x++)
+        {
+            const auto xyOffset = yOffset + x;
+            auto* bgr = &imgPtr[3*xyOffset];
+            bgr[0] = (caffeImg[xyOffset]*256.) + 128;
+            bgr[1] = (caffeImg[xyOffset + imageAugmentedArea]*256.) + 128;
+            bgr[2] = (caffeImg[xyOffset + 2*imageAugmentedArea]*256.) + 128;
+        }
+    }
+}
+
+// OpenPose: added
+template<typename Dtype>
+void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
+                                                  const Datum& datum, const Datum& datumNegativeO, const int datasetIndex)
+{
+    // Parameters
+    const Datum* datumNegative = &datumNegativeO;
+    const std::string& data = datum.data();
+    const int datumHeight = datum.height();
+    const int datumWidth = datum.width();
+    const auto datumArea = (int)(datumHeight * datumWidth);
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+
+    // Dome doesnt work now
+
+    // Read meta data (LMDB channel 3)
+    MetaData metaData;
+    bool validMetaData = readMetaData<Dtype>(metaData, mCurrentEpoch, mDatasetString, &data[3 * datumArea], datumWidth,
+                                        mPoseCategory, mPoseModel);
+    if(!validMetaData) throw std::runtime_error("Invalid Metadata");
+
+    // Image
+    cv::Mat image;
+    const cv::Mat b(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[0]);
+    const cv::Mat g(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[datumArea]);
+    const cv::Mat r(datumHeight, datumWidth, CV_8UC1, (unsigned char*)&data[2*datumArea]);
+    std::vector<cv::Mat> bgr = {b,g,r};
+    cv::merge(bgr, image);
+    const auto initImageWidth = (int)image.cols;
+    const auto initImageHeight = (int)image.rows;
+
+    // Read background image
+    cv::Mat backgroundImage;
+    cv::Mat maskBackgroundImage = (datumNegative != nullptr
+            ? cv::Mat(image.size().height, image.size().width, CV_8UC1, cv::Scalar{0}) : cv::Mat());
+    if (datumNegative != nullptr)
+    {
+        const std::string& data = datumNegative->data();
+        const int datumNegativeWidth = datumNegative->width();
+        const int datumNegativeHeight = datumNegative->height();
+        const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
+        // OpenCV wrapping --> 1.7x speed up naive image.at<cv::Vec3b>, 1.25x speed up with smart speed up
+        const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
+        const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
+        const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
+        std::vector<cv::Mat> bgr = {b,g,r};
+        cv::merge(bgr, backgroundImage);
+        // // Security checks
+        // const auto datumNegativeArea2 = (int)(backgroundImage.rows * backgroundImage.cols);
+        // CHECK_EQ(datumNegativeArea2, datumNegativeArea);
+        // CHECK_EQ(cv::norm(backgroundImage-image2), 0);
+        // Included data augmentation: cropping
+        // Disable data augmentation --> minX = minY = 0
+        // Data augmentation: cropping
+        if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
+        {
+            const auto xDiff = datumNegativeWidth - finalImageWidth;
+            const auto yDiff = datumNegativeHeight - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                                            (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                                            (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+        }
+        // Resize (if smaller than final crop size)
+        // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+        else
+        {
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+        }
+    }
+
+    // Mask
+    cv::Mat maskMiss = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea]);
+
+
+
+
+    // Start Aug
+    // metaData.objPos = cv::Point(image.size().width/2, image.size().height/2
+    AugmentSelection startAug, endAug;
+    startAug.scale = estimateScale(metaData, param_, datasetIndex).first;
+    startAug.rotation = getRotRand(param_);
+    startAug.pointOffset = estimatePO(metaData, param_);
+    endAug.scale = estimateScale(metaData, param_, datasetIndex).first;
+    endAug.rotation = getRotRand(param_);
+    endAug.pointOffset = estimatePO(metaData, param_);
+    bool to_flip = estimateFlip(param_.flip_prob());
+
+    // Synthetic Motion
+    bool motion = true;
+    std::vector<AugmentSelection> augVec(frames);
+    MetaData metaDataPrev;
+    for(int i=0; i<frames; i++){
+        float scale;
+        float rotation;
+        cv::Size ci;
+        if(motion){
+            scale = startAug.scale + (((endAug.scale - startAug.scale) / frames))*i;
+            rotation = startAug.rotation + (((endAug.rotation - startAug.rotation) / frames))*i;
+            ci = cv::Size(startAug.pointOffset.width + (((endAug.pointOffset.width - startAug.pointOffset.width) / frames))*i,
+                                         startAug.pointOffset.height + (((endAug.pointOffset.height - startAug.pointOffset.height) / frames))*i);
+        }else{
+            scale = startAug.scale;
+            rotation = startAug.rotation;
+            ci = cv::Size(startAug.pointOffset.width,startAug.pointOffset.height);
+        }
+        MetaData metaDataCopy = metaData;
+
+        // Augment
+        cv::Mat& img = image;
+        const cv::Mat& mask = maskMiss;
+        AugmentSelection augmentSelection;
+        // Augment here
+        cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;
+        augmentSelection.scale = scale;
+        applyScale(metaDataCopy, augmentSelection.scale, mPoseModel);
+        augmentSelection.RotAndFinalSize = estimateRotation(
+                    metaDataCopy,
+                    cv::Size{(int)std::round(metaDataCopy.imageSize.width * startAug.scale),
+                             (int)std::round(metaDataCopy.imageSize.height * startAug.scale)},
+                    rotation);
+        applyRotation(metaDataCopy, augmentSelection.RotAndFinalSize.first, mPoseModel);
+        augmentSelection.cropCenter = addPO(metaDataCopy, ci);
+        applyCrop(metaDataCopy, augmentSelection.cropCenter, finalCropSize, mPoseModel);
+        //if(i==0) augmentSelection.flip = estimateFlip(metaData, param_);
+        augmentSelection.flip = to_flip;
+        applyFlip(metaDataCopy, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+        applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
+        applyAllAugmentation(maskAug, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, mask, 255);
+        applyAllAugmentation(maskBgAug, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, maskBackgroundImage, 255);
+        const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
+        cv::Mat backgroundImageTemp;
+        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
+        applyFlip(bgImgAug, augmentSelection.flip, backgroundImageTemp);
+        // Resize mask
+        if (!maskAug.empty()){
+            cv::Mat maskAugTemp;
+            cv::resize(maskAug, maskAugTemp, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+            maskAug = maskAugTemp;
+        }
+        // Final background image - elementwise multiplication
+        if (!bgImgAug.empty() && !maskBgAug.empty())
+        {
+            // Apply mask to background image
+            cv::Mat backgroundImageAugmentedTemp;
+            bgImgAug.copyTo(backgroundImageAugmentedTemp, maskBgAug);
+            // Add background image to image augmented
+            cv::Mat imageAugmentedTemp;
+            cv::addWeighted(imgAug, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
+            imgAug = imageAugmentedTemp;
+        }
+
+        // Save Prev
+        if(i != 0){
+            metaDataCopy.jointsOthersPrev = metaDataPrev.jointsOthers;
+            metaDataCopy.jointsSelfPrev = metaDataPrev.jointsSelf;
+        }
+        metaDataPrev = metaDataCopy;
+
+        // Create Label for frame
+        Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
+//        if(mStaf){
+//            if(mStaf == 1) generateLabelMapStaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+//            else if(mStaf == 2) generateLabelMapStafWithPaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+//            else if(mStaf == 3) generateLabelMapStafWithPafAndTaf(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+//            else if(mStaf == 4) generateLabelMapStafNew(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride, true);
+//        }else{
+//            generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaDataCopy, imgAug, stride);
+//        }
+////        if(i == 3 &&  metaData.writeNumber == 1){
+////        vizDebug(imgAug, metaDataCopy, labelmapTemp, finalImageWidth, finalImageHeight, gridX, gridY, stride, mPoseModel, mModelString, getNumberChannels()/2);
+////        exit(-1);
+////        }
+
+        // Convert image to Caffe Format
+        Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
+        matToCaffe(imgaugTemp, imgAug);
+
+        // Get pointers for all
+        int dataOffset = imgAug.channels()*imgAug.size().width*imgAug.size().height;
+        int labelOffset = getNumberChannels() * gridY * gridX;
+        Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
+        Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data(); // Max 6,703,488
+
+        // Copy label
+        int totalVid = transformedLabel->shape()[0]/frames;
+        std::copy(labelmapTemp, labelmapTemp + labelOffset, transformedLabelPtr + (i*totalVid*labelOffset + vid*labelOffset));
+        delete labelmapTemp;
+
+        // Copy data
+        std::copy(imgaugTemp, imgaugTemp + dataOffset, transformedDataPtr + (i*totalVid*dataOffset + vid*dataOffset));
+        delete imgaugTemp;
+    }
+}
+
+template<typename Dtype>
+void OPDataTransformer<Dtype>::TestVideo(int frames, Blob<Dtype> *transformedData, Blob<Dtype> *transformedLabel)
+{
+    int totalVid = transformedLabel->shape()[0]/frames;
+    int dataOffset = transformedData->shape()[1]*transformedData->shape()[2]*transformedData->shape()[3];
+    int labelOffset = transformedLabel->shape()[1]*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+    Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
+    Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data(); // Max 6,703,488
+
+    // Test Data
+    for(int fid=0; fid<frames; fid++){
+        for(int vid=0; vid<totalVid; vid++){
+            Dtype* imgPtr = transformedDataPtr + totalVid*fid*dataOffset + vid*dataOffset;
+            cv::Mat testImg;
+            caffeToMat(testImg, imgPtr, cv::Size(transformedData->shape()[3], transformedData->shape()[2]));
+            //int labelFrame = 2 * getNumberBodyBkgAndPAF(mPoseModel) - 1;
+
+//            int labelFrame = 174 + (2*5);
+//            int hmLabelFrame = 331;
+//            int maskLabelFrame = 132 + (2*5);
+
+//            // Need a way to visalize paf?
+//            cv::Mat hmLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+//            cv::Mat xLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+//            cv::Mat yLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+//            cv::Mat maskLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+//            Dtype* xLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (labelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+//            Dtype* yLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (labelFrame+1)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+//            Dtype* hmLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (hmLabelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+//            Dtype* maskLabelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (maskLabelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+//            std::copy(xLabelPtr, xLabelPtr + xLabel.size().width*xLabel.size().height, &xLabel.at<float>(0,0));
+//            std::copy(yLabelPtr, yLabelPtr + yLabel.size().width*yLabel.size().height, &yLabel.at<float>(0,0));
+//            std::copy(hmLabelPtr, hmLabelPtr + hmLabel.size().width*hmLabel.size().height, &hmLabel.at<float>(0,0));
+//            std::copy(maskLabelPtr, maskLabelPtr + maskLabel.size().width*maskLabel.size().height, &maskLabel.at<float>(0,0));
+//            cv::resize(xLabel, xLabel, cv::Size(xLabel.size().width*8,xLabel.size().height*8));
+//            cv::resize(yLabel, yLabel, cv::Size(yLabel.size().width*8,yLabel.size().height*8));
+//            cv::resize(hmLabel, hmLabel, cv::Size(hmLabel.size().width*8,hmLabel.size().height*8));
+//            cv::resize(maskLabel, maskLabel, cv::Size(maskLabel.size().width*8,maskLabel.size().height*8));
+//            for(int v=0; v<xLabel.size().height; v+=5){
+//                for(int u=0; u<xLabel.size().height; u+=5){
+//                    if(fabs(xLabel.at<float>(cv::Point(u,v))) > 0 || fabs(yLabel.at<float>(cv::Point(u,v))) > 0){
+//                        float scalar = 10;
+//                        cv::Point2f vector(xLabel.at<float>(cv::Point(u,v)), yLabel.at<float>(cv::Point(u,v)));
+//                        cv::Point2f p1(u,v);
+//                        cv::Point p2(u + scalar*vector.x, v + scalar*vector.y);
+//                        cv::line(testImg, p1, p2, cv::Scalar(255,0,0));
+//                    }
+//                }
+//            }
+//            hmLabel*=255;
+//            maskLabel*=255;
+//            hmLabel.convertTo(hmLabel, CV_8UC1);
+//            maskLabel.convertTo(maskLabel, CV_8UC1);
+//            hmLabel = 255-hmLabel;
+//            cv::cvtColor(hmLabel, hmLabel, cv::COLOR_GRAY2BGR);
+//            cv::cvtColor(maskLabel, maskLabel, cv::COLOR_GRAY2BGR);
+//            testImg = testImg*0.6 + hmLabel*0.2 + maskLabel*0.2;
+//            //testImg = testImg*0.5 + maskLabel*0.5;
+//            //testImg = maskLabel;
+
+            // 0,1,2,3,4
+            //labelFrame = 131;
+
+//            cv::Mat bgLabel(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
+//            Dtype* labelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (labelFrame)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
+//            std::copy(labelPtr, labelPtr + bgLabel.size().width*bgLabel.size().height, &bgLabel.at<float>(0,0));
+//            bgLabel*=255;
+//            bgLabel.convertTo(bgLabel, CV_8UC1);
+//            cv::bitwise_not(bgLabel, bgLabel);
+//            cv::cvtColor(bgLabel, bgLabel, cv::COLOR_GRAY2BGR);
+//            cv::resize(bgLabel, bgLabel, cv::Size(bgLabel.size().width*8,bgLabel.size().height*8));
+//            testImg = testImg*0.2 + bgLabel*0.8;
+
+            cv::imwrite("/home/raaj/visualize/"+std::to_string(vid)+"-"+std::to_string(fid)+".png",testImg);
+        }
+    }
+
+    exit(-1);
+}
+
 
 template<typename Dtype>
 void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtype* transformedLabel,

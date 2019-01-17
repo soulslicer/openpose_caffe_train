@@ -177,6 +177,19 @@ namespace caffe {
     }
 
     std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
+                                                  const float rotation)
+    {
+        // Estimate center & BBox
+        const cv::Point2f center{imageSize.width / 2.f, imageSize.height / 2.f};
+        const cv::Rect bbox = cv::RotatedRect(center, imageSize, rotation).boundingRect();
+        // Adjust transformation matrix
+        cv::Mat Rot = cv::getRotationMatrix2D(center, rotation, 1.0);
+        Rot.at<double>(0,2) += bbox.width/2. - center.x;
+        Rot.at<double>(1,2) += bbox.height/2. - center.y;
+        return std::make_pair(Rot, bbox.size());
+    }
+
+    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
                                                   const OPTransformationParameter& param_)
     {
         // Estimate random rotation
@@ -191,6 +204,33 @@ namespace caffe {
         Rot.at<double>(0,2) += bbox.width/2. - center.x;
         Rot.at<double>(1,2) += bbox.height/2. - center.y;
         return std::make_pair(Rot, bbox.size());
+    }
+
+    float getRotRand(const OPTransformationParameter& param_){
+        float rotation;
+        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        rotation = (dice - 0.5f) * 2 * param_.max_rotate_degree();
+        return rotation;
+    }
+
+    cv::Size estimatePO(const MetaData& metaData, const OPTransformationParameter& param_)
+    {
+        // Estimate random crop
+        const float diceX = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+        const float diceY = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); //[0,1]
+
+        const cv::Size pointOffset{int((diceX - 0.5f) * 2.f * param_.center_perterb_max()),
+                                   int((diceY - 0.5f) * 2.f * param_.center_perterb_max())};
+        return pointOffset;
+    }
+
+    cv::Point2i addPO(const MetaData& metaData, const cv::Size pointOffset)
+    {
+        const cv::Point2i cropCenter{
+            (int)(metaData.objPos.x + pointOffset.width),
+            (int)(metaData.objPos.y + pointOffset.height),
+        };
+        return cropCenter;
     }
 
     // void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size>& RotAndFinalSize,

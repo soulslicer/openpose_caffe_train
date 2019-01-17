@@ -918,6 +918,13 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         }
     };
 
+    const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_A{
+        std::vector<int>{},
+    };
+    const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_B{
+        std::vector<int>{},
+    };
+
     const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
         POSE_BODY_18_BODY_PARTS, // 18 (COCO_18, DOME_18)
         POSE_BODY_19_BODY_PARTS, // 19 (COCO_19(b), DOME_19)
@@ -1115,6 +1122,11 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     int getNumberPafChannels(const PoseModel poseModel)
     {
         return (int)(2*getPafIndexA(poseModel).size());
+    }
+
+    int getNumberTafChannels(const int tafTopology)
+    {
+        return TAF_MAP_A[tafTopology].size()*2;
     }
 
     int getNumberBodyAndPafChannels(const PoseModel poseModel)

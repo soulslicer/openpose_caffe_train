@@ -17,9 +17,13 @@ namespace caffe {
         const MetaData& metaData, const OPTransformationParameter& param_, const int index);
     // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image);
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel);
+    std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_, const int datasetIndex);
     // Rotation
     std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
+                                                  const float rotation);
+    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
                                                   const OPTransformationParameter& param_);
+    float getRotRand(const OPTransformationParameter& param_);
     // void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size>& RotAndFinalSize,
     //                    const cv::Mat& image, const unsigned char defaultBorderValue);
     void applyRotation(MetaData& metaData, const cv::Mat& Rot, const PoseModel poseModel);
@@ -43,6 +47,8 @@ namespace caffe {
     // Other functions
     void keepRoiInside(cv::Rect& roi, const cv::Size& imageSize);
     void clahe(cv::Mat& bgrImage, const int tileSize, const int clipLimit);
+    cv::Size estimatePO(const MetaData& metaData, const OPTransformationParameter& param_);
+    cv::Point2i addPO(const MetaData& metaData, const cv::Size pointOffset);
     // Auxiliary functions
     const std::string DELIMITER = ";";
     std::vector<std::string> split(const std::string& stringToSplit, const std::string& delimiter = DELIMITER);
