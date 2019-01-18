@@ -619,7 +619,7 @@ cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel,
 {
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
-        || (poseModel == PoseModel::MPII_25B_16 || poseModel == PoseModel::MPII_95_16)
+        || (poseModel == PoseModel::MPII_25B_16 || poseModel == PoseModel::MPII_95_16 || poseModel == PoseModel::PT_25B_15)
         // COCO & Car
         // TODO: Car23 needs a mask, Car12 does not have one!!!
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
@@ -1270,9 +1270,6 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, Blob<Dtype>
     // Mask
     cv::Mat maskMiss = cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea]);
 
-
-
-
     // Start Aug
     // metaData.objPos = cv::Point(image.size().width/2, image.size().height/2
     AugmentSelection startAug, endAug;
@@ -1543,11 +1540,12 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
 //    // THIS IS ALL BLACK SCREEN?
 //    static int counter = 0;
 //    counter += 1;
-//    if(counter == 3){
-//        cv::imwrite("mask.png", maskMissAugmented);
-//        cv::imwrite("imageAugmented.png", imageAugmented);
-//    visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
-//    exit(-1);
+//    std::cout << "****" << counter << std::endl;
+//    if(counter == 4){
+//        cv::imwrite("image.png",imageAugmented);
+//        cv::imwrite("mask.png",maskMissAugmented);
+//        visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
+//        exit(-1);
 //    }
 }
 
