@@ -292,7 +292,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     Datum datumBackground;
     // OpenPose: added - Batch within
     const auto randomIndex = getRandomIndex(mProbabilities, onlyBackgroundProbability);
-    const auto desiredDbIsBkg = randomIndex == -1;
+    const auto desiredDbIsBkg = (randomIndex == -1);
     // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();

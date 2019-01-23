@@ -555,7 +555,7 @@ cv::Mat readImage(const std::string& data, const PoseCategory& poseCategory, con
         const auto imageFullPath = mediaDirectory + imageSource;
         image = cv::imread(imageFullPath, CV_LOAD_IMAGE_COLOR);
         if (image.empty())
-            throw std::runtime_error{"Empty image at " + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
+            throw std::runtime_error{"Empty image" + imageFullPath + getLine(__LINE__, __FUNCTION__, __FILE__)};
     }
     // COCO & MPII
     else
@@ -620,6 +620,7 @@ cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel,
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
         || (poseModel == PoseModel::MPII_25B_16 || poseModel == PoseModel::MPII_95_16 || poseModel == PoseModel::PT_25B_15)
+        || poseCategory == PoseCategory::MPII || poseCategory == PoseCategory::PT
         // COCO & Car
         // TODO: Car23 needs a mask, Car12 does not have one!!!
         ? cv::Mat(initImageHeight, initImageWidth, CV_8UC1, (unsigned char*)&data[4*datumArea])
@@ -802,9 +803,11 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
             // Read mask miss (LMDB channel 2)
             const auto initImageWidth = (int)image.cols;
             const auto initImageHeight = (int)image.rows;
+            // const auto allMasked = metaData.datasetString == "face70_mask_out" || poseCategory == PoseCategory::HAND;
+            const auto allMasked = metaData.datasetString == "face70_mask_out" || poseModel == PoseModel::HAND_135_42;
             maskMiss = readMaskMiss(
                 poseCategory, poseModel, initImageHeight, initImageWidth, datumArea, data,
-                metaData.datasetString == "face70_mask_out");
+                allMasked);
         }
         else
             LOG(INFO) << "Invalid metaData" + getLine(__LINE__, __FUNCTION__, __FILE__);
@@ -813,7 +816,8 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
     {
         metaData.filled = false;
         validMetaData = false;
-        LOG(INFO) << "datum == nullptr" + getLine(__LINE__, __FUNCTION__, __FILE__);
+        if (datumNegative == nullptr)
+            throw std::runtime_error{"Both datum and datumNegative are nullptr" + getLine(__LINE__, __FUNCTION__, __FILE__)};
     }
 
     // Parameters
@@ -882,7 +886,7 @@ bool generateAugmentedImages(MetaData& metaData, int& currentEpoch, std::string&
                 metaData,
                 cv::Size{(int)std::round(image.cols * augmentSelection.scale),
                          (int)std::round(image.rows * augmentSelection.scale)},
-                param_);
+                param_, datasetIndex);
             applyRotation(metaData, augmentSelection.RotAndFinalSize.first, poseModel);
             augmentSelection.cropCenter = estimateCrop(metaData, param_);
             applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, poseModel);
@@ -1013,7 +1017,7 @@ void fillTransformedData(Dtype* transformedData, const cv::Mat& imageAugmented,
     }
     // Unknown
     else
-        throw std::runtime_error{"Unknown normalization at " + getLine(__LINE__, __FUNCTION__, __FILE__)};
+        throw std::runtime_error{"Unknown normalization" + getLine(__LINE__, __FUNCTION__, __FILE__)};
 }
 
 void putTextOnCvMat(cv::Mat& cvMat, const std::string& textToDisplay, const cv::Size& position,
@@ -1037,17 +1041,21 @@ void putTextOnCvMat(cv::Mat& cvMat, const std::string& textToDisplay, const cv::
 
 std::atomic<int> sCounterAuxiliary{0};
 template<typename Dtype>
-void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, const MetaData& metaData,
-               const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
-               const bool addDistance, const int tafTopology=0, const std::string folderName = "visualize")
+void visualize(
+    const Dtype* const transformedLabel, const PoseModel poseModel, const PoseCategory poseCategory,
+    const MetaData& metaData, const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
+    const bool addDistance, const int tafTopology=0, const std::string folderName = "visualize")
 {
     // Remove
     system(std::string("rm -rf " + folderName).c_str());
     system(std::string("mkdir " + folderName).c_str());
 
     // Debugging - Visualize - Write on disk
-    // if (poseModel == PoseModel::COCO_25E)
-    // if (poseModel == PoseModel::FACE_95_70)
+    // if (poseCategory == PoseCategory::COCO)
+    // if (poseCategory == PoseCategory::MPII)
+    // if (poseCategory == PoseCategory::FACE)
+    // if (poseCategory == PoseCategory::HAND)
+    // if (false)
     {
         // if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
         // if (metaData.writeNumber < 2 && sCounterAuxiliary < 2)
@@ -1067,6 +1075,7 @@ void visualize(const Dtype* const transformedLabel, const PoseModel poseModel, c
                                            + addDistance * getDistanceAverage(poseModel).size();
             const auto bkgChannel = getNumberBodyBkgAndPAF(poseModel) - 1;
             (void)bkgChannel; // In case I do not use it inside the for loop
+            (void)poseCategory; // In case I do not use it inside the for loop
             for (auto part = 0; part < numberTotalChannels; part++)
             {
                 // Reduce #images saved (ideally mask images should be the same)
@@ -1406,10 +1415,10 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, Blob<Dtype>
 
 
 //        if(i == 0 && vid == 0){
-//            visualize(labelmapTemp, mPoseModel, metaDataCopy, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v0");
+//            visualize(labelmapTemp, mPoseModel, mPoseCategory, metaDataCopy, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v0");
 //        }
 //        if(i==1 && vid == 0){
-//            visualize(labelmapTemp, mPoseModel, metaDataCopy, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v1");
+//            visualize(labelmapTemp, mPoseModel, mPoseCategory, metaDataCopy, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v1");
 //            std::cout << "Done" << std::endl;
 //            exit(-1);
 //        }
@@ -1512,7 +1521,7 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
         metaData, mCurrentEpoch, mDatasetString, imageAugmented, maskMissAugmented,
         datum, datumNegative, param_, mPoseCategory, mPoseModel, phase_, datasetIndex);
     // If error reading meta data --> Labels to 0 and return
-    if (!validMetaData || datumNegative == nullptr)
+    if (!validMetaData && datumNegative == nullptr)
     {
         const auto channelOffset = gridY * gridX;
         const auto addDistance = param_.add_distance();
@@ -1537,17 +1546,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-//    // // Debugging - Visualize - Write on disk
-//    // THIS IS ALL BLACK SCREEN?
-//    static int counter = 0;
-//    counter += 1;
-//    std::cout << "****" << counter << std::endl;
-//    if(counter == 2){
-//        cv::imwrite("image.png",imageAugmented);
-//        cv::imwrite("mask.png",maskMissAugmented);
-//        visualize(transformedLabel, mPoseModel, metaData, imageAugmented, stride, mModelString, param_.add_distance());
-//        exit(-1);
-//    }
+    // // Debugging - Visualize - Write on disk
+    // visualize(
+    //     transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
+    //     param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -1596,7 +1598,7 @@ void maskFeet(cv::Mat& maskMiss, const std::vector<float>& isVisible, const std:
     {
         auto kneeIndex = kneeIndexBase+part*3;
         auto ankleIndex = kneeIndex+1;
-        if (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_95_17)
+        if (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_95_17 || poseModel == PoseModel::COCO_135_17)
         {
             kneeIndex = 13+part;
             ankleIndex = 15+part;
@@ -1796,9 +1798,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                         maskHands(maskMissTemp, jointsOther.isVisible, jointsOther.points, stride, 0.6f);
                 }
                 // If foot
-                if (mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
-                    || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17
-                     || mPoseModel == PoseModel::COCO_95_17)
+                if (mPoseCategory == PoseCategory::COCO
+                    && (getNumberBodyParts(mPoseModel) > 70
+                        || mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
+                        || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17))
                 {
                     maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
                              mPoseModel);

@@ -39,6 +39,13 @@ enum class PoseModel : unsigned short
     COCO_95_17,
     MPII_95_16, // 25
     FACE_95_70,
+    // COCO + MPII + Foot + Face + Hand
+    COCO_135_23,
+    COCO_135_17,
+    MPII_135_16,
+    HAND_135_21,
+    HAND_135_42,
+    FACE_135_70,
     Size,
 };
 enum class PoseCategory : unsigned short
@@ -48,6 +55,7 @@ enum class PoseCategory : unsigned short
     MPII,
     CAR,
     FACE,
+    HAND,
     PT
 };
 

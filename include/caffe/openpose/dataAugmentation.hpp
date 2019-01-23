@@ -19,10 +19,11 @@ namespace caffe {
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel);
     std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_, const int datasetIndex);
     // Rotation
+    std::pair<cv::Mat, cv::Size> estimateRotation(
+        const MetaData& metaData, const cv::Size& imageSize, const OPTransformationParameter& param_,
+        const int datasetIndex);
     std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
                                                   const float rotation);
-    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
-                                                  const OPTransformationParameter& param_);
     float getRotRand(const OPTransformationParameter& param_);
     // void applyRotation(cv::Mat& imageAugmented, const std::pair<cv::Mat, cv::Size>& RotAndFinalSize,
     //                    const cv::Mat& image, const unsigned char defaultBorderValue);

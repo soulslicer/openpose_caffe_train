@@ -176,6 +176,37 @@ namespace caffe {
         }
     }
 
+    std::vector<double> sMaxDegreeRotations;
+    std::mutex sRotationMutex;
+    std::pair<cv::Mat, cv::Size> estimateRotation(
+        const MetaData& metaData, const cv::Size& imageSize, const OPTransformationParameter& param_,
+        const int datasetIndex)
+    {
+        // Get max and min
+        std::unique_lock<std::mutex> lock{sScaleMutex};
+        // First time
+        if (sMaxDegreeRotations.empty())
+            splitFloating(sMaxDegreeRotations, param_.max_degree_rotations(), DELIMITER);
+        // Dynamic resize
+        if (sMaxDegreeRotations.size() <= datasetIndex)
+            sMaxDegreeRotations.resize(datasetIndex+1, sMaxDegreeRotations[0]);
+        // Get value
+        const auto maxDegreeRotation = sMaxDegreeRotations[datasetIndex];
+        lock.unlock();
+        // Estimate random rotation
+        float rotation;
+        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        rotation = (dice - 0.5f) * 2 * maxDegreeRotation;
+        // Estimate center & BBox
+        const cv::Point2f center{imageSize.width / 2.f, imageSize.height / 2.f};
+        const cv::Rect bbox = cv::RotatedRect(center, imageSize, rotation).boundingRect();
+        // Adjust transformation matrix
+        cv::Mat Rot = cv::getRotationMatrix2D(center, rotation, 1.0);
+        Rot.at<double>(0,2) += bbox.width/2. - center.x;
+        Rot.at<double>(1,2) += bbox.height/2. - center.y;
+        return std::make_pair(Rot, bbox.size());
+    }
+
     std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
                                                   const float rotation)
     {
@@ -189,27 +220,10 @@ namespace caffe {
         return std::make_pair(Rot, bbox.size());
     }
 
-    std::pair<cv::Mat, cv::Size> estimateRotation(const MetaData& metaData, const cv::Size& imageSize,
-                                                  const OPTransformationParameter& param_)
-    {
-        // Estimate random rotation
-        float rotation;
-        const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        rotation = (dice - 0.5f) * 2 * param_.max_rotate_degree();
-        // Estimate center & BBox
-        const cv::Point2f center{imageSize.width / 2.f, imageSize.height / 2.f};
-        const cv::Rect bbox = cv::RotatedRect(center, imageSize, rotation).boundingRect();
-        // Adjust transformation matrix
-        cv::Mat Rot = cv::getRotationMatrix2D(center, rotation, 1.0);
-        Rot.at<double>(0,2) += bbox.width/2. - center.x;
-        Rot.at<double>(1,2) += bbox.height/2. - center.y;
-        return std::make_pair(Rot, bbox.size());
-    }
-
     float getRotRand(const OPTransformationParameter& param_){
         float rotation;
         const float dice = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        rotation = (dice - 0.5f) * 2 * param_.max_rotate_degree();
+        rotation = (dice - 0.5f) * 2 * std::stof(param_.max_degree_rotations());
         return rotation;
     }
 
