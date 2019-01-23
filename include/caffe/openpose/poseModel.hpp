@@ -77,6 +77,10 @@ const std::vector<int>& getPafIndexA(const PoseModel poseModel);
 
 const std::vector<int>& getPafIndexB(const PoseModel poseModel);
 
+const std::vector<int>& getTafIndexA(const int tafTopology);
+
+const std::vector<int>& getTafIndexB(const int tafTopology);
+
 const std::map<unsigned int, std::string>& getMapping(const PoseModel poseModel);
 
 const std::vector<float>& getDistanceAverage(const PoseModel poseModel);
@@ -86,12 +90,13 @@ const std::vector<float>& getDistanceSigma(const PoseModel poseModel);
 unsigned int getRootIndex();
 
 std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
-                                    const std::vector<float>& isVisible, const float minVisibleToBlock = 4.f);
+                                    const std::vector<float>& isVisible, const float minVisibleToBlock = 4.f,
+                                    const int tafTopology = 0);
 
 std::vector<int> getEmptyChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
-                                  const float minVisibleToBlock = 4.f);
+                                  const float minVisibleToBlock = 4.f, const int tafTopology = 0);
 
-std::vector<int> getMinus1Channels(const PoseModel poseModel, const std::vector<float>& isVisible);
+std::vector<int> getMinus1Channels(const PoseModel poseModel, const std::vector<float>& isVisible, const int tafTopology = 0);
 
 }  // namespace caffe
 

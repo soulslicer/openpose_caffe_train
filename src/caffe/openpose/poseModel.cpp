@@ -920,9 +920,11 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_A{
         std::vector<int>{},
+        std::vector<int>{0,6},
     };
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_B{
         std::vector<int>{},
+        std::vector<int>{1,18},
     };
 
     const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
@@ -1164,6 +1166,16 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         return LABEL_MAP_B.at(poseModelToIndex(poseModel));
     }
 
+    const std::vector<int>& getTafIndexA(const int tafTopology)
+    {
+        return TAF_MAP_A.at(tafTopology);
+    }
+
+    const std::vector<int>& getTafIndexB(const int tafTopology)
+    {
+        return TAF_MAP_B.at(tafTopology);
+    }
+
     const std::map<unsigned int, std::string>& getMapping(const PoseModel poseModel)
     {
         return MAPPINGS.at(poseModelToIndex(poseModel));
@@ -1185,8 +1197,10 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     }
 
     std::vector<int> getIndexesForParts(const PoseModel poseModel, const std::vector<int>& missingBodyPartsBase,
-                                        const std::vector<float>& isVisible, const float minVisibleToBlock)
+                                        const std::vector<float>& isVisible, const float minVisibleToBlock, const int tafTopology)
     {
+        auto totalTafChannels = getNumberTafChannels(tafTopology);
+
         auto missingBodyParts = missingBodyPartsBase;
         // If masking also non visible points
         if (isVisible.empty())
@@ -1202,6 +1216,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<int> missingChannels;
         if (!missingBodyParts.empty())
         {
+            // PAF
             const auto& pafIndexA = getPafIndexA(poseModel);
             const auto& pafIndexB = getPafIndexB(poseModel);
             for (auto i = 0u ; i < missingBodyParts.size() ; i++)
@@ -1215,6 +1230,26 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                     }
                 }
             }
+            // Offset for TAF
+            for(auto& m : missingChannels) m+= totalTafChannels;
+
+            // TAF
+            if(tafTopology){
+                const auto& tafIndexA = getTafIndexA(tafTopology);
+                const auto& tafIndexB = getTafIndexB(tafTopology);
+                for (auto i = 0u ; i < missingBodyParts.size() ; i++)
+                {
+                    for (auto tafId = 0u ; tafId < tafIndexA.size() ; tafId++)
+                    {
+                        if (tafIndexA[tafId] == missingBodyParts[i] || tafIndexB[tafId] == missingBodyParts[i])
+                        {
+                            missingChannels.emplace_back(2*tafId);
+                            missingChannels.emplace_back(2*tafId+1);
+                        }
+                    }
+                }
+            }
+
             // Sort indexes (only disordered in PAFs)
             std::sort(missingChannels.begin(), missingChannels.end());
             // Remove duplicates (only possible in PAFs)
@@ -1222,7 +1257,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             missingChannels.resize(std::distance(missingChannels.begin(), it));
             // Body parts to channel indexes (add #PAF channels)
             std::transform(missingBodyParts.begin(), missingBodyParts.end(), missingBodyParts.begin(),
-                           std::bind2nd(std::plus<int>(), getNumberPafChannels(poseModel)));
+                           std::bind2nd(std::plus<int>(), totalTafChannels + getNumberPafChannels(poseModel)));
             missingChannels.insert(missingChannels.end(), missingBodyParts.begin(), missingBodyParts.end());
         }
         // Return result
@@ -1230,7 +1265,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     }
 
     std::vector<int> getEmptyChannels(const PoseModel poseModel, const std::vector<float>& isVisible,
-                                      const float minVisibleToBlock)
+                                      const float minVisibleToBlock, const int tafTopology)
     {
         // Missing body parts
         std::vector<int> missingBodyParts;
@@ -1239,10 +1274,10 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
             if (lmdbToOpenPoseKeypoints[i].empty())
                 missingBodyParts.emplace_back(i);
-        return getIndexesForParts(poseModel, missingBodyParts, isVisible, minVisibleToBlock);
+        return getIndexesForParts(poseModel, missingBodyParts, isVisible, minVisibleToBlock, tafTopology);
     }
 
-    std::vector<int> getMinus1Channels(const PoseModel poseModel, const std::vector<float>& isVisible)
+    std::vector<int> getMinus1Channels(const PoseModel poseModel, const std::vector<float>& isVisible, const int tafTopology)
     {
         // Missing body parts
         std::vector<int> missingBodyParts;
@@ -1251,6 +1286,6 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         for (auto i = 0u ; i < lmdbToOpenPoseKeypoints.size() ; i++)
             if (lmdbToOpenPoseKeypoints[i].size() == 1 && lmdbToOpenPoseKeypoints[i][0] == -1)
                 missingBodyParts.emplace_back(i);
-        return getIndexesForParts(poseModel, missingBodyParts, isVisible);
+        return getIndexesForParts(poseModel, missingBodyParts, isVisible, 4.f, tafTopology);
     }
 }  // namespace caffe
