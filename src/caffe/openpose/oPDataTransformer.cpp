@@ -412,7 +412,7 @@ void maskPersonIfVisibleIsX(
     Dtype* transformedLabel, const std::vector<cv::Point2f> points, const std::vector<float>& isVisible,
     const int stride, const int gridX, const int gridY, const int backgroundMaskIndex,
     const PoseModel poseModel, const int X,
-    const float sideRatioX = 0.3f, const float sideRatioY = 0.3f)
+    const float sideRatioX = 0.3f, const float sideRatioY = 0.3f, const int tafTopology = 0)
 {
     // Fake neck, mid hip - Mask out the person bounding box for those PAFs/BP where isVisible == 3
     std::vector<int> missingBodyPartsBase;
@@ -423,7 +423,7 @@ void maskPersonIfVisibleIsX(
     // Make out channels
     maskPerson(
         transformedLabel, points, isVisible, stride, gridX, gridY, backgroundMaskIndex, true, poseModel,
-        missingBodyPartsBase);
+        missingBodyPartsBase, sideRatioX, sideRatioY, tafTopology);
 }
 // OpenPose: added ended
 
@@ -619,7 +619,6 @@ cv::Mat readMaskMiss(const PoseCategory poseCategory, const PoseModel poseModel,
 {
     // Read mask miss (LMDB channel 2)
     const cv::Mat maskMiss = (poseCategory == PoseCategory::COCO || poseCategory == PoseCategory::CAR//CAR_22, no CAR_12
-        || (poseModel == PoseModel::MPII_25B_16 || poseModel == PoseModel::MPII_95_16 || poseModel == PoseModel::PT_25B_15)
         || poseCategory == PoseCategory::MPII || poseCategory == PoseCategory::PT
         // COCO & Car
         // TODO: Car23 needs a mask, Car12 does not have one!!!
@@ -1414,10 +1413,10 @@ void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, Blob<Dtype>
                          a, b, c, d, e);
 
 
-//        if(i == 0 && vid == 0){
+//        if(i == 0 && vid == 4){
 //            visualize(labelmapTemp, mPoseModel, mPoseCategory, metaDataCopy, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v0");
 //        }
-//        if(i==1 && vid == 0){
+//        if(i==1 && vid == 4){
 //            visualize(labelmapTemp, mPoseModel, mPoseCategory, metaDataCopy, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v1");
 //            std::cout << "Done" << std::endl;
 //            exit(-1);
@@ -1465,11 +1464,12 @@ void OPDataTransformer<Dtype>::TestVideo(int frames, Blob<Dtype> *transformedDat
 
             // Channel Wanted
             int channelWanted = getNumberChannels()/2 + 2;
-            // int channelWanted = getNumberChannels()/2 + getNumberTafChannels(param_.taf_topology()) + getNumberPafChannels(mPoseModel) + 0;
+            //int channelWanted = getNumberChannels()/2 + getNumberTafChannels(param_.taf_topology()) + getNumberPafChannels(mPoseModel) + 18;
             Dtype* labelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (channelWanted)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
             cv::Mat labelMat(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
             std::copy(labelPtr, labelPtr + labelMat.size().width*labelMat.size().height, &labelMat.at<float>(0,0));
             cv::resize(labelMat, labelMat, cv::Size(labelMat.size().width*8,labelMat.size().height*8));
+            labelMat = cv::abs(labelMat);
             labelMat*=255;
             labelMat.convertTo(labelMat, CV_8UC1);
             cv::cvtColor(labelMat, labelMat, cv::COLOR_GRAY2BGR);
@@ -1546,10 +1546,11 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-    // // Debugging - Visualize - Write on disk
-    // visualize(
-    //     transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
-    //     param_.add_distance());
+     // Debugging - Visualize - Write on disk
+     visualize(
+         transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
+         param_.add_distance());
+     exit(-1);
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -1763,14 +1764,10 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             // Remove BP/PAF non-labeled channels
             // MPII hands special cases (2/4)
             //     - If left or right hand not labeled --> mask out training of those channels
-            auto missingChannels = getEmptyChannels(
+            const auto missingChannels = getEmptyChannels(
                 mPoseModel, metaData.jointsSelf.isVisible,
                 (mPoseModel == PoseModel::MPII_59 || mPoseModel == PoseModel::MPII_65_42
                     ? 2.f : 4.f), param_.taf_topology());
-
-            // HAAAAAAAAAAAACK
-            //for(auto& m : missingChannels) m+=4;
-                //std::cout << m << std::endl;
 
             for (const auto& index : missingChannels)
                 std::fill(&transformedLabel[index*channelOffset],
@@ -1825,13 +1822,13 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         if (mPoseModel == PoseModel::CAR_22)
             maskPersonIfVisibleIsX(
                 transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-                mPoseModel, 2);
+                mPoseModel, 2, 0.3, 0.3, param_.taf_topology());
         maskPersonIfVisibleIsX(
             transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-            mPoseModel, 3);
+            mPoseModel, 3, 0.3, 0.3, param_.taf_topology());
         maskPersonIfVisibleIsX(
             transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-            mPoseModel, 4);
+            mPoseModel, 4, 0.3, 0.3, param_.taf_topology());
         // For every other person
         for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
         {
@@ -1839,20 +1836,18 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             if (mPoseModel == PoseModel::CAR_22)
                 maskPersonIfVisibleIsX(
                     transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-                    mPoseModel, 2);
+                    mPoseModel, 2, 0.3, 0.3, param_.taf_topology());
             maskPersonIfVisibleIsX(
                 transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-                mPoseModel, 3);
+                mPoseModel, 3, 0.3, 0.3, param_.taf_topology());
             maskPersonIfVisibleIsX(
                 transformedLabel, joints.points, joints.isVisible, stride, gridX, gridY, backgroundMaskIndexTemp,
-                mPoseModel, 4);
+                mPoseModel, 4, 0.3, 0.3, param_.taf_topology());
         }
 
         // Body parts
         for (auto part = 0; part < numberBodyParts; part++)
         {
-
-
             // Self
             if (metaData.jointsSelf.isVisible[part] <= 1)
             {
@@ -1863,7 +1858,6 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                     transformedLabel + (numberTafChannels+numberPafChannels+part)*channelOffset,
                     centerPoint, stride, gridX, gridY, keypointSigma);
             }
-
 
             // For every other person
             for (auto otherPerson = 0; otherPerson < metaData.numberOtherPeople; otherPerson++)
