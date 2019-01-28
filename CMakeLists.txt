@@ -136,6 +136,3 @@ caffe_generate_export_configs()
 
 # OP
 add_subdirectory(op)
-
-message("${PROJECT_SOURCE_DIR}/op")
-message("****************")

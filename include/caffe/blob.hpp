@@ -105,6 +105,21 @@ class Blob {
   }
 
   /**
+   * @brief Compute strides
+   *
+   */
+  inline std::vector<int> stride() const {
+    std::vector<int> strides(this->shape().size());
+    if (!strides.empty())
+    {
+      strides.back() = sizeof(Dtype);
+      for (auto i = (int)strides.size()-2 ; i > -1 ; i--)
+        strides[i] = strides[i+1] * this->shape()[i+1];
+    }
+    return strides;
+  }
+
+  /**
    * @brief Returns the 'canonical' version of a (usually) user-specified axis,
    *        allowing for negative indexing (e.g., -1 for the last axis).
    *
@@ -216,6 +231,7 @@ class Blob {
     return diff_;
   }
 
+  Dtype* psuedo_cpu_data() const;
   const Dtype* cpu_data() const;
   void set_cpu_data(Dtype* data);
   const int* gpu_shape() const;

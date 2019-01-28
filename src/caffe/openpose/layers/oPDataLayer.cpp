@@ -130,7 +130,7 @@ void OPDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
         this->prefetch_[i]->data_.Reshape(topShape);
     LOG(INFO) << "Image shape: " << topShape[0] << ", " << topShape[1] << ", " << topShape[2] << ", " << topShape[3];
     // Label
-    if (this->output_labels_)
+    if (1)
     {
         const int stride = this->layer_param_.op_transform_param().stride();
         const int numberChannels = this->mOPDataTransformers[0]->getNumberChannels();
@@ -292,7 +292,7 @@ void OPDataLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     Datum datumBackground;
     // OpenPose: added - Batch within
     const auto randomIndex = getRandomIndex(mProbabilities, onlyBackgroundProbability);
-    const auto desiredDbIsBkg = (randomIndex == -1);
+    const auto desiredDbIsBkg = randomIndex == -1;
     // OpenPose: added ended
     for (int item_id = 0; item_id < batch_size; ++item_id) {
         timer.Start();
