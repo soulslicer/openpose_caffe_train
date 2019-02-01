@@ -43,7 +43,7 @@ struct AugmentSelection
     std::pair<cv::Mat, cv::Size> RotAndFinalSize;
     cv::Point2i cropCenter;
     float scale = 1.f;
-    // Temp Data
+    // Video: Temp Data
     float rotation = 0.f;
     cv::Size pointOffset;
 };
@@ -512,7 +512,7 @@ void OPDataTransformer<Dtype>::Transform(Blob<Dtype>* transformedData, Blob<Dtyp
 template <typename Dtype>
 int OPDataTransformer<Dtype>::getNumberChannels() const
 {
-    if(mInputType == "image")
+    if (mInputType == "image")
     {
         // If distance
         if (param_.add_distance())
@@ -1129,7 +1129,7 @@ void visualize(
                     // Add body part / PAF name to image
                     std::string textToDisplay = "textToDisplay";
 
-                    if(tafTopology != 0)
+                    if (tafTopology != 0)
                     {
                         if (part >= 0 && part < getNumberTafChannels(tafTopology))
                         {
@@ -1137,7 +1137,7 @@ void visualize(
                             textToDisplay += getMapping(poseModel).at(getTafIndexA(tafTopology).at(part/2))
                                           + "->" + getMapping(poseModel).at(getTafIndexB(tafTopology).at(part/2));
                         }
-                        else if(part >= getNumberTafChannels(tafTopology) && part < getNumberTafChannels(tafTopology)+getNumberPafChannels(poseModel)){
+                        else if (part >= getNumberTafChannels(tafTopology) && part < getNumberTafChannels(tafTopology)+getNumberPafChannels(poseModel)){
                             auto pafPart = part-getNumberTafChannels(tafTopology);
                             textToDisplay = getMapping(poseModel).at(getPafIndexA(poseModel).at(pafPart/2))
                                           + "->" + getMapping(poseModel).at(getPafIndexB(poseModel).at(pafPart/2));
@@ -1178,6 +1178,7 @@ void visualize(
     }
 }
 
+// OpenPose: added
 template<typename Dtype>
 void matToCaffe(Dtype* caffeImg, const cv::Mat& imgAug){
     const int imageAugmentedArea = imgAug.rows * imgAug.cols;
@@ -1218,7 +1219,6 @@ void caffeToMat(cv::Mat& img, const Dtype* caffeImg, cv::Size imageSize){
     }
 }
 
-// OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
                                                   const Datum& datum, const Datum& datumNegativeO, const int datasetIndex)
