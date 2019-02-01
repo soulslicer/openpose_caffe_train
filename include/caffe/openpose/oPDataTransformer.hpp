@@ -28,7 +28,7 @@ template <typename Dtype>
 class OPDataTransformer {
 public:
     explicit OPDataTransformer(const OPTransformationParameter& param, Phase phase,
-        const std::string& modelString, const std::string& inputType = "image"); // OpenPose: Added std::string
+        const std::string& modelString, const std::string& inputType = "image"); // OpenPose: Added last 2
     virtual ~OPDataTransformer() {}
 
     /**
@@ -73,7 +73,6 @@ public:
                    const int datasetIndex,
                    const Datum* datum, const Datum* const datumNegative = nullptr);
     int getNumberChannels() const;
-
 
     // For Video
     void TransformVideoSF(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
