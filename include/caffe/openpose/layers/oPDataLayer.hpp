@@ -31,8 +31,6 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual inline int MinTopBlobs() const { return 1; }
   virtual inline int MaxTopBlobs() const { return 2; }
 
-  virtual void load_batch(Batch<Dtype>* batch);
-
  protected:
   // void Next(); // OpenPose: commented for more generic
   // bool Skip(); // OpenPose: commented for more generic
@@ -40,6 +38,10 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   bool Skip(const int index = 0); // OpenPose: added
   void NextBackground(); // OpenPose: added
   bool SkipBackground(); // OpenPose: added
+
+ public: // OpenPose: added
+  virtual void load_batch(Batch<Dtype>* batch);
+ protected: // OpenPose: added
 
   // shared_ptr<db::DB> db_; // OpenPose: commented for more generic mDbs
   // shared_ptr<db::Cursor> cursor_; // OpenPose: commented for more generic mCursors
