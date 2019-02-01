@@ -527,9 +527,7 @@ int OPDataTransformer<Dtype>::getNumberChannels() const
         return 2 * (getNumberTafChannels(param_.taf_topology())+getNumberBodyBkgAndPAF(mPoseModel));
     }
     else
-    {
-        throw std::runtime_error("Type not defined");
-    }
+        throw std::runtime_error("Type not defined" + getLine(__LINE__, __FUNCTION__, __FILE__));
     return -1;
 }
 // OpenPose: end
@@ -1043,11 +1041,11 @@ template<typename Dtype>
 void visualize(
     const Dtype* const transformedLabel, const PoseModel poseModel, const PoseCategory poseCategory,
     const MetaData& metaData, const cv::Mat& imageAugmented, const int stride, const std::string& modelString,
-    const bool addDistance, const int tafTopology=0, const std::string folderName = "visualize")
+    const bool addDistance, const int tafTopology = 0, const std::string folderName = "visualize")
 {
-    // Remove
-    system(std::string("rm -rf " + folderName).c_str());
-    system(std::string("mkdir " + folderName).c_str());
+    // Remove previous folder
+    std::system(std::string("rm -rf " + folderName).c_str());
+    std::system(std::string("mkdir " + folderName).c_str());
 
     // Debugging - Visualize - Write on disk
     // if (poseCategory == PoseCategory::COCO)
@@ -1056,7 +1054,7 @@ void visualize(
     // if (poseCategory == PoseCategory::HAND)
     // if (false)
     {
-        // if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
+        if (metaData.writeNumber < 1 && sCounterAuxiliary < 1)
         // if (metaData.writeNumber < 2 && sCounterAuxiliary < 2)
         // if (metaData.writeNumber < 3 && sCounterAuxiliary < 3)
         // if (metaData.writeNumber < 5 && sCounterAuxiliary < 5)
@@ -1131,22 +1129,29 @@ void visualize(
                     // Add body part / PAF name to image
                     std::string textToDisplay = "textToDisplay";
 
-                    if(tafTopology != 0){
-                        if(part >= 0 && part < getNumberTafChannels(tafTopology)){
+                    if(tafTopology != 0)
+                    {
+                        if (part >= 0 && part < getNumberTafChannels(tafTopology))
+                        {
                             textToDisplay = "TAF: ";
                             textToDisplay += getMapping(poseModel).at(getTafIndexA(tafTopology).at(part/2))
                                           + "->" + getMapping(poseModel).at(getTafIndexB(tafTopology).at(part/2));
-                        }else if(part >= getNumberTafChannels(tafTopology) && part < getNumberTafChannels(tafTopology)+getNumberPafChannels(poseModel)){
+                        }
+                        else if(part >= getNumberTafChannels(tafTopology) && part < getNumberTafChannels(tafTopology)+getNumberPafChannels(poseModel)){
                             auto pafPart = part-getNumberTafChannels(tafTopology);
                             textToDisplay = getMapping(poseModel).at(getPafIndexA(poseModel).at(pafPart/2))
                                           + "->" + getMapping(poseModel).at(getPafIndexB(poseModel).at(pafPart/2));
                                           // + (part%2 == 0 ? " (X)" : " (Y)");
 
-                        }else{
+                        }
+                        else
+                        {
                             auto hmPart = part-getNumberPafChannels(poseModel)-getNumberTafChannels(tafTopology);
                             textToDisplay = getMapping(poseModel).at(hmPart);
                         }
-                    }else{
+                    }
+                    else
+                    {
                         if (part < getNumberPafChannels(poseModel))
                             textToDisplay = getMapping(poseModel).at(getPafIndexA(poseModel).at(part/2))
                                           + "->" + getMapping(poseModel).at(getPafIndexB(poseModel).at(part/2));
@@ -1546,11 +1551,10 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-//     // Debugging - Visualize - Write on disk
-//     visualize(
-//         transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
-//         param_.add_distance());
-//     exit(-1);
+    // // Debugging - Visualize - Write on disk
+    // visualize(
+    //     transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
+    //     param_.add_distance());
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
