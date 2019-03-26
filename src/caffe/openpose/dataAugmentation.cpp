@@ -33,7 +33,7 @@ namespace caffe {
         objPos.x = widthMinusOne - objPos.x;
         for (auto& point : joints.points)
             point.x = widthMinusOne - point.x;
-        swapLeftRightKeypoints(joints, poseModel);
+        if(joints.points.size()) swapLeftRightKeypoints(joints, poseModel);
     }
 
     // Public functions

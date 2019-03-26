@@ -1213,6 +1213,366 @@ void caffeToMat(cv::Mat& img, const Dtype* caffeImg, cv::Size imageSize){
     }
 }
 
+int getRand(int min, int max){
+    int randNum = rand()%(max-min + 1) + min;
+    return randNum;
+}
+
+struct VSeq{
+    std::vector<cv::Mat> images;
+    std::vector<cv::Mat> imagesAug;
+    std::vector<cv::Mat> masks;
+    std::vector<Json::Value> jsons;
+};
+
+// OpenPose: added
+template<typename Dtype>
+void OPDataTransformer<Dtype>::TransformVideoMFJson(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
+                                                  const Datum& datum, const Datum& datumNegativeO, const int datasetIndex)
+{
+    // Lock
+    std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+    // First time
+    if (sNumberMaxOcclusions.empty())
+    {
+        splitUnsigned(sNumberMaxOcclusions, param_.number_max_occlusions(), DELIMITER);
+        splitFloating(sKeypointSigmas, param_.sigmas(), DELIMITER);
+    }
+    // Dynamic resize
+    if (sNumberMaxOcclusions.size() <= datasetIndex)
+        sNumberMaxOcclusions.resize(datasetIndex+1, sNumberMaxOcclusions[0]);
+    if (sKeypointSigmas.size() <= datasetIndex)
+        sKeypointSigmas.resize(datasetIndex+1, sKeypointSigmas[0]);
+    lock.unlock();
+
+    static int quick_counter = 0;
+    quick_counter += 1;
+
+    // Parameters
+    const Datum* datumNegative = &datumNegativeO;
+    const int datumHeight = datum.height();
+    const int datumWidth = datum.width();
+    const auto datumArea = (int)(datumHeight * datumWidth);
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+
+    // Load json data
+    std::vector<Json::Value> jsonVideoData;
+    std::vector<int> skip;
+    const std::string& data = datum.data();
+    for(int i=0; i<datum.channels(); i++){
+        std::string jsonString(datum.height(),' ');
+        for(int j=0; j<datum.height(); j++){
+            jsonString[j] = data[i*datum.height()*datum.width() + j];
+        }
+
+        // Load string
+        Json::Value root;
+        Json::Reader reader;
+        bool parsingSuccessful = reader.parse( jsonString.c_str(), root );     //parse process
+        if ( !parsingSuccessful )
+        {
+            std::cout  << "Failed to parse" << reader.getFormattedErrorMessages();
+            throw;
+        }
+        jsonVideoData.emplace_back(root);
+
+        if(root.isMember("skip")){
+            if(i==0 && root["skip"].size())
+            {
+                for(int f=0; f<root["skip"].size(); f++){
+                    skip.push_back(root["skip"][f].asInt());
+                }
+            }
+        }
+    }
+
+    // Sample for flip
+    bool rev = 1;
+    rev = getRand(0,1);
+
+    // Sample for step frames
+    int step = 1;
+    if(!skip.size()) step = getRand(1,2);
+
+    // Sample the start frame (We can timestep too) NOT DONE!!! Try to do cache also
+    int startIndex = getRand(0,datum.channels()-(frames*step)-1);
+
+    // Skip
+    if(skip.size()) throw std::runtime_error("Skip not Impl");
+
+    // Load Data
+    VSeq vs;
+    vs.images.clear();
+    vs.masks.clear();
+    vs.jsons.clear();
+    for(int i=startIndex; i<startIndex+(frames*step); i+=step){
+        //cout << "Looking at frame: " << i << endl;
+        vs.images.emplace_back(cv::imread(jsonVideoData[i]["image_path_full"].asString()));
+        vs.masks.emplace_back(cv::imread(jsonVideoData[i]["mask_path_full"].asString(),0));
+        vs.jsons.emplace_back(jsonVideoData[i]);
+    }
+
+    // Reverse Sequence
+    if(rev){
+        std::reverse(vs.images.begin(), vs.images.end());
+        std::reverse(vs.masks.begin(), vs.masks.end());
+        std::reverse(vs.jsons.begin(), vs.jsons.end());
+    }
+
+    // Sample person to focus?
+    std::vector<int> trackIds;
+    if(jsonVideoData[0]["annorect"].size()){
+        if(jsonVideoData[0]["annorect"][0].isMember("track_id")){
+            for(int i=0; i<jsonVideoData[0]["annorect"].size(); i++){
+                int track_id = jsonVideoData[0]["annorect"][i]["track_id"].asInt();
+                trackIds.emplace_back(track_id);
+            }
+        }
+    }
+    // First select a possible track
+    std::vector<cv::Rect> bboxes;
+    if(trackIds.size()){
+        std::random_shuffle(trackIds.begin(), trackIds.end());
+        int selected_track = trackIds[0];
+        // Iterate each frame
+        for(int i=0; i<jsonVideoData.size(); i++){
+            // If frame has people
+            if(jsonVideoData[i]["annorect"].size()){
+                // Iterate each person and select bbox for that id
+                bool found = false;
+                cv::Rect bbox;
+                for(int j=0; j<jsonVideoData[i]["annorect"].size(); j++){
+                    int track_id = jsonVideoData[i]["annorect"][j]["track_id"].asInt();
+                    if(track_id == selected_track){
+                        found = true;
+                        bbox.x = jsonVideoData[i]["annorect"][j]["rect"][0].asInt();
+                        bbox.y = jsonVideoData[i]["annorect"][j]["rect"][1].asInt();
+                        bbox.width = jsonVideoData[i]["annorect"][j]["rect"][2].asInt() - bbox.x;
+                        bbox.height = jsonVideoData[i]["annorect"][j]["rect"][3].asInt() - bbox.y;
+                        break;
+                    }
+                }
+                // Person found for this frame, push back
+                if(found) bboxes.emplace_back(bbox);
+                // Person not found for this frame
+                else{
+                    // Take last if available
+                    if(bboxes.size()) bboxes.emplace_back(bboxes.back());
+                    // If not
+                    bboxes.emplace_back(cv::Rect(0,0,0,0));
+                }
+            }
+            else{
+                throw std::runtime_error("Handle this");
+            }
+        }
+    }
+    for(cv::Rect& r : bboxes){
+        if(r.x == 0 && r.y == 0){
+            bboxes.clear();
+            break;
+        }
+    }
+    int sampleToFocus = getRand(0,1);
+    if(!sampleToFocus) bboxes.clear();
+
+    // Read background image
+    cv::Mat backgroundImage;
+    cv::Mat maskBackgroundImage = (datumNegative != nullptr
+            ? cv::Mat(vs.images[0].size().height, vs.images[0].size().width, CV_8UC1, cv::Scalar{0}) : cv::Mat());
+    if (datumNegative != nullptr)
+    {
+        const std::string& data = datumNegative->data();
+        const int datumNegativeWidth = datumNegative->width();
+        const int datumNegativeHeight = datumNegative->height();
+        const auto datumNegativeArea = (int)(datumNegativeHeight * datumNegativeWidth);
+        const cv::Mat b(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[0]);
+        const cv::Mat g(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[datumNegativeArea]);
+        const cv::Mat r(datumNegativeHeight, datumNegativeWidth, CV_8UC1, (uchar*)&data[2*datumNegativeArea]);
+        std::vector<cv::Mat> bgr = {b,g,r};
+        cv::merge(bgr, backgroundImage);
+        if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
+        {
+            const auto xDiff = datumNegativeWidth - finalImageWidth;
+            const auto yDiff = datumNegativeHeight - finalImageHeight;
+            const auto minX = (xDiff <= 0 ? 0 :
+                                            (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            const auto minY = (xDiff <= 0 ? 0 :
+                                            (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                            );
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+            applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+        }
+        // Resize (if smaller than final crop size)
+        // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+        else
+        {
+            cv::Mat backgroundImageTemp;
+            std::swap(backgroundImage, backgroundImageTemp);
+            cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+        }
+    }
+
+    // Convert format
+    std::map<int, Joints> personIDJointsLast;
+    cv::Mat imgAugPrev;
+    AugmentSelection augmentSelection;
+    for(int i=0; i<frames; i++){
+        const Json::Value& json = vs.jsons[i];
+        const cv::Mat& img = vs.images[i];
+        const cv::Mat& mask = vs.masks[i];
+
+        // Load metadata
+        MetaData metaData;
+        metaData.imageSize = vs.images[i].size();
+        metaData.isValidation = false;
+        metaData.numberOtherPeople = json["annorect"].size();
+        metaData.writeNumber = json["image_id"].asInt();
+        metaData.totalWriteNumber = 0; // WTF IS THIS IT USED BY THE DIAGONAL FUNCTION
+        //metaData.objPos.x = 368/2; metaData.objPos.y = 368/2;
+        if(bboxes.size()){
+            metaData.objPos.x = bboxes[i].x + (bboxes[i].width/2);
+            metaData.objPos.y = bboxes[i].y + (bboxes[i].height/2);
+        }else
+            metaData.objPos.x = metaData.imageSize.width/2.; metaData.objPos.y = metaData.imageSize.height/2; // Set to rotate around centre
+        metaData.jointsOthers.resize(metaData.numberOtherPeople);
+        metaData.objPosOthers.resize(metaData.numberOtherPeople);
+        metaData.scaleOthers.resize(metaData.numberOtherPeople);
+        metaData.scaleSelf = 1;
+
+        // Iterate each person
+        int j=0;
+        for(Joints& joints : metaData.jointsOthers){
+            int totalKeypoints = json["annorect"][j]["keypoints"].size()/3;
+            joints.points.resize(totalKeypoints);
+            joints.isVisible.resize(totalKeypoints);
+            for(int m=0; m<totalKeypoints; m++){
+                joints.points[m].x = json["annorect"][j]["keypoints"][m*3 + 0].asFloat();
+                joints.points[m].y = json["annorect"][j]["keypoints"][m*3 + 1].asFloat();
+                joints.isVisible[m] = json["annorect"][j]["keypoints"][m*3 + 2].asFloat();
+                joints.isVisible[m] = ((int)joints.isVisible[m] + 2) % 3;
+            }
+            j++;
+        }
+        for (auto& joints : metaData.jointsOthers)
+            lmdbJointsToOurModel(joints, mPoseModel);
+
+        // Augment here
+        cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;
+        if(i==0) augmentSelection.scale = estimateScale(metaData, param_, datasetIndex).first;
+        applyScale(metaData, augmentSelection.scale, mPoseModel);
+        if(i==0) augmentSelection.RotAndFinalSize = estimateRotation(
+                    metaData,
+                    cv::Size{(int)std::round(metaData.imageSize.width * augmentSelection.scale),
+                             (int)std::round(metaData.imageSize.height * augmentSelection.scale)},
+                    param_, datasetIndex);
+        applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
+        if(i==0) augmentSelection.cropCenter = estimateCrop(metaData, param_);
+        applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, mPoseModel);
+        if(i==0) augmentSelection.flip = estimateFlip(param_.flip_prob());
+        applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+        applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                             augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
+        applyAllAugmentation(maskAug, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, mask, 255);
+        applyAllAugmentation(maskBgAug, augmentSelection.RotAndFinalSize.first,
+                             augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                             finalCropSize, maskBackgroundImage, 255);
+        const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
+        cv::Mat backgroundImageTemp;
+        applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
+        applyFlip(bgImgAug, augmentSelection.flip, backgroundImageTemp);
+        // Resize mask
+        if (!maskAug.empty()){
+            cv::Mat maskAugTemp;
+            cv::resize(maskAug, maskAugTemp, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+            maskAug = maskAugTemp;
+        }
+        // Final background image - elementwise multiplication
+        if (!bgImgAug.empty() && !maskBgAug.empty())
+        {
+            // Apply mask to background image
+            cv::Mat backgroundImageAugmentedTemp;
+            bgImgAug.copyTo(backgroundImageAugmentedTemp, maskBgAug);
+            // Add background image to image augmented
+            cv::Mat imageAugmentedTemp;
+            cv::addWeighted(imgAug, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
+            imgAug = imageAugmentedTemp;
+        }
+
+        // Handle prev case
+        j=0;
+        if(i != 0){
+            metaData.jointsOthersPrev.resize(metaData.jointsOthers.size());
+            for(Joints& joints : metaData.jointsOthers){
+                int personID = json["annorect"][j]["track_id"].asInt();
+                if(personIDJointsLast.count(personID)){
+                    metaData.jointsOthersPrev[j] = personIDJointsLast[personID].clone();
+                }
+                j++;
+            }
+        }
+        // Store Previous
+        personIDJointsLast.clear();
+        j=0;
+        for(Joints& joints : metaData.jointsOthers){
+            personIDJointsLast[json["annorect"][j]["track_id"].asInt()] = joints.clone();
+            j++;
+        }
+
+        // Create Label for frame
+        Dtype* labelmapTemp = new Dtype[getNumberChannels() * gridY * gridX];
+        const std::vector<float> a;
+        const std::vector<float> b;
+        std::vector<long double> c;
+        std::vector<long double> d;
+        std::vector<unsigned long long> e;
+        generateLabelMap(labelmapTemp, imgAug.size(), maskAug, metaData, datasetIndex,
+                         a, b, c, d, e);
+
+//        visualize(labelmapTemp, mPoseModel, mPoseCategory, metaData, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v0");
+//        exit(-1);
+
+//        if(i == 0 && vid == 0){
+//            visualize(labelmapTemp, mPoseModel, mPoseCategory, metaData, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v0");
+//        }
+//        if(i==1 && vid == 0){
+//            visualize(labelmapTemp, mPoseModel, mPoseCategory, metaData, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v1");
+//            std::cout << "Done" << std::endl;
+//            exit(-1);
+//        }
+
+        // Convert image to Caffe Format
+        Dtype* imgaugTemp = new Dtype[imgAug.channels()*imgAug.size().width*imgAug.size().height];
+        matToCaffe(imgaugTemp, imgAug);
+
+        // Get pointers for all
+        int dataOffset = imgAug.channels()*imgAug.size().width*imgAug.size().height;
+        int labelOffset = getNumberChannels() * gridY * gridX;
+        Dtype* transformedDataPtr = transformedData->mutable_cpu_data();
+        Dtype* transformedLabelPtr = transformedLabel->mutable_cpu_data(); // Max 6,703,488
+
+        // Copy label
+        int totalVid = transformedLabel->shape()[0]/frames;
+        std::copy(labelmapTemp, labelmapTemp + labelOffset, transformedLabelPtr + (i*totalVid*labelOffset + vid*labelOffset));
+        delete labelmapTemp;
+
+        // Copy data
+        std::copy(imgaugTemp, imgaugTemp + dataOffset, transformedDataPtr + (i*totalVid*dataOffset + vid*dataOffset));
+        delete imgaugTemp;
+
+    }
+}
+
 // OpenPose: added
 template<typename Dtype>
 void OPDataTransformer<Dtype>::TransformVideoSF(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel,
@@ -1461,9 +1821,8 @@ void OPDataTransformer<Dtype>::TestVideo(int frames, Blob<Dtype> *transformedDat
             caffeToMat(testImg, imgPtr, cv::Size(transformedData->shape()[3], transformedData->shape()[2]));
             //int labelFrame = 2 * getNumberBodyBkgAndPAF(mPoseModel) - 1;
 
-
             // Channel Wanted
-            int channelWanted = getNumberChannels()/2 + 2;
+            int channelWanted = getNumberChannels()/2 + 86;
             //int channelWanted = getNumberChannels()/2 + getNumberTafChannels(param_.taf_topology()) + getNumberPafChannels(mPoseModel) + 18;
             Dtype* labelPtr = transformedLabelPtr + totalVid*fid*labelOffset + vid*labelOffset + (channelWanted)*transformedLabel->shape()[2]*transformedLabel->shape()[3];
             cv::Mat labelMat(cv::Size(transformedLabel->shape()[3], transformedLabel->shape()[2]), CV_32FC1);
@@ -1812,6 +2171,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         // Lock
         std::unique_lock<std::mutex> lock{sOcclusionsMutex};
         // Get value
+        if(!sKeypointSigmas.size()) throw std::runtime_error("sKeypointSigmas is empty");
         const auto keypointSigma = sKeypointSigmas[datasetIndex];
         lock.unlock();
 
@@ -1849,14 +2209,16 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
         for (auto part = 0; part < numberBodyParts; part++)
         {
             // Self
-            if (metaData.jointsSelf.isVisible[part] <= 1)
-            {
-                const auto& centerPoint = metaData.jointsSelf.points[part];
-                //cv::Point centerPoint = cv::Point(0,0);
-                putGaussianMaps(
-                    transformedLabel + (numberTotalChannels+numberTafChannels+numberPafChannels+part)*channelOffset,
-                    transformedLabel + (numberTafChannels+numberPafChannels+part)*channelOffset,
-                    centerPoint, stride, gridX, gridY, keypointSigma);
+            if(metaData.jointsSelf.isVisible.size()){
+                if (metaData.jointsSelf.isVisible[part] <= 1)
+                {
+                    const auto& centerPoint = metaData.jointsSelf.points[part];
+                    //cv::Point centerPoint = cv::Point(0,0);
+                    putGaussianMaps(
+                        transformedLabel + (numberTotalChannels+numberTafChannels+numberPafChannels+part)*channelOffset,
+                        transformedLabel + (numberTafChannels+numberPafChannels+part)*channelOffset,
+                        centerPoint, stride, gridX, gridY, keypointSigma);
+                }
             }
 
             // For every other person
@@ -2109,22 +2471,24 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
             cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
             // Self
             const auto& joints = metaData.jointsSelf;
-            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
-            {
-                putVectorMaps(transformedLabel + (numberTotalChannels + numberTafChannels + 2*i)*channelOffset,
-                              transformedLabel + (numberTotalChannels + numberTafChannels + 2*i + 1)*channelOffset,
-                              transformedLabel + (numberTafChannels + 2*i)*channelOffset,
-                              transformedLabel + (numberTafChannels + 2*i + 1)*channelOffset,
-                              // // For Distance
-                              // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
-                              // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
-                              count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
-                              param_.stride(), gridX, gridY, threshold,
-                              // diagonal, diagonalProportion,
-                              // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
-                              // transformedLabelBkgMask
-                              (mPoseModel == PoseModel::CAR_12 ? transformedLabelBkgMask : nullptr)
-                              );
+            if(joints.isVisible.size()){
+                if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+                {
+                    putVectorMaps(transformedLabel + (numberTotalChannels + numberTafChannels + 2*i)*channelOffset,
+                                  transformedLabel + (numberTotalChannels + numberTafChannels + 2*i + 1)*channelOffset,
+                                  transformedLabel + (numberTafChannels + 2*i)*channelOffset,
+                                  transformedLabel + (numberTafChannels + 2*i + 1)*channelOffset,
+                                  // // For Distance
+                                  // transformedLabel + (2*numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                  // transformedLabel + (numberTotalChannels - numberPafChannels/2 + i)*channelOffset,
+                                  count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                                  param_.stride(), gridX, gridY, threshold,
+                                  // diagonal, diagonalProportion,
+                                  // For Car_v1 --> Not all cars labeled, so mask out everything but keypoints/PAFs
+                                  // transformedLabelBkgMask
+                                  (mPoseModel == PoseModel::CAR_12 ? transformedLabelBkgMask : nullptr)
+                                  );
+                }
             }
 
             // For every other person

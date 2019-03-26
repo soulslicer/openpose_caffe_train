@@ -326,8 +326,12 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
             oPDataTransformerPtr->TransformVideoSF(item_id, mFrameSize, &(this->transformed_data_),
                                             &(this->transformed_label_),
                                             datum, datumBackground, randomIndex);
+        else if(inputType == "video")
+            oPDataTransformerPtr->TransformVideoMFJson(item_id, mFrameSize, &(this->transformed_data_),
+                                            &(this->transformed_label_),
+                                            datum, datumBackground, randomIndex);
         else
-            throw std::runtime_error("Not implemented");
+            throw std::runtime_error("Not Impl");
 
 //        if (backgroundDb)
 //            oPDataTransformerPtr->Transform(
@@ -384,14 +388,11 @@ void OPVideoLayer<Dtype>::load_batch(Batch<Dtype>* batch)
     DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
     DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
 
-    std::cout << "DONE!!" << std::endl;
-
-    // Video Test
-    auto oPDataTransformerPtr = this->mOPDataTransformers[std::max(0, randomIndex)];
-    oPDataTransformerPtr->TestVideo(mFrameSize, &(this->transformed_data_), &(this->transformed_label_));
-
-    std::cout << "VIDEO" << std::endl;
-    exit(-1);
+//    // Video Test
+//    auto oPDataTransformerPtr = this->mOPDataTransformers[std::max(0, randomIndex)];
+//    oPDataTransformerPtr->TestVideo(mFrameSize, &(this->transformed_data_), &(this->transformed_label_));
+//    std::cout << "VIDEO" << std::endl;
+//    exit(-1);
 
 //    CPUTimer batch_timer;
 //    batch_timer.Start();

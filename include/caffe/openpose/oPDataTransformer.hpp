@@ -18,6 +18,10 @@
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+#include <jsoncpp/json/json.h>
+#include <jsoncpp/json/value.h>
+#include <jsoncpp/json/reader.h>
+
 namespace caffe {
 
 /**
@@ -77,6 +81,8 @@ public:
 
     // For Video
     void TransformVideoSF(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
+                   const Datum& datumNegative, const int datasetIndex);
+    void TransformVideoMFJson(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum& datumNegative, const int datasetIndex);
     void TestVideo(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
 protected:

@@ -12,6 +12,12 @@ namespace caffe {
     {
         std::vector<cv::Point2f> points;
         std::vector<float> isVisible;
+        Joints clone(){
+            Joints newJoints;
+            newJoints.points = this->points;
+            newJoints.isVisible = this->isVisible;
+            return newJoints;
+        }
     };
 
     struct MetaData
@@ -46,6 +52,7 @@ namespace caffe {
     bool readMetaData(MetaData& metaData, int& currentEpoch, std::string& datasetString,
                       const char* data, const size_t offsetPerLine, const PoseCategory poseCategory,
                       const PoseModel poseModel);
+    void lmdbJointsToOurModel(Joints& joints, const PoseModel poseModel);
 
 }  // namespace caffe
 

@@ -1193,7 +1193,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     };
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_B{
         std::vector<int>{},
-        std::vector<int>{1,18},
+        std::vector<int>{0,18},
     };
 
     const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
@@ -1471,15 +1471,15 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
         auto missingBodyParts = missingBodyPartsBase;
         // If masking also non visible points
-        if (isVisible.empty())
+        if (isVisible.empty() && (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_25B_23))
             throw std::runtime_error{"Field isVisible cannot be empty" + getLine(__LINE__, __FUNCTION__, __FILE__)};
-        // if (!isVisible.empty())
-        // {
+        if (!isVisible.empty())
+        {
             for (auto i = 0u ; i < isVisible.size() ; i++)
                 if (isVisible[i] >= minVisibleToBlock)
                     missingBodyParts.emplace_back(i);
             std::sort(missingBodyParts.begin(), missingBodyParts.end());
-        // }
+        }
         // Missing PAF channels
         std::vector<int> missingChannels;
         if (!missingBodyParts.empty())

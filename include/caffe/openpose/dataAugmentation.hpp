@@ -15,6 +15,8 @@ namespace caffe {
     // Scale
     std::pair<float, float> estimateScale(
         const MetaData& metaData, const OPTransformationParameter& param_, const int index);
+    std::pair<float, float> estimateScale(
+        const MetaData& metaData, const OPTransformationParameter& param_, const int datasetIndex);
     // void applyScale(cv::Mat& imageAugmented, const float scale, const cv::Mat& image);
     void applyScale(MetaData& metaData, const float scale, const PoseModel poseModel);
     std::pair<float, float> estimateScale(const MetaData& metaData, const OPTransformationParameter& param_, const int datasetIndex);
