@@ -104,6 +104,7 @@ class Blob {
     return count(start_axis, num_axes());
   }
 
+  // OpenPose: added
   /**
    * @brief Compute strides
    *
@@ -118,6 +119,7 @@ class Blob {
     }
     return strides;
   }
+  // OpenPose: added end
 
   /**
    * @brief Returns the 'canonical' version of a (usually) user-specified axis,
@@ -231,7 +233,7 @@ class Blob {
     return diff_;
   }
 
-  Dtype* psuedo_cpu_data() const;
+  Dtype* pseudo_cpu_data() const;  // OpenPose: added
   const Dtype* cpu_data() const;
   void set_cpu_data(Dtype* data);
   const int* gpu_shape() const;
