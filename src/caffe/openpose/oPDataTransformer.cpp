@@ -1381,6 +1381,23 @@ void OPDataTransformer<Dtype>::TransformVideoMFJson(int vid, int frames, Blob<Dt
     int sampleToFocus = getRand(0,1);
     if(!sampleToFocus) bboxes.clear();
 
+//    static int counter = 0;
+//    counter = counter + 1;
+//    if(counter > 50){
+//        for(int i=0; i<vs.images.size(); i++){
+
+//            if(bboxes.size()){
+//                cv::Rect bbox = bboxes[i+startIndex];
+//                cv::rectangle(vs.images[i], bbox, cv::Scalar(255,0,0));
+//            }
+
+
+//            cv::imshow("win", vs.images[i]);
+//            cv::waitKey(-1);
+//        }
+//    }
+//    std::cout << counter << std::endl;
+
     // Read background image
     cv::Mat backgroundImage;
     cv::Mat maskBackgroundImage = (datumNegative != nullptr
@@ -1439,8 +1456,8 @@ void OPDataTransformer<Dtype>::TransformVideoMFJson(int vid, int frames, Blob<Dt
         metaData.totalWriteNumber = 0; // WTF IS THIS IT USED BY THE DIAGONAL FUNCTION
         //metaData.objPos.x = 368/2; metaData.objPos.y = 368/2;
         if(bboxes.size()){
-            metaData.objPos.x = bboxes[i].x + (bboxes[i].width/2);
-            metaData.objPos.y = bboxes[i].y + (bboxes[i].height/2);
+            metaData.objPos.x = bboxes[i+startIndex].x + (bboxes[i+startIndex].width/2);
+            metaData.objPos.y = bboxes[i+startIndex].y + (bboxes[i+startIndex].height/2);
         }else
             metaData.objPos.x = metaData.imageSize.width/2.; metaData.objPos.y = metaData.imageSize.height/2; // Set to rotate around centre
         metaData.jointsOthers.resize(metaData.numberOtherPeople);
