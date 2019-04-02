@@ -1045,7 +1045,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             // Redundant ones
             // Ears-shoulders, shoulders-hips, shoulders-wrists, hips-ankles, wrists,  ankles, wrists-hips, small toes-ankles)
                    2, 5,            2, 5,             2, 5,         9, 12,       4,      11,        4, 7,        },//11, 14},
-        std::vector<int>{                                                                                           // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
+        std::vector<int>{    // (BODY_25B)                                                                                       // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
             // Minimum spanning tree
             // |----------------------- COCO Body -----------------------|   |------ Foot ------|  | MPII |
                  0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5, 5,
@@ -1189,11 +1189,17 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_A{
         std::vector<int>{},
-        std::vector<int>{0,6},
+        std::vector<int>{10,6},
+        std::vector<int>{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
+                        0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5,5,   6,6
+                        },
     };
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_B{
         std::vector<int>{},
-        std::vector<int>{0,18},
+        std::vector<int>{10,6},
+        std::vector<int>{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
+                        1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,   17,18
+                        },
     };
 
     const std::array<std::map<unsigned int, std::string>, NUMBER_MODELS> MAPPINGS{
