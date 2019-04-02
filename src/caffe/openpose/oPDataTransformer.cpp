@@ -1297,7 +1297,8 @@ void OPDataTransformer<Dtype>::TransformVideoMFJson(int vid, int frames, Blob<Dt
 
     // Sample for step frames
     int step = 1;
-    if(!skip.size()) step = getRand(1,2);
+    int max_step = param_.taf_maxstepsize();
+    if(!skip.size()) step = getRand(1,max_step);
 
     // Sample the start frame (We can timestep too) NOT DONE!!! Try to do cache also
     int startIndex = getRand(0,datum.channels()-(frames*step)-1);
