@@ -20,7 +20,7 @@
 namespace caffe {
 
 template <typename Dtype>
-OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
+OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param, const int fsize, const int frank) :
     BasePrefetchingDataLayer<Dtype>(param),
     // offset_(), // OpenPose: commented
     offsetBackground(), // OpenPose: added
@@ -34,6 +34,8 @@ OPDataLayer<Dtype>::OPDataLayer(const LayerParameter& param) :
     // OpenPose: commented end
     // OpenPose: added
     // Set mSources, mModels, and mProbabilites
+    mFsize = fsize;
+    mFrank = frank;
     mSources = split(param.op_transform_param().sources(), DELIMITER);
     mModels = split(param.op_transform_param().models(), DELIMITER);
     splitFloating(mProbabilities, param.op_transform_param().probabilities(), DELIMITER);
@@ -221,8 +223,12 @@ void OPDataLayer<Dtype>::Next(const int index)
 template <typename Dtype>
 bool OPDataLayer<Dtype>::Skip(const int index)
 {
-    int size = Caffe::solver_count();
-    int rank = Caffe::solver_rank();
+    int size = mFsize; int rank = mFrank;
+    if(mFsize == -1 || mFrank == -1){
+        size = Caffe::solver_count();
+        rank = Caffe::solver_rank();
+    }
+    //std::cout << "RANK: " << rank << std::endl;
     bool keep = (mOffsets[index] % size) == rank ||
                   // In test mode, only rank 0 runs, so avoid skipping
                   this->layer_param_.phase() == TEST;
@@ -246,8 +252,11 @@ void OPDataLayer<Dtype>::NextBackground()
 template <typename Dtype>
 bool OPDataLayer<Dtype>::SkipBackground()
 {
-    int size = Caffe::solver_count();
-    int rank = Caffe::solver_rank();
+    int size = mFsize; int rank = mFrank;
+    if(mFsize == -1 || mFrank == -1){
+        size = Caffe::solver_count();
+        rank = Caffe::solver_rank();
+    }
     bool keep = (offsetBackground % size) == rank ||
                   // In test mode, only rank 0 runs, so avoid skipping
                   this->layer_param_.phase() == TEST;

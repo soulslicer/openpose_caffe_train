@@ -22,7 +22,7 @@ namespace caffe {
 template <typename Dtype>
 class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
  public:
-  explicit OPDataLayer(const LayerParameter& param);
+  explicit OPDataLayer(const LayerParameter& param, const int fsize=-1, const int frank=-1);
   virtual ~OPDataLayer();
   virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
@@ -73,6 +73,8 @@ class OPDataLayer : public BasePrefetchingDataLayer<Dtype> {
   std::vector<std::string> mSources;
   std::vector<std::string> mModels;
   std::vector<float> mProbabilities;
+  int mFsize;
+  int mFrank;
   // OpenPose: added end
 };
 

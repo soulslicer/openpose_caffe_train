@@ -49,12 +49,18 @@ public:
         param.mutable_op_transform_param()->set_source_background(py::str(d["source_background"]));
         param.mutable_op_transform_param()->set_normalization(py::int_(d["normalization"]));
         param.mutable_op_transform_param()->set_add_distance(py::int_(d["add_distance"]));
-
-        dataLayer = std::shared_ptr<OPDataLayer<float>>(new OPDataLayer<float>(param));
+        int size = -1; int rank = -1;
+        if(d.contains("msize") && d.contains("mrank")){
+            size = py::int_(d["msize"]);
+            rank = py::int_(d["mrank"]);
+        }
+        dataLayer = std::shared_ptr<OPDataLayer<float>>(new OPDataLayer<float>(param, size, rank));
 
         bottom = {new Blob<float>{1,1,1,1}};
         top = {new Blob<float>{1,1,1,1}, new Blob<float>{1,1,1,1}};
         dataLayer->DataLayerSetUp(bottom, top);
+
+        std::cout << "Initialized" << std::endl;
     }
 
     void load(Batch<float>& batch){
