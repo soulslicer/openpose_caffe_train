@@ -32,6 +32,7 @@ namespace caffe {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
         joints.points.resize(numberBodyParts);
         joints.isVisible.resize(numberBodyParts);
+        if(joints.points3D.size()) joints.points3D.resize(numberBodyParts);
 
         // From COCO/DomeDB to OP keypoint indexes
         const auto& lmdbToOurModel = getLmdbToOpenPoseKeypoints(poseModel);
@@ -42,10 +43,14 @@ namespace caffe {
             {
                 // Initialize point
                 joints.points[i] = cv::Point2f{0.f, 0.f};
+                if(joints.points3D.size()) joints.points3D[i] = cv::Point3f{0.f, 0.f, 0.f};
                 // Get and average joints.points[i]
-                for (auto& lmdbToOurModelIndex : lmdbToOurModel[i])
+                for (auto& lmdbToOurModelIndex : lmdbToOurModel[i]){
                     joints.points[i] += jointsOld.points[lmdbToOurModelIndex];
+                    if(joints.points3D.size()) joints.points3D[i] += jointsOld.points3D[lmdbToOurModelIndex];
+                }
                 joints.points[i] *= (1.f / (float)lmdbToOurModel[i].size());
+                if(joints.points3D.size()) joints.points3D[i] *= (1.f / (float)lmdbToOurModel[i].size());
                 // Get joints.isVisible[i]
                 // Original COCO:
                 //     v=0: not labeled
@@ -131,6 +136,7 @@ namespace caffe {
             else
             {
                 joints.points[i] = cv::Point2f{0.f, 0.f};
+                if(joints.points3D.size()) joints.points3D[i] = cv::Point3f{0.f, 0.f, 0.f};
                 joints.isVisible[i] = 4;
             }
         }

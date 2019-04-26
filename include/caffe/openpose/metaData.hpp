@@ -11,10 +11,12 @@ namespace caffe {
     struct Joints
     {
         std::vector<cv::Point2f> points;
+        std::vector<cv::Point3f> points3D;
         std::vector<float> isVisible;
         Joints clone(){
             Joints newJoints;
             newJoints.points = this->points;
+            newJoints.points3D = this->points3D;
             newJoints.isVisible = this->isVisible;
             return newJoints;
         }

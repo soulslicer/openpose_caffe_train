@@ -18,6 +18,8 @@
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+#include <caffe/layers/base_data_layer.hpp>
+
 #include <jsoncpp/json/json.h>
 #include <jsoncpp/json/value.h>
 #include <jsoncpp/json/reader.h>
@@ -84,6 +86,7 @@ public:
                    const Datum& datumNegative, const int datasetIndex);
     void TransformVideoMFJson(int vid, int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel, const Datum& datum,
                    const Datum& datumNegative, const int datasetIndex);
+    void TransformPOF(const cv::Mat& img, const cv::Mat& background, MetaData& metaData, Batch<Dtype>& batch);
     void TestVideo(int frames, Blob<Dtype>* transformedData, Blob<Dtype>* transformedLabel);
 protected:
     // OpenPose: added end

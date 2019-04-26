@@ -239,6 +239,82 @@ void putDistanceMaps(Dtype* entryDistX, Dtype* entryDistY, Dtype* maskDistX, Dty
 }
 
 template<typename Dtype>
+void putVectorMapsPOF(Dtype* entryX, Dtype* entryY, Dtype* entryZ, cv::Mat& count,
+                      const cv::Point2f& centerA, const cv::Point2f& centerB,
+                      const cv::Point3f& pofA, const cv::Point3f& pofB,
+                      const int stride, const int gridX,
+                      const int gridY, const int threshold)
+{
+    const auto scaleLabel = Dtype(1)/Dtype(stride);
+    const auto centerALabelScale = scaleLabel * centerA;
+    const auto centerBLabelScale = scaleLabel * centerB;
+    cv::Point3f directionAB = pofB - pofA;
+    const auto distanceAB = std::sqrt(directionAB.x*directionAB.x + directionAB.y*directionAB.y + directionAB.z*directionAB.z);
+    directionAB *= (Dtype(1) / distanceAB);
+
+    cv::Point2f directionABA = centerBLabelScale - centerALabelScale;
+    directionABA *= (Dtype(1) / std::sqrt(directionABA.x*directionABA.x + directionABA.y*directionABA.y));
+
+    // // For Distance
+    // const auto dMin = Dtype(0);
+    // const auto dMax = Dtype(std::sqrt(gridX*gridX + gridY*gridY));
+    // const auto dRange = dMax - dMin;
+    // const auto entryDValue = 2*(distanceAB - dMin)/dRange - 1; // Main range: [-1, 1],
+    // -1 is 0px-distance, 1 is 368 / stride x sqrt(2) px of distance
+
+    // If PAF is not 0 or NaN (e.g. if PAF perpendicular to image plane)
+    if (!isnan(directionAB.x) && !isnan(directionAB.y) && !isnan(directionAB.z))
+    {
+        const int minX = std::max(0,
+                                  int(std::round(std::min(centerALabelScale.x, centerBLabelScale.x) - threshold)));
+        const int maxX = std::min(gridX,
+                                  int(std::round(std::max(centerALabelScale.x, centerBLabelScale.x) + threshold)));
+        const int minY = std::max(0,
+                                  int(std::round(std::min(centerALabelScale.y, centerBLabelScale.y) - threshold)));
+        const int maxY = std::min(gridY,
+                                  int(std::round(std::max(centerALabelScale.y, centerBLabelScale.y) + threshold)));
+        // alpha*1 + (1-alpha)*realProportion
+        // const auto weight = (1-diagonalProportion) + diagonalProportion * diagonal/distanceAB;
+        for (auto gY = minY; gY < maxY; gY++)
+        {
+            const auto yOffset = gY*gridX;
+            const auto gYMenosCenterALabelScale = gY - centerALabelScale.y;
+            for (auto gX = minX; gX < maxX; gX++)
+            {
+                const auto xyOffset = yOffset + gX;
+                const cv::Point2f ba{gX - centerALabelScale.x, gYMenosCenterALabelScale};
+                const float distance = std::abs(ba.x*directionABA.y - ba.y*directionABA.x);
+                if (distance <= threshold)
+                {
+                    auto& counter = count.at<uchar>(gY, gX);
+                    if (counter == 0)
+                    {
+                        entryX[xyOffset] = directionAB.x;
+                        entryY[xyOffset] = directionAB.y;
+                        entryZ[xyOffset] = directionAB.z;
+                        // Weight makes small PAFs as important as big PAFs
+                        // maskX[xyOffset] *= weight;
+                        // maskY[xyOffset] *= weight;
+                        // // For Distance
+                        // entryD[xyOffset] = entryDValue;
+                        // entryDMask[xyOffset] = Dtype(1);
+                    }
+                    else
+                    {
+                        entryX[xyOffset] = (entryX[xyOffset]*counter + directionAB.x) / (counter + 1);
+                        entryY[xyOffset] = (entryY[xyOffset]*counter + directionAB.y) / (counter + 1);
+                        entryZ[xyOffset] = (entryZ[xyOffset]*counter + directionAB.z) / (counter + 1);
+                        // // For Distance
+                        // entryD[xyOffset] = (entryD[xyOffset]*counter + entryDValue) / (counter + 1);
+                    }
+                    counter++;
+                }
+            }
+        }
+    }
+}
+
+template<typename Dtype>
 void putVectorMaps(Dtype* entryX, Dtype* entryY, Dtype* maskX, Dtype* maskY,
                    cv::Mat& count, const cv::Point2f& centerA,
                    const cv::Point2f& centerB, const int stride, const int gridX,
@@ -1224,6 +1300,175 @@ struct VSeq{
     std::vector<cv::Mat> masks;
     std::vector<Json::Value> jsons;
 };
+
+// OpenPose: added
+template<typename Dtype>
+void OPDataTransformer<Dtype>::TransformPOF(const cv::Mat& img, const cv::Mat& background, MetaData& metaData, Batch<Dtype>& batch)
+{
+    // Lock
+    int datasetIndex = 0;
+    std::unique_lock<std::mutex> lock{sOcclusionsMutex};
+    // First time
+    if (sNumberMaxOcclusions.empty())
+    {
+        splitUnsigned(sNumberMaxOcclusions, param_.number_max_occlusions(), DELIMITER);
+        splitFloating(sKeypointSigmas, param_.sigmas(), DELIMITER);
+    }
+    // Dynamic resize
+    if (sNumberMaxOcclusions.size() <= datasetIndex)
+        sNumberMaxOcclusions.resize(datasetIndex+1, sNumberMaxOcclusions[0]);
+    if (sKeypointSigmas.size() <= datasetIndex)
+        sKeypointSigmas.resize(datasetIndex+1, sKeypointSigmas[0]);
+    lock.unlock();
+
+    // Params
+    const cv::Size finalCropSize{(int)param_.crop_size_x(), (int)param_.crop_size_y()};
+    const auto stride = (int)param_.stride();
+    const auto finalImageWidth = (int)param_.crop_size_x();
+    const auto finalImageHeight = (int)param_.crop_size_y();
+    const auto gridX = finalImageWidth / stride;
+    const auto gridY = finalImageHeight / stride;
+
+    // Background processing
+    cv::Mat backgroundImage = background.clone();
+    const auto datumNegativeWidth = backgroundImage.size().width;
+    const auto datumNegativeHeight = backgroundImage.size().height;
+    if (datumNegativeWidth > finalImageWidth && datumNegativeHeight > finalImageHeight)
+    {
+        const auto xDiff = datumNegativeWidth - finalImageWidth;
+        const auto yDiff = datumNegativeHeight - finalImageHeight;
+        const auto minX = (xDiff <= 0 ? 0 :
+                                        (int)std::round(xDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                        );
+        const auto minY = (xDiff <= 0 ? 0 :
+                                        (int)std::round(yDiff * float(std::rand()) / float(RAND_MAX)) // [0,1]
+                                        );
+        cv::Mat backgroundImageTemp;
+        std::swap(backgroundImage, backgroundImageTemp);
+        const cv::Point2i backgroundCropCenter{minX + finalImageWidth/2, minY + finalImageHeight/2};
+        applyCrop(backgroundImage, backgroundCropCenter, backgroundImageTemp, 0, finalCropSize);
+    }
+    // Resize (if smaller than final crop size)
+    // if (datumNegativeWidth < finalImageWidth || datumNegativeHeight < finalImageHeight)
+    else
+    {
+        cv::Mat backgroundImageTemp;
+        std::swap(backgroundImage, backgroundImageTemp);
+        cv::resize(backgroundImageTemp, backgroundImage, cv::Size{finalImageWidth, finalImageHeight}, 0, 0, CV_INTER_CUBIC);
+    }
+
+    // Mask
+    cv::Mat mask = cv::Mat(img.size(), CV_8UC1, cv::Scalar(255));
+    cv::Mat maskBackgroundImage =  cv::Mat(img.size(), CV_8UC1, cv::Scalar{0});
+
+    // Convert model
+    lmdbJointsToOurModel(metaData.jointsSelf, mPoseModel);
+    if(metaData.jointsOthers.size()) throw std::runtime_error("Jointothers not handled yet");
+
+    // Augment
+    metaData.filled = true;
+    AugmentSelection augmentSelection;
+    cv::Mat imgAug, maskAug, maskBgAug, bgImgAug;
+    augmentSelection.scale = estimateScale(metaData, param_, datasetIndex).first;
+    applyScale(metaData, augmentSelection.scale, mPoseModel);
+    // We dont handle rotations as we need to rotate the 3D keypoints too?
+    augmentSelection.RotAndFinalSize = estimateRotation(
+                metaData,
+                cv::Size{(int)std::round(metaData.imageSize.width * augmentSelection.scale),
+                         (int)std::round(metaData.imageSize.height * augmentSelection.scale)},
+                param_, datasetIndex);
+    applyRotation(metaData, augmentSelection.RotAndFinalSize.first, mPoseModel);
+    augmentSelection.cropCenter = estimateCrop(metaData, param_);
+    applyCrop(metaData, augmentSelection.cropCenter, finalCropSize, mPoseModel);
+    augmentSelection.flip = estimateFlip(param_.flip_prob());
+    applyFlip(metaData, augmentSelection.flip, finalImageHeight, param_, mPoseModel);
+    applyAllAugmentation(imgAug, augmentSelection.RotAndFinalSize.first, augmentSelection.scale,
+                         augmentSelection.flip, augmentSelection.cropCenter, finalCropSize, img, 0);
+    applyAllAugmentation(maskAug, augmentSelection.RotAndFinalSize.first,
+                         augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                         finalCropSize, mask, 255);
+    applyAllAugmentation(maskBgAug, augmentSelection.RotAndFinalSize.first,
+                         augmentSelection.scale, augmentSelection.flip, augmentSelection.cropCenter,
+                         finalCropSize, maskBackgroundImage, 255);
+    const cv::Point2i backgroundCropCenter{backgroundImage.cols/2, backgroundImage.rows/2};
+    cv::Mat backgroundImageTemp;
+    applyCrop(backgroundImageTemp, backgroundCropCenter, backgroundImage, 0, finalCropSize);
+    applyFlip(bgImgAug, augmentSelection.flip, backgroundImageTemp);
+    // Resize mask
+    if (!maskAug.empty()){
+        cv::Mat maskAugTemp;
+        cv::resize(maskAug, maskAugTemp, cv::Size{gridX, gridY}, 0, 0, cv::INTER_AREA);
+        maskAug = maskAugTemp;
+    }
+    // Final background image - elementwise multiplication
+    if (!bgImgAug.empty() && !maskBgAug.empty())
+    {
+        // Apply mask to background image
+        cv::Mat backgroundImageAugmentedTemp;
+        bgImgAug.copyTo(backgroundImageAugmentedTemp, maskBgAug);
+        // Add background image to image augmented
+        cv::Mat imageAugmentedTemp;
+        cv::addWeighted(imgAug, 1., backgroundImageAugmentedTemp, 1., 0., imageAugmentedTemp);
+        imgAug = imageAugmentedTemp;
+    }
+
+//    // Cout Joints
+//    std::cout << augmentSelection.flip << std::endl;
+//    for(auto joint : metaData.jointsSelf.points3D){
+//        std::cout << joint.x << " " << joint.y << " " << joint.z << std::endl;
+//    }
+//////    std::cout << "---" << std::endl;
+//////    for(auto joint : metaData.jointsSelf.isVisible){
+//////        std::cout << joint << std::endl;
+//////    }
+////    exit(-1);
+
+    // Create Label for frame
+    batch.label_.Reshape({1, getNumberChannels(), gridY, gridX});
+    const std::vector<float> a;
+    const std::vector<float> b;
+    std::vector<long double> c;
+    std::vector<long double> d;
+    std::vector<unsigned long long> e;
+    generateLabelMap(batch.label_.mutable_cpu_data(), imgAug.size(), maskAug, metaData, datasetIndex,
+                     a, b, c, d, e);
+
+    // Image
+    batch.data_.Reshape({1, imgAug.channels(), imgAug.size().height, imgAug.size().width});
+    matToCaffe(batch.data_.mutable_cpu_data(), imgAug);
+
+    // POF Case
+    if(!metaData.jointsSelf.points3D.size()) return;
+    int totalPofPairs = 24;
+    batch.other_.Reshape({1, totalPofPairs*3, gridY, gridX});
+    Dtype* pofPtr = batch.other_.mutable_cpu_data();
+    const auto channelOffset = gridY * gridX;
+
+    // POF
+    const auto& labelMapA = getPafIndexA(mPoseModel);
+    const auto& labelMapB = getPafIndexB(mPoseModel);
+    const auto threshold = 1;
+    for (auto i = 0 ; i < totalPofPairs ; i++)
+    {
+        cv::Mat count = cv::Mat::zeros(gridY, gridX, CV_8UC1);
+        // Self
+        const auto& joints = metaData.jointsSelf;
+        if(joints.isVisible.size()){
+            if (joints.isVisible[labelMapA[i]] <= 1 && joints.isVisible[labelMapB[i]] <= 1)
+            {
+                putVectorMapsPOF(pofPtr + (3*i + 0)*channelOffset,
+                                  pofPtr + (3*i + 1)*channelOffset,
+                                  pofPtr + (3*i + 2)*channelOffset,
+                                  count, joints.points[labelMapA[i]], joints.points[labelMapB[i]],
+                                  joints.points3D[labelMapA[i]], joints.points3D[labelMapB[i]],
+                                  param_.stride(), gridX, gridY, threshold);
+            }
+        }
+    }
+
+//    visualize(batch.label_.cpu_data(), mPoseModel, mPoseCategory, metaData, imgAug, stride, mModelString, param_.add_distance(), param_.taf_topology(), "v0");
+//    exit(-1);
+}
 
 // OpenPose: added
 template<typename Dtype>

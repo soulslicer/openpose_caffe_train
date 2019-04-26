@@ -47,6 +47,7 @@ template <typename Dtype>
 class Batch {
  public:
   Blob<Dtype> data_, label_;
+  Blob<Dtype> other_;
 };
 
 template <typename Dtype>

@@ -25,6 +25,7 @@ namespace caffe {
             const auto ri = swapLeftRightKeypoint[1];
             std::swap(joints.points[ri], joints.points[li]);
             std::swap(joints.isVisible[ri], joints.isVisible[li]);
+            if(joints.points3D.size()) std::swap(joints.points3D[ri], joints.points3D[li]);
         }
     }
 
@@ -34,6 +35,13 @@ namespace caffe {
         for (auto& point : joints.points)
             point.x = widthMinusOne - point.x;
         if(joints.points.size()) swapLeftRightKeypoints(joints, poseModel);
+
+        if(joints.points3D.size()){
+            for (auto& point : joints.points3D){
+                point.x *= -1;
+            }
+            swapLeftRightKeypoints(joints, poseModel);
+        }
     }
 
     // Public functions
