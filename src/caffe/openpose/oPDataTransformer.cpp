@@ -1526,14 +1526,14 @@ void OPDataTransformer<Dtype>::TransformVideoMFJson(int vid, int frames, Blob<Dt
         }
         jsonVideoData.emplace_back(root);
 
-        if(root.isMember("skip")){
-            if(i==0 && root["skip"].size())
-            {
-                for(int f=0; f<root["skip"].size(); f++){
-                    skip.push_back(root["skip"][f].asInt());
-                }
-            }
-        }
+//        if(root.isMember("skip")){
+//            if(i==0 && root["skip"].size())
+//            {
+//                for(int f=0; f<root["skip"].size(); f++){
+//                    skip.push_back(root["skip"][f].asInt());
+//                }
+//            }
+//        }
     }
 
     // Sample for flip
@@ -1557,7 +1557,6 @@ void OPDataTransformer<Dtype>::TransformVideoMFJson(int vid, int frames, Blob<Dt
     vs.masks.clear();
     vs.jsons.clear();
     for(int i=startIndex; i<startIndex+(frames*step); i+=step){
-        //cout << "Looking at frame: " << i << endl;
         vs.images.emplace_back(cv::imread(jsonVideoData[i]["image_path_full"].asString()));
         vs.masks.emplace_back(cv::imread(jsonVideoData[i]["mask_path_full"].asString(),0));
         vs.jsons.emplace_back(jsonVideoData[i]);
