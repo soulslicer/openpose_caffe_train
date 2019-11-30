@@ -16,6 +16,7 @@
 #include <pybind11/numpy.h>
 
 #include <caffe/openpose/layers/oPDataLayer.hpp>
+#include <caffe/openpose/layers/oPVideoLayer.hpp>
 
 #ifdef USE_OPENCV
 using namespace caffe;  // NOLINT(build/namespaces)
@@ -55,6 +56,58 @@ public:
             rank = py::int_(d["mrank"]);
         }
         dataLayer = std::shared_ptr<OPDataLayer<float>>(new OPDataLayer<float>(param, size, rank));
+
+        bottom = {new Blob<float>{1,1,1,1}};
+        top = {new Blob<float>{1,1,1,1}, new Blob<float>{1,1,1,1}};
+        dataLayer->DataLayerSetUp(bottom, top);
+
+        std::cout << "Initialized" << std::endl;
+    }
+
+    void load(Batch<float>& batch){
+        batch.data_.Reshape(top[0]->shape());
+        batch.label_.Reshape(top[1]->shape());
+        dataLayer->load_batch(&batch);
+    }
+};
+
+class OPCaffeVideo{
+public:
+    std::shared_ptr<OPVideoLayer<float>> dataLayer;
+    std::vector<Blob<float>*> bottom, top;
+
+    OPCaffeVideo(py::dict d){
+        LayerParameter param;
+        param.mutable_data_param()->set_batch_size(py::int_(d["batch_size"]));
+        param.mutable_data_param()->set_backend(DataParameter::LMDB);
+        param.mutable_op_transform_param()->set_stride(py::int_(d["stride"]));
+        param.mutable_op_transform_param()->set_max_degree_rotations(py::str(d["max_degree_rotations"]));
+        param.mutable_op_transform_param()->set_crop_size_x(py::int_(d["crop_size_x"]));
+        param.mutable_op_transform_param()->set_crop_size_y(py::int_(d["crop_size_y"]));
+        param.mutable_op_transform_param()->set_center_perterb_max(py::float_(d["center_perterb_max"]));
+        param.mutable_op_transform_param()->set_center_swap_prob(py::float_(d["center_swap_prob"]));
+        param.mutable_op_transform_param()->set_scale_prob(py::float_(d["scale_prob"]));
+        param.mutable_op_transform_param()->set_scale_mins(py::str(d["scale_mins"]));
+        param.mutable_op_transform_param()->set_scale_maxs(py::str(d["scale_maxs"]));
+        param.mutable_op_transform_param()->set_target_dist(py::float_(d["target_dist"]));
+        param.mutable_op_transform_param()->set_number_max_occlusions(py::str(d["number_max_occlusions"]));
+        param.mutable_op_transform_param()->set_sigmas(py::str(d["sigmas"]));
+        param.mutable_op_transform_param()->set_models(py::str(d["models"]));
+        param.mutable_op_transform_param()->set_sources(py::str(d["sources"]));
+        param.mutable_op_transform_param()->set_probabilities(py::str(d["probabilities"]));
+        param.mutable_op_transform_param()->set_source_background(py::str(d["source_background"]));
+        param.mutable_op_transform_param()->set_normalization(py::int_(d["normalization"]));
+        param.mutable_op_transform_param()->set_add_distance(py::int_(d["add_distance"]));
+        param.mutable_op_transform_param()->set_input_type(py::str(d["input_type"]));
+        param.mutable_op_transform_param()->set_frame_size(py::int_(d["frame_size"]));
+        param.mutable_op_transform_param()->set_taf_topology(py::int_(d["taf_topology"]));
+        param.mutable_op_transform_param()->set_taf_maxstepsize(py::int_(d["taf_maxstepsize"]));
+        int size = -1; int rank = -1;
+        if(d.contains("msize") && d.contains("mrank")){
+            size = py::int_(d["msize"]);
+            rank = py::int_(d["mrank"]);
+        }
+        dataLayer = std::shared_ptr<OPVideoLayer<float>>(new OPVideoLayer<float>(param));
 
         bottom = {new Blob<float>{1,1,1,1}};
         top = {new Blob<float>{1,1,1,1}, new Blob<float>{1,1,1,1}};
@@ -143,6 +196,11 @@ PYBIND11_MODULE(opcaffe, m){
     py::class_<OPCaffe>(m, "OPCaffe")
         .def(py::init<py::dict>())
         .def("load", &OPCaffe::load)
+        ;
+
+    py::class_<OPCaffeVideo>(m, "OPCaffeVideo")
+        .def(py::init<py::dict>())
+        .def("load", &OPCaffeVideo::load)
         ;
 
     py::class_<MetaData>(m, "MetaData")

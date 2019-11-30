@@ -33,6 +33,7 @@ public:
     virtual inline int ExactNumBottomBlobs() const { return 0; }
     virtual inline int MinTopBlobs() const { return 1; }
     virtual inline int MaxTopBlobs() const { return 2; }
+    virtual void load_batch(Batch<Dtype>* batch);
 
 protected:
     // void Next(); // OpenPose: commented for more generic
@@ -41,8 +42,6 @@ protected:
     bool Skip(const int index = 0); // OpenPose: added
     void NextBackground(); // OpenPose: added
     bool SkipBackground(); // OpenPose: added
-
-    virtual void load_batch(Batch<Dtype>* batch);
 
     // shared_ptr<db::DB> db_; // OpenPose: commented for more generic mDbs
     // shared_ptr<db::Cursor> cursor_; // OpenPose: commented for more generic mCursors

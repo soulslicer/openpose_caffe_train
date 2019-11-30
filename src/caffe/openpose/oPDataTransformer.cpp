@@ -2167,11 +2167,15 @@ void OPDataTransformer<Dtype>::generateDataAndLabel(Dtype* transformedData, Dtyp
                      distanceAverage, sigmaAverage, distanceAverageNew, distanceSigmaNew, distanceCounterNew);
     VLOG(2) << "  AddGaussian+CreateLabel: " << timer1.MicroSeconds()*1e-3 << " ms";
 
-//     // Debugging - Visualize - Write on disk
-//     visualize(
-//         transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
-//         param_.add_distance());
-//     exit(-1);
+     // Debugging - Visualize - Write on disk
+    static int counter = 0;
+    counter++;
+    if(counter == 5){
+     visualize(
+         transformedLabel, mPoseModel, mPoseCategory, metaData, imageAugmented, stride, mModelString,
+         param_.add_distance());
+     exit(-1);
+    }
 }
 
 float getNorm(const cv::Point2f& pointA, const cv::Point2f& pointB)
@@ -2419,7 +2423,8 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
                 if (mPoseCategory == PoseCategory::COCO
                     && (getNumberBodyParts(mPoseModel) > 70
                         || mPoseModel == PoseModel::COCO_23_17 || mPoseModel == PoseModel::COCO_25_17
-                        || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17))
+                        || mPoseModel == PoseModel::COCO_25_17E || mPoseModel == PoseModel::COCO_25B_17
+                        || mPoseModel == PoseModel::COCO_21_17))
                 {
                     maskFeet(maskMissTemp, metaData.jointsSelf.isVisible, metaData.jointsSelf.points, stride, 0.8f,
                              mPoseModel);
@@ -2499,7 +2504,7 @@ void OPDataTransformer<Dtype>::generateLabelMap(Dtype* transformedLabel, const c
 
         // For upper neck and top head --> mask out people bounding boxes, leave rest as mask = 1, neck/head value = 0
         if (mPoseCategory == PoseCategory::COCO && (mPoseModel == PoseModel::COCO_25B_23
-            || mPoseModel == PoseModel::COCO_25B_17 || getNumberBodyParts(mPoseModel) > 70))
+            || mPoseModel == PoseModel::COCO_25B_17 || mPoseModel == PoseModel::COCO_21_17 || getNumberBodyParts(mPoseModel) > 70))
         {
             // Mask people
             // Indexes: Real neck, top head, foot (for COCO_X_17), etc...

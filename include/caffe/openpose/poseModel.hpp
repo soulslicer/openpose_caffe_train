@@ -46,6 +46,10 @@ enum class PoseModel : unsigned short
     HAND_135_21,
     HAND_135_42,
     FACE_135_70,
+    // BODY
+    COCO_21_17,
+    MPII_21_16,
+    PT_21_15,
     Size,
 };
 enum class PoseCategory : unsigned short

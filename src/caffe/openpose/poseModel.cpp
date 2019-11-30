@@ -442,13 +442,35 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
     {22, "Tailpipe"},
     {23, "Background"},
 };
-
+const std::map<unsigned int, std::string> POSE_BODY_21_BODY_PARTS {
+    {0,  "Nose"},
+    {1,  "Neck"},
+    {2,  "RShoulder"},
+    {3,  "RElbow"},
+    {4,  "RWrist"},
+    {5,  "LShoulder"},
+    {6,  "LElbow"},
+    {7,  "LWrist"},
+    {8,  "LowerAbs"},
+    {9,  "RHip"},
+    {10, "RKnee"},
+    {11, "RAnkle"},
+    {12, "LHip"},
+    {13, "LKnee"},
+    {14, "LAnkle"},
+    {15, "REye"},
+    {16, "LEye"},
+    {17, "REar"},
+    {18, "LEar"},
+    {19, "RealNeck"},
+    {20, "Top"},
+};
 
 
 
 
     // Auxiliary functions
-    const auto NUMBER_MODELS = 15; // How many are the same
+    const auto NUMBER_MODELS = 16; // How many are the same
     int poseModelToIndex(const PoseModel poseModel)
     {
         const auto numberBodyParts = getNumberBodyParts(poseModel);
@@ -482,6 +504,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             return 13;
         else if (numberBodyParts == 135) // COCO + MPII + Foot + Hands + Face
             return 14;
+        else if (poseModel == PoseModel::COCO_21_17 || poseModel == PoseModel::MPII_21_16 || poseModel == PoseModel::PT_21_15)
+            return 15;
         // else
         throw std::runtime_error{"PoseModel does not have corresponding index yet."
                                  + getLine(__LINE__, __FUNCTION__, __FILE__)};
@@ -494,10 +518,10 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
     // Parameters and functions to change if new PoseModel
     const std::array<int, (int)PoseModel::Size> NUMBER_BODY_PARTS{
-        18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25,25, 95,95,95,95, 135,135,135,135,135,135};
+        18, 18, 19, 19, 59, 59, 59, 19, 19, 25, 25, 65, 12, 25, 25, 23, 23, 22, 19, 25,25,25,25, 95,95,95,95, 135,135,135,135,135,135, 21,21,21};
 
     const std::array<int, (int)PoseModel::Size> NUMBER_PARTS_LMDB{
-        17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16,15, 23,17,16,70,  23, 17, 16, 21, 42, 70};
+        17, 19, 17, 19, 59, 17, 59, 17, 17, 23, 17, 42, 14, 23, 17, 23, 17, 22, 17, 23,17,16,15, 23,17,16,70,  23, 17, 16, 21, 42, 70, 17,16,15};
 
     const std::array<std::vector<std::vector<int>>, (int)PoseModel::Size> LMDB_TO_OPENPOSE_KEYPOINTS{
         std::vector<std::vector<int>>{
@@ -692,6 +716,16 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
             {68},{69} // Pupils
         },
+
+        std::vector<std::vector<int>>{
+            {0},{5,6}, {6},{8},{10}, {5},{7},{9}, {11,12}, {12},{14},{16}, {11},{13},{15}, {2},{1},{4},{3}, {},{}   // COCO_21
+        },
+        std::vector<std::vector<int>>{
+            {}, {12,13}, {12},{11},{10}, {13},{14},{15}, {2,3}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {8},{9}         // MPII_21
+        },
+        std::vector<std::vector<int>>{
+            {13}, {8,9}, {8},{7},{6}, {9},{10},{11}, {2,3}, {2},{1},{0}, {3},{4},{5}, {},{},{},{}, {12},{14} // PT_21
+        },
     };
 
     // Idea: Keypoint that is empty will be masked out (including the PAFs that use it)
@@ -876,6 +910,17 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {48},{49},{50},{51},{52},{53},{54},{55},{56},{57},{58},{59},{60},{61},{62},{63},{64},{65},{66},{67}, // Mouth
             {68},{69} // Pupils
         },
+
+        // NOT SURE
+        std::vector<std::vector<int>>{                                                                              // COCO_21_17
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15},{16},{17},{18},{},{}
+        },
+        std::vector<std::vector<int>>{                                                                              // MPII_21_16
+            {},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{},{},{},{},{19},{20}
+        },
+        std::vector<std::vector<int>>{                                                                              // PT_25B_15
+            {0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{},{},{},{},{19},{20}
+        },
     };
 
     std::pair<PoseModel,PoseCategory> flagsToPoseModel(const std::string& poseModeString)
@@ -917,6 +962,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             return std::make_pair(PoseModel::COCO_135_17, PoseCategory::COCO);
         else if (poseModeString == "COCO_135_23")
             return std::make_pair(PoseModel::COCO_135_23, PoseCategory::COCO);
+        else if (poseModeString == "COCO_21_17")
+            return std::make_pair(PoseModel::COCO_21_17, PoseCategory::COCO);
         // Dome
         else if (poseModeString == "DOME_18")
             return std::make_pair(PoseModel::DOME_18, PoseCategory::DOME);
@@ -931,9 +978,13 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             return std::make_pair(PoseModel::MPII_95_16, PoseCategory::MPII);
         else if (poseModeString == "MPII_135_16")
             return std::make_pair(PoseModel::MPII_135_16, PoseCategory::MPII);
+        else if (poseModeString == "MPII_21_16")
+            return std::make_pair(PoseModel::MPII_21_16, PoseCategory::MPII);
         // PT
         else if (poseModeString == "PT_25B_15")
             return std::make_pair(PoseModel::PT_25B_15, PoseCategory::PT);
+        else if (poseModeString == "PT_21_15")
+            return std::make_pair(PoseModel::PT_21_15, PoseCategory::PT);
         // Hand
         else if (poseModeString == "MPII_59")
             return std::make_pair(PoseModel::MPII_59, PoseCategory::HAND);
@@ -1009,6 +1060,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
             {F135+48,F135+54},{F135+49,F135+53},{F135+50,F135+52},{F135+55,F135+59},{F135+56,F135+58},{F135+60,F135+64},{F135+61,F135+63},{F135+65,F135+67}, // Mouth
             {F135+68,F135+69} // Pupils
         },
+        // COCO_21, MPI_21, PT_21
+        std::vector<std::array<int,2>>{{5,2},{6,3},{7,4},{12,9},{13,10},{14,11},{16,15},{18,17}},
     };
 
     const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_A{
@@ -1097,6 +1150,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                F135+48,F135+54,F135+60,F135+61,F135+62,F135+63,F135+64,F135+65,F135+66, // Outer-Inner + Inner Mouth (+1)
                F135+36,F135+39,F135+42,F135+45, // Eyes-Pupils (+2)
         },
+        // 21 (COCO_21, MPII_21, PT_21)
+        std::vector<int>{1, 9, 10, 8,8, 12, 13, 1, 2, 3,  2, 1, 5, 6, 5,  1, 0,  0,  15, 16, 1, 19, 5, 2},
     };
 
     const std::array<std::vector<int>, NUMBER_MODELS> LABEL_MAP_B{
@@ -1185,6 +1240,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                F135+60,F135+64,F135+61,F135+62,F135+63,F135+64,F135+65,F135+66,F135+67, // Outer-Inner + Inner Mouth (+1)
                F135+68,F135+68,F135+69,F135+69, // Eyes-Pupils (+2)
         },
+        // 21 (COCO_21, MPII_21, PT_21)
+        std::vector<int>{8,10, 11, 9,12,13, 14, 2, 3, 4, 17, 5, 6, 7, 18, 0, 15, 16, 17, 18, 19, 20, 12, 9},
     };
 
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_A{
@@ -1196,6 +1253,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<int>{1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,   17,18,
                          0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5,5,   6,6
                         },
+        std::vector<int>{1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,      17,18,   17,18,
+                         0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,      5,5,   6,6
+                        },
     };
     const std::array<std::vector<int>, NUMBER_MODELS> TAF_MAP_B{
         std::vector<int>{},
@@ -1205,6 +1265,9 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
                         },
         std::vector<int>{0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,   15,19,15,  16,22,16,    5,5,   6,6,
                          1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,   19,20,21,  22,23,24,   17,18,   17,18
+                        },
+        std::vector<int>{0,0,1,2,   0,0,   5,6,   7, 8,    5, 6,   11,12,   13,14,     5,5,   6,6,
+                         1,2,3,4,   5,6,   7,8,   9,10,   11,12,   13,14,   15,16,     17,18,   17,18
                         },
     };
 
@@ -1224,6 +1287,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         POSE_BODY_25B_BODY_PARTS, // 25B (COCO_25B_23, COCO_25B_17, MPII_25B_16)
         POSE_BODY_95_BODY_PARTS, // 95 (COCO_95_23, COCO_95_17, MPII_95_16, FACE_95_70)
         POSE_BODY_135_BODY_PARTS, // 135 (COCO_135_23, COCO_135_17, MPII_135_16, HAND_135_70, FACE_135_70)
+        POSE_BODY_21_BODY_PARTS,
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_AVERAGE{
@@ -1301,6 +1365,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
         // COCO + MPII + Foot + Hands + Face
         std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
+        // 21
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
     };
 
     const std::array<std::vector<float>, (int)PoseModel::Size> DISTANCE_SIGMA{
@@ -1379,6 +1445,8 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
         std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
         // COCO + MPII + Foot + Hands + Face
         std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
+        // 21
+        std::vector<float>{},        std::vector<float>{},        std::vector<float>{},
     };
 
 
@@ -1483,7 +1551,7 @@ const std::map<unsigned int, std::string> CAR_22_PARTS {
 
         auto missingBodyParts = missingBodyPartsBase;
         // If masking also non visible points
-        if (isVisible.empty() && (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_25B_23))
+        if (isVisible.empty() && (poseModel == PoseModel::COCO_25B_17 || poseModel == PoseModel::COCO_25B_23 || poseModel == PoseModel::COCO_21_17))
             throw std::runtime_error{"Field isVisible cannot be empty" + getLine(__LINE__, __FUNCTION__, __FILE__)};
         if (!isVisible.empty())
         {
